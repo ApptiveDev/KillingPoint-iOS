@@ -1,5 +1,0 @@
-@import "tailwindcss/preflight.css" layer(base);
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css";
-
-@import "nativewind/theme";
