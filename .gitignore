@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Xcode build artifacts
+build/
+DerivedData/
+
+# Xcode user-specific files
+*.xcworkspace/xcuserdata/
+*.xcuserdatad
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# Coverage / profiling
+*.profdata
+*.xccovreport
+*.xccovarchive
