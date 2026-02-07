@@ -19,7 +19,7 @@ struct PrimaryButton: View {
             .foregroundStyle(.black)
             .frame(maxWidth: .infinity)
             .padding(.vertical, AppSpacing.m)
-            .background(Color("Primary"))
+            .background(Color("kpPrimary"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .disabled(isLoading)
