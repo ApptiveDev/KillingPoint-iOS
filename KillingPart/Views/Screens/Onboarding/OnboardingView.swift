@@ -11,9 +11,9 @@ struct OnboardingView: View {
                 .font(AppFont.title())
 
             VStack(alignment: .leading, spacing: AppSpacing.m) {
-                Text("핵심 기능을 빠르게 시작할 수 있도록 기본 온보딩 화면을 구성해두었습니다.")
+                Text("핵심 기능을 빠르게 22시작할 수 있도록 기본 온보딩 화면을 구성해두었습니다.")
                     .font(AppFont.body())
-                Text("프로젝트 요구사항에 맞춰 단계별 안내 문구와 이미지를 추가하면 됩니다.")
+                Text("프로젝트 요구사항에 맞춰 단계별 안내 문구와 이미지를 추가하면 됩니다22.2")
                     .font(AppFont.body())
                     .foregroundStyle(.secondary)
             }
@@ -27,4 +27,9 @@ struct OnboardingView: View {
         .padding(AppSpacing.l)
         .background(AppColors.primary100.ignoresSafeArea())
     }
+}
+
+
+#Preview {
+    OnboardingView{}
 }

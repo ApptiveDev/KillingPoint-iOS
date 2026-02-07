@@ -1,42 +1,127 @@
 import SwiftUI
+import AVFoundation
+import UIKit
 
 struct SplashView: View {
     let onFinished: () -> Void
 
+    @StateObject private var splashVideoPlayer = SplashVideoPlayer()
     @State private var isReadyToNavigate = false
+    @State private var navigationTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
+            if splashVideoPlayer.isConfigured {
+                SplashVideoPlayerView(player: splashVideoPlayer.player)
+                    .ignoresSafeArea()
+            } else {
+                LinearGradient(
+                    colors: [Color.black, AppColors.primary300.opacity(0.65)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            }
+
             LinearGradient(
-                colors: [Color.black, AppColors.primary300.opacity(0.65)],
+                colors: [Color.black.opacity(0.08), Color.black.opacity(0.35)],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-
-            VStack(spacing: AppSpacing.l) {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.black.opacity(0.4))
-                    .overlay {
-                        Text("Splash Video Placeholder")
-                            .font(AppFont.body())
-                            .foregroundStyle(.white)
-                    }
-                    .frame(height: 220)
-
-                Text("KillingPart")
-                    .font(AppFont.title())
-                    .foregroundStyle(.white)
-            }
-            .padding(AppSpacing.l)
         }
         .onAppear {
             guard !isReadyToNavigate else { return }
             isReadyToNavigate = true
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            navigationTask?.cancel()
+            navigationTask = Task { @MainActor in
+                let fallbackDuration: TimeInterval = 1.8
+
+                if splashVideoPlayer.isConfigured {
+                    splashVideoPlayer.playFromStart()
+                    let duration = await splashVideoPlayer.loadPlaybackDuration()
+                    try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+                } else {
+                    try? await Task.sleep(nanoseconds: UInt64(fallbackDuration * 1_000_000_000))
+                }
+
+                guard !Task.isCancelled else { return }
                 onFinished()
             }
         }
+        .onDisappear {
+            navigationTask?.cancel()
+            navigationTask = nil
+            splashVideoPlayer.pause()
+        }
+    }
+}
+
+@MainActor
+private final class SplashVideoPlayer: ObservableObject {
+    let player = AVPlayer()
+    let isConfigured: Bool
+    private let fallbackDuration: TimeInterval = 1.8
+
+    init() {
+        guard let videoURL = Bundle.main.url(forResource: "sc 9-16", withExtension: "mp4") else {
+            isConfigured = false
+            return
+        }
+
+        let item = AVPlayerItem(url: videoURL)
+        player.replaceCurrentItem(with: item)
+        player.isMuted = true
+        player.actionAtItemEnd = .pause
+
+        isConfigured = true
+    }
+
+    func loadPlaybackDuration() async -> TimeInterval {
+        guard isConfigured, let asset = player.currentItem?.asset else {
+            return fallbackDuration
+        }
+
+        do {
+            let duration = try await asset.load(.duration)
+            let seconds = duration.seconds
+            return seconds.isFinite && seconds > 0 ? seconds : fallbackDuration
+        } catch {
+            return fallbackDuration
+        }
+    }
+
+    func playFromStart() {
+        guard isConfigured else { return }
+        player.seek(to: .zero)
+        player.play()
+    }
+
+    func pause() {
+        player.pause()
+    }
+}
+
+private struct SplashVideoPlayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> SplashPlayerUIView {
+        let view = SplashPlayerUIView()
+        view.playerLayer.videoGravity = .resizeAspectFill
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateUIView(_ uiView: SplashPlayerUIView, context: Context) {
+        uiView.playerLayer.player = player
+    }
+}
+
+private final class SplashPlayerUIView: UIView {
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+
+    var playerLayer: AVPlayerLayer {
+        layer as! AVPlayerLayer
     }
 }
