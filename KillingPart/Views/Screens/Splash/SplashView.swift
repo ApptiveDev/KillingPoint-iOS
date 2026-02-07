@@ -7,6 +7,7 @@ struct SplashView: View {
 
     @StateObject private var splashVideoPlayer = SplashVideoPlayer()
     @State private var isReadyToNavigate = false
+    @State private var navigationTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -33,18 +34,25 @@ struct SplashView: View {
             guard !isReadyToNavigate else { return }
             isReadyToNavigate = true
 
-            if splashVideoPlayer.isConfigured {
-                splashVideoPlayer.playFromStart()
-                DispatchQueue.main.asyncAfter(deadline: .now() + splashVideoPlayer.playbackDuration) {
-                    onFinished()
+            navigationTask?.cancel()
+            navigationTask = Task { @MainActor in
+                let fallbackDuration: TimeInterval = 1.8
+
+                if splashVideoPlayer.isConfigured {
+                    splashVideoPlayer.playFromStart()
+                    let duration = await splashVideoPlayer.loadPlaybackDuration()
+                    try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+                } else {
+                    try? await Task.sleep(nanoseconds: UInt64(fallbackDuration * 1_000_000_000))
                 }
-            } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                    onFinished()
-                }
+
+                guard !Task.isCancelled else { return }
+                onFinished()
             }
         }
         .onDisappear {
+            navigationTask?.cancel()
+            navigationTask = nil
             splashVideoPlayer.pause()
         }
     }
@@ -54,12 +62,11 @@ struct SplashView: View {
 private final class SplashVideoPlayer: ObservableObject {
     let player = AVPlayer()
     let isConfigured: Bool
-    let playbackDuration: TimeInterval
+    private let fallbackDuration: TimeInterval = 1.8
 
     init() {
         guard let videoURL = Bundle.main.url(forResource: "sc 9-16", withExtension: "mp4") else {
             isConfigured = false
-            playbackDuration = 1.8
             return
         }
 
@@ -69,8 +76,20 @@ private final class SplashVideoPlayer: ObservableObject {
         player.actionAtItemEnd = .pause
 
         isConfigured = true
-        let duration = item.asset.duration.seconds
-        playbackDuration = duration.isFinite && duration > 0 ? duration : 1.8
+    }
+
+    func loadPlaybackDuration() async -> TimeInterval {
+        guard isConfigured, let asset = player.currentItem?.asset else {
+            return fallbackDuration
+        }
+
+        do {
+            let duration = try await asset.load(.duration)
+            let seconds = duration.seconds
+            return seconds.isFinite && seconds > 0 ? seconds : fallbackDuration
+        } catch {
+            return fallbackDuration
+        }
     }
 
     func playFromStart() {
