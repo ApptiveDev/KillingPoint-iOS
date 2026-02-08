@@ -11,7 +11,7 @@ struct LoginView: View {
             Spacer()
 
             Text("로그인")
-                .font(AppFont.title())
+                .font(AppFont.paperlogy7Bold(size: 28))
 
             VStack(spacing: AppSpacing.m) {
                 TextField("Email", text: $email)

@@ -14,7 +14,7 @@ struct PrimaryButton: View {
                 }
 
                 Text(title)
-                    .font(AppFont.button())
+                    .font(AppFont.paperlogy6SemiBold(size: 16))
             }
             .foregroundStyle(.black)
             .frame(maxWidth: .infinity)

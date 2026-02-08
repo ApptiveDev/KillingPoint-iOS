@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Paperlogy-1Thin.ttf</string>
+		<string>Paperlogy-2ExtraLight.ttf</string>
+		<string>Paperlogy-3Light.ttf</string>
+		<string>Paperlogy-4Regular.ttf</string>
+		<string>Paperlogy-5Medium.ttf</string>
+		<string>Paperlogy-6SemiBold.ttf</string>
+		<string>Paperlogy-7Bold.ttf</string>
+		<string>Paperlogy-8ExtraBold.ttf</string>
+		<string>Paperlogy-9Black.ttf</string>
+	</array>
+</dict>
+</plist>
