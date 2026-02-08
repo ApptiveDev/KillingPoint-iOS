@@ -63,7 +63,7 @@ struct OnboardingContainerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.2), value: currentPage)
+        .animation(.easeInOut(duration: 0.3), value: currentPage)
         .background(Color.black.ignoresSafeArea())
     }
 
