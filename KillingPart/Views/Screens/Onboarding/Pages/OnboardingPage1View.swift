@@ -4,8 +4,7 @@ struct OnboardingPage1View: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.l) {
             Text("Tip. 좋아하는 곡을 선택하면 핵심 파트를 자동으로 추천해드려요.")
-                .font(AppFont.body())
-                .foregroundStyle(.secondary)
+                .font(AppFont.paperlogy5Medium(size: 30))
 
             Spacer(minLength: AppSpacing.m)
 
@@ -35,3 +34,9 @@ struct OnboardingPage1View: View {
         .padding(.bottom, AppSpacing.m)
     }
 }
+
+
+#Preview {
+    OnboardingPage1View()
+}
+

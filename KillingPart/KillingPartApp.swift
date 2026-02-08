@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct KillingPartApp: App {
+    init() {
+        AppFont.registerPaperlogyFonts()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootFlowView()

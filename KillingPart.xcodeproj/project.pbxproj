@@ -29,9 +29,22 @@
 		1231F1372F372E5D00CFA51D /* KillingPartUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KillingPartUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		12B0C1402F38723500D9EE4B /* Exceptions for "KillingPart" folder in "KillingPart" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1231F11C2F372E5B00CFA51D /* KillingPart */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1231F11F2F372E5B00CFA51D /* KillingPart */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				12B0C1402F38723500D9EE4B /* Exceptions for "KillingPart" folder in "KillingPart" target */,
+			);
 			path = KillingPart;
 			sourceTree = "<group>";
 		};
@@ -397,6 +410,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KillingPart/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "킬링파트";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -438,6 +452,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KillingPart/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "킬링파트";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

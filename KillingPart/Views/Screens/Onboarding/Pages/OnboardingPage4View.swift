@@ -4,7 +4,7 @@ struct OnboardingPage4View: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.l) {
             Text("Tip. 오늘 연습한 기록을 확인하면서 꾸준한 루틴을 만들어보세요.")
-                .font(AppFont.body())
+                .font(AppFont.paperlogy4Regular(size: 16))
                 .foregroundStyle(.secondary)
 
             Spacer(minLength: AppSpacing.m)

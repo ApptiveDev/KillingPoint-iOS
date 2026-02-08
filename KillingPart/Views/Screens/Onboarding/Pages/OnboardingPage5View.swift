@@ -4,7 +4,7 @@ struct OnboardingPage5View: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.l) {
             Text("Tip. 자주 듣는 파트를 모아 나만의 플레이리스트로 빠르게 접근해보세요.")
-                .font(AppFont.body())
+                .font(AppFont.paperlogy4Regular(size: 16))
                 .foregroundStyle(.secondary)
 
             Spacer(minLength: AppSpacing.m)
