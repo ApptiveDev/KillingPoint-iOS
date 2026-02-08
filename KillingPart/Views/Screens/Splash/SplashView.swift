@@ -1,6 +1,11 @@
 import SwiftUI
 import AVFoundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct SplashView: View {
     let onFinished: () -> Void
@@ -103,6 +108,7 @@ private final class SplashVideoPlayer: ObservableObject {
     }
 }
 
+#if canImport(UIKit)
 private struct SplashVideoPlayerView: UIViewRepresentable {
     let player: AVPlayer
 
@@ -125,3 +131,34 @@ private final class SplashPlayerUIView: UIView {
         layer as! AVPlayerLayer
     }
 }
+#elseif canImport(AppKit)
+private struct SplashVideoPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> SplashPlayerNSView {
+        let view = SplashPlayerNSView()
+        view.playerLayer.videoGravity = .resizeAspectFill
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateNSView(_ nsView: SplashPlayerNSView, context: Context) {
+        nsView.playerLayer.player = player
+    }
+}
+
+private final class SplashPlayerNSView: NSView {
+    override func makeBackingLayer() -> CALayer {
+        AVPlayerLayer()
+    }
+
+    var playerLayer: AVPlayerLayer {
+        layer as! AVPlayerLayer
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        wantsLayer = true
+    }
+}
+#endif
