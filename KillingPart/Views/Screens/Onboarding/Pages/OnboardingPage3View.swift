@@ -9,19 +9,7 @@ struct OnboardingPage3View: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
-            
-
-            Image("onboarding_3")
-                .resizable()
-                .scaledToFill() // ⭐ 꽉 채우고 남는 부분은 잘림
-                .frame(height: 600)
-                .frame(maxWidth: .infinity)
-                .aspectRatio(9/16, contentMode: .fit) // ⭐ 컨테이너 비율 9:16 고정
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.kpPrimary, lineWidth: 1)
-                )
+            OnboardingImageCardView(imageName: "onboarding_3")
 
             Spacer(minLength: 0)
         }

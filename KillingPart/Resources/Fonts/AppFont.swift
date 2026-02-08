@@ -2,6 +2,7 @@ import SwiftUI
 import CoreText
 
 enum AppFont {
+    private static var hasRegisteredPaperlogyFonts = false
     private static let paperlogyFontNames = [
         "Paperlogy-1Thin",
         "Paperlogy-2ExtraLight",
@@ -15,6 +16,9 @@ enum AppFont {
     ]
 
     static func registerPaperlogyFonts() {
+        guard !hasRegisteredPaperlogyFonts else { return }
+        hasRegisteredPaperlogyFonts = true
+
         for fontName in paperlogyFontNames {
             guard let fontURL = Bundle.main.url(forResource: fontName, withExtension: "ttf") else {
                 continue

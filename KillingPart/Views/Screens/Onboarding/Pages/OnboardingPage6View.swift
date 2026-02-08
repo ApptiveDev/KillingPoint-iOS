@@ -6,8 +6,9 @@ struct OnboardingPage6View: View {
             Spacer()
 
             Text("이제 첫번째 **킬링파트**를 기록할 시간이예요!")
-                .font(.system(size: 30, weight: .regular, design: .rounded))
+                .font(AppFont.paperlogy7Bold(size: 30))
                 .multilineTextAlignment(.center)
+                .foregroundStyle(Color.white)
                 .padding(.horizontal, AppSpacing.l)
 
             Spacer()

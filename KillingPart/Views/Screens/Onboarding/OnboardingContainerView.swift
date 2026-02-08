@@ -5,6 +5,7 @@ struct OnboardingContainerView: View {
 
     @State private var currentPage = 0
     private let lastPageIndex = 5
+    private var shouldShowSwipeHint: Bool { currentPage < lastPageIndex }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,6 +41,18 @@ struct OnboardingContainerView: View {
                     .tag(5)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                if shouldShowSwipeHint {
+                    HStack {
+                        swipeHintArrow(systemName: "chevron.left")
+                        Spacer()
+                        swipeHintArrow(systemName: "chevron.right")
+                    }
+                    .padding(.horizontal, AppSpacing.s)
+                    .allowsHitTesting(false)
+                }
+            }
 
             if currentPage == lastPageIndex {
                 PrimaryButton(title: "지금 시작하기") {
@@ -49,8 +62,18 @@ struct OnboardingContainerView: View {
                 .padding(.bottom, AppSpacing.l)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.2), value: currentPage)
         .background(Color.black.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private func swipeHintArrow(systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 18, weight: .bold))
+            .foregroundStyle(.white.opacity(0.95))
+            .padding(10)
+            .background(Color.black.opacity(0.38), in: Circle())
     }
 }
 
