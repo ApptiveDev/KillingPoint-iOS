@@ -9,23 +9,11 @@ struct OnboardingPage2View: View {
 
             Spacer(minLength: AppSpacing.m)
 
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(AppColors.primary300, lineWidth: 1)
-                )
-                .overlay(
-                    VStack(spacing: AppSpacing.s) {
-                        Image(systemName: "repeat")
-                            .font(.system(size: 44, weight: .semibold))
-                        Text("앱 화면 2")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .foregroundStyle(AppColors.primary600)
-                )
-                .aspectRatio(9 / 16, contentMode: .fit)
+            Image("onboarding_2")
+                .resizable()
+                .scaledToFit()
                 .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
 
             Spacer(minLength: 0)
