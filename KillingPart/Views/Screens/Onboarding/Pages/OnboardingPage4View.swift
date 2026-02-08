@@ -2,19 +2,26 @@ import SwiftUI
 
 struct OnboardingPage4View: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.l) {
-            Text("Tip. 오늘 연습한 기록을 확인하면서 꾸준한 루틴을 만들어보세요.")
-                .font(AppFont.paperlogy4Regular(size: 16))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .center, spacing: AppSpacing.l) {
+            Text("내 프로필 뿐만 아니라 캘린더에도 저장해놨어요.\n 킬링파트를 모아 나만의 캘린더를 완성해보세요.")
+                .font(AppFont.paperlogy6SemiBold(size: 16))
+                .foregroundStyle(Color.white)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
 
-            Spacer(minLength: AppSpacing.m)
+            
 
             Image("onboarding_4")
                 .resizable()
-                .scaledToFit()
+                .scaledToFill() // ⭐ 꽉 채우고 남는 부분은 잘림
+                .frame(height: 600)
                 .frame(maxWidth: .infinity)
+                .aspectRatio(9/16, contentMode: .fit) // ⭐ 컨테이너 비율 9:16 고정
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.kpPrimary, lineWidth: 1)
+                )
 
             Spacer(minLength: 0)
         }

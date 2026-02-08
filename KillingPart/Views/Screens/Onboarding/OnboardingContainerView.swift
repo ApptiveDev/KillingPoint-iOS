@@ -11,7 +11,8 @@ struct OnboardingContainerView: View {
             if currentPage < lastPageIndex {
                 ZStack {
                     Text("KILLING TIPS!")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(AppFont.paperlogy7Bold(size: 24))
+                        .foregroundStyle(Color.kpPrimary)
                         .tracking(0.5)
 
                     HStack {
@@ -49,7 +50,7 @@ struct OnboardingContainerView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: currentPage)
-        .background(AppColors.primary100.ignoresSafeArea())
+        .background(Color.black.ignoresSafeArea())
     }
 }
 

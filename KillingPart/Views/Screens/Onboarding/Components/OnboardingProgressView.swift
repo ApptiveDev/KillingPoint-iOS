@@ -5,7 +5,12 @@ struct OnboardingProgressView: View {
 
     var body: some View {
         Text("\(currentPage) / 5")
-            .font(.system(size: 28, weight: .bold, design: .rounded))
-            .foregroundStyle(.primary)
+            .font(AppFont.paperlogy8ExtraBold(size: 16))
+            .padding(16)
+            .background(
+                   RoundedRectangle(cornerRadius: 14, style: .continuous)
+                       .fill(Color.kpGray600)
+               )
+            .foregroundStyle(Color.kpGray300)
     }
 }

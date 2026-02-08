@@ -2,19 +2,26 @@ import SwiftUI
 
 struct OnboardingPage5View: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.l) {
-            Text("Tip. 자주 듣는 파트를 모아 나만의 플레이리스트로 빠르게 접근해보세요.")
-                .font(AppFont.paperlogy4Regular(size: 16))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .center, spacing: AppSpacing.l) {
+            Text("그날의 감정이 담긴 코멘트를 읽으며\n 킬링파트를 더 깊이 있게 감상할 수 있어요")
+                .font(AppFont.paperlogy6SemiBold(size: 16))
+                .foregroundStyle(Color.white)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
 
-            Spacer(minLength: AppSpacing.m)
+            
 
             Image("onboarding_5")
                 .resizable()
-                .scaledToFit()
+                .scaledToFill() // ⭐ 꽉 채우고 남는 부분은 잘림
+                .frame(height: 600)
                 .frame(maxWidth: .infinity)
+                .aspectRatio(9/16, contentMode: .fit) // ⭐ 컨테이너 비율 9:16 고정
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.kpPrimary, lineWidth: 1)
+                )
 
             Spacer(minLength: 0)
         }
