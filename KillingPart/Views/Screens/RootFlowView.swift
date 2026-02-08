@@ -9,7 +9,7 @@ struct RootFlowView: View {
             case .splash:
                 SplashView(onFinished: viewModel.completeSplash)
             case .onboarding:
-                OnboardingView(onContinue: viewModel.completeOnboarding)
+                OnboardingContainerView(onContinue: viewModel.completeOnboarding)
             case .login:
                 LoginView(viewModel: viewModel)
             case .main:
