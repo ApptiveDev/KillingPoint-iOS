@@ -1,10 +1,7 @@
 import SwiftUI
 
 struct LoginView: View {
-    @ObservedObject var viewModel: AppFlowViewModel
-
-    @State private var email = ""
-    @State private var password = ""
+    @ObservedObject var viewModel: LoginViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.l) {
@@ -13,20 +10,9 @@ struct LoginView: View {
             Text("로그인")
                 .font(AppFont.paperlogy7Bold(size: 28))
 
-            VStack(spacing: AppSpacing.m) {
-                TextField("Email", text: $email)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.emailAddress)
-                    .padding(AppSpacing.m)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                SecureField("Password", text: $password)
-                    .padding(AppSpacing.m)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
+            Text("카카오 계정으로 간편하게 시작하세요.")
+                .font(AppFont.paperlogy4Regular(size: 16))
+                .foregroundStyle(.secondary)
 
             if let message = viewModel.loginErrorMessage {
                 Text(message)
@@ -34,13 +20,33 @@ struct LoginView: View {
                     .foregroundStyle(.red)
             }
 
-            PrimaryButton(title: "로그인", isLoading: viewModel.isLoading) {
-                viewModel.login(email: email, password: password)
+            Button {
+                viewModel.loginWithKakao()
+            } label: {
+                HStack(spacing: AppSpacing.s) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .tint(.black)
+                    }
+
+                    Text("카카오로 로그인")
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
+                }
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, AppSpacing.m)
+                .background(Color(hex: "#FEE500"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
             }
+            .disabled(viewModel.isLoading)
 
             Spacer()
         }
         .padding(AppSpacing.l)
         .background(AppColors.primary200.ignoresSafeArea())
     }
+}
+
+#Preview {
+    LoginView(viewModel: LoginViewModel())
 }

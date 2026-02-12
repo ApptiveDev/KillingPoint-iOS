@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RootFlowView: View {
-    @StateObject private var viewModel = AppFlowViewModel()
+    @StateObject private var viewModel = AppViewModel()
 
     var body: some View {
         Group {
@@ -11,7 +11,7 @@ struct RootFlowView: View {
             case .onboarding:
                 OnboardingContainerView(onContinue: viewModel.completeOnboarding)
             case .login:
-                LoginView(viewModel: viewModel)
+                LoginView(viewModel: viewModel.loginViewModel)
             case .main:
                 MainTabView(onLogout: viewModel.logout)
             }
