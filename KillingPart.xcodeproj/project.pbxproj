@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		12CE25AA2F3DC9BE0057A858 /* Development.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25A92F3DC9BE0057A858 /* Development.xcconfig */; };
+		12CE25AC2F3DCA940057A858 /* Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25AB2F3DCA940057A858 /* Release.xcconfig */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1231F12E2F372E5D00CFA51D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +32,8 @@
 		1231F11D2F372E5B00CFA51D /* KillingPart.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KillingPart.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1231F12D2F372E5D00CFA51D /* KillingPartTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KillingPartTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1231F1372F372E5D00CFA51D /* KillingPartUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KillingPartUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		12CE25A92F3DC9BE0057A858 /* Development.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Development.xcconfig; sourceTree = "<group>"; };
+		12CE25AB2F3DCA940057A858 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +95,8 @@
 		1231F1142F372E5B00CFA51D = {
 			isa = PBXGroup;
 			children = (
+				12CE25AB2F3DCA940057A858 /* Release.xcconfig */,
+				12CE25A92F3DC9BE0057A858 /* Development.xcconfig */,
 				1231F11F2F372E5B00CFA51D /* KillingPart */,
 				1231F1302F372E5D00CFA51D /* KillingPartTests */,
 				1231F13A2F372E5D00CFA51D /* KillingPartUITests */,
@@ -225,6 +234,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				12CE25AA2F3DC9BE0057A858 /* Development.xcconfig in Resources */,
+				12CE25AC2F3DCA940057A858 /* Release.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,6 +295,7 @@
 /* Begin XCBuildConfiguration section */
 		1231F13F2F372E5D00CFA51D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 12CE25A92F3DC9BE0057A858 /* Development.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -348,6 +360,7 @@
 		};
 		1231F1402F372E5D00CFA51D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 12CE25AB2F3DCA940057A858 /* Release.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

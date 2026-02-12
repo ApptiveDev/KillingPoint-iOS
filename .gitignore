@@ -12,6 +12,7 @@ DerivedData/
 *.xccheckout
 *.xcscmblueprint
 *.moved-aside
+*.xcconfig
 
 # Swift Package Manager
 .build/
