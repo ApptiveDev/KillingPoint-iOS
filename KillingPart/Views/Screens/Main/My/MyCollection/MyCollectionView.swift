@@ -4,7 +4,8 @@ struct MyCollectionView: View {
     let onSessionEnded: () -> Void
 
     @StateObject private var viewModel: MyCollectionViewModel
-    @State private var isWithdrawAlertPresented = false
+    @State private var screenMode: MyCollectionScreenMode = .collectionList
+    @State private var isAccountActionDialogPresented = false
 
     init(
         onSessionEnded: @escaping () -> Void,
@@ -17,8 +18,30 @@ struct MyCollectionView: View {
     }
 
     var body: some View {
+        Group {
+            switch screenMode {
+            case .collectionList:
+                collectionListSection
+            case .profileSettings:
+                profileSettingsSection
+            }
+        }
+        .confirmationDialog("계정", isPresented: $isAccountActionDialogPresented, titleVisibility: .visible) {
+            Button("로그아웃", role: .destructive) {
+                viewModel.logout(onSuccess: onSessionEnded)
+            }
+            Button("회원탈퇴", role: .destructive) {
+                viewModel.deleteMyAccount(onSuccess: onSessionEnded)
+            }
+            Button("취소", role: .cancel) {}
+        }
+    }
+
+    private var collectionListSection: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.m) {
+                profileCard
+
                 Text("내 컬렉션")
                     .font(AppFont.paperlogy7Bold(size: 24))
                     .foregroundStyle(.white)
@@ -49,23 +72,117 @@ struct MyCollectionView: View {
                         }
                 }
 
-                actionSection
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.red.opacity(0.95))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
-        .alert("회원 탈퇴", isPresented: $isWithdrawAlertPresented) {
-            Button("탈퇴", role: .destructive) {
-                viewModel.deleteMyAccount(onSuccess: onSessionEnded)
+    }
+
+    private var profileCard: some View {
+        HStack(spacing: AppSpacing.m) {
+            Circle()
+                .fill(Color.white.opacity(0.12))
+                .frame(width: 56, height: 56)
+                .overlay {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text("킬링파트 사용자")
+                    .font(AppFont.paperlogy6SemiBold(size: 16))
+                    .foregroundStyle(.white)
+
+                Text("@killingpart_user")
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(.white.opacity(0.7))
             }
-            Button("취소", role: .cancel) {}
-        } message: {
-            Text("정말 회원 탈퇴하시겠어요? 이 작업은 되돌릴 수 없습니다.")
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    screenMode = .profileSettings
+                }
+            } label: {
+                Text("프로필 설정")
+                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .foregroundStyle(.white)
+                    .padding(.vertical, AppSpacing.xs)
+                    .padding(.horizontal, AppSpacing.s)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(AppSpacing.m)
+        .background(Color.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         }
     }
 
-    private var actionSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.s) {
+    private var profileSettingsSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.m) {
+            HStack {
+                Text("프로필 설정")
+                    .font(AppFont.paperlogy7Bold(size: 24))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        screenMode = .collectionList
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("뒤로가기")
+                            .font(AppFont.paperlogy5Medium(size: 13))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.vertical, AppSpacing.xs)
+                    .padding(.horizontal, AppSpacing.s)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(spacing: AppSpacing.m) {
+                Circle()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(width: 92, height: 92)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 34))
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+
+                VStack(alignment: .leading, spacing: AppSpacing.s) {
+                    profileInfoRow(title: "이름", value: "킬링파트 사용자")
+                    profileInfoRow(title: "아이디", value: "@killingpart_user")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(AppSpacing.m)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
+
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
                     .font(AppFont.paperlogy4Regular(size: 13))
@@ -73,48 +190,43 @@ struct MyCollectionView: View {
             }
 
             Button {
-                viewModel.logout(onSuccess: onSessionEnded)
+                guard !viewModel.isProcessing else { return }
+                isAccountActionDialogPresented = true
             } label: {
-                HStack(spacing: AppSpacing.s) {
-                    if viewModel.isProcessing {
-                        ProgressView()
-                            .tint(.white)
-                    }
-
-                    Text("로그아웃")
-                        .font(AppFont.paperlogy6SemiBold(size: 16))
-                        .foregroundStyle(.white)
-                }
+                Text("로그아웃/회원탈퇴")
+                    .font(AppFont.paperlogy5Medium(size: 15))
+                    .underline()
+                    .foregroundStyle(.white.opacity(0.9))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, AppSpacing.m)
-                .background(Color.white.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(AppColors.primary600.opacity(0.65), lineWidth: 1)
-                }
             }
             .disabled(viewModel.isProcessing)
+            .padding(.top, AppSpacing.s)
 
-            Button(role: .destructive) {
-                isWithdrawAlertPresented = true
-            } label: {
-                Text("회원 탈퇴")
-                    .font(AppFont.paperlogy6SemiBold(size: 15))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, AppSpacing.m)
-                    .background(Color.red.opacity(0.22))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.red.opacity(0.5), lineWidth: 1)
-                    }
-            }
-            .disabled(viewModel.isProcessing)
+            Spacer()
         }
-        .padding(.top, AppSpacing.s)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.bottom, AppSpacing.l)
     }
+
+    @ViewBuilder
+    private func profileInfoRow(title: String, value: String) -> some View {
+        HStack(spacing: AppSpacing.s) {
+            Text(title)
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white.opacity(0.72))
+                .frame(width: 48, alignment: .leading)
+
+            Text(value)
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white)
+        }
+        .padding(.vertical, AppSpacing.xs)
+    }
+}
+
+private enum MyCollectionScreenMode {
+    case collectionList
+    case profileSettings
 }
 
 @MainActor
