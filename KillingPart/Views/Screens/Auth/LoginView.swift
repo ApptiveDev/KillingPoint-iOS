@@ -1,46 +1,62 @@
 import SwiftUI
 
 struct LoginView: View {
-    @ObservedObject var viewModel: AppFlowViewModel
-
-    @State private var email = ""
-    @State private var password = ""
+    @ObservedObject var viewModel: LoginViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.l) {
-            Spacer()
+        GeometryReader { geometry in
+            let logoWidth = min(max(geometry.size.width * 0.75, 220), 560)
+            let horizontalPadding = max(AppSpacing.m, geometry.size.width * 0.06)
+            let topPadding = geometry.safeAreaInsets.top + AppSpacing.l
+            let bottomPadding = geometry.safeAreaInsets.bottom + AppSpacing.l
 
-            Text("로그인")
-                .font(AppFont.paperlogy7Bold(size: 28))
+            ZStack {
+                LoginBackgroundVideoView()
+                    .ignoresSafeArea()
 
-            VStack(spacing: AppSpacing.m) {
-                TextField("Email", text: $email)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.emailAddress)
-                    .padding(AppSpacing.m)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                LinearGradient(
+                    colors: [Color.black.opacity(0.15), Color.black.opacity(0.72)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
-                SecureField("Password", text: $password)
-                    .padding(AppSpacing.m)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 0) {
+                    Image("loginTitle")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: logoWidth)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .padding(.top, topPadding)
+                        .padding(.horizontal, horizontalPadding)
+
+                    Spacer(minLength: AppSpacing.l)
+
+                    VStack(spacing: AppSpacing.m) {
+                        Text("SNS로 간편로그인")
+                            .font(AppFont.paperlogy5Medium(size: 15))
+                            .foregroundStyle(Color.kpGray300)
+
+                        if let message = viewModel.loginErrorMessage {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(Color.red.opacity(0.95))
+                        }
+
+                        KakaoLoginButton(
+                            isLoading: viewModel.isLoading,
+                            action: viewModel.loginWithKakao
+                        )
+                    }
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.bottom, bottomPadding)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-
-            if let message = viewModel.loginErrorMessage {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-
-            PrimaryButton(title: "로그인", isLoading: viewModel.isLoading) {
-                viewModel.login(email: email, password: password)
-            }
-
-            Spacer()
         }
-        .padding(AppSpacing.l)
-        .background(AppColors.primary200.ignoresSafeArea())
     }
+}
+
+#Preview {
+    LoginView(viewModel: LoginViewModel())
 }
