@@ -10,7 +10,7 @@ struct MyTabView: View {
                 topToggleTabs
 
                 TabView(selection: $selectedTab) {
-                    MyCollectionView()
+                    MyCollectionView(onSessionEnded: onLogout)
                         .tag(MyTopTab.myCollection)
 
                     PlayKillingPartView()
@@ -26,12 +26,6 @@ struct MyTabView: View {
             .padding(.top, AppSpacing.m)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .navigationTitle("마이")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("로그아웃", action: onLogout)
-                        .font(AppFont.paperlogy5Medium(size: 14))
-                }
-            }
         }
     }
 
