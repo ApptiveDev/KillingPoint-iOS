@@ -3,6 +3,8 @@ import Foundation
 protocol AuthenticationServicing {
     func login(email: String, password: String) async -> Bool
     func loginWithKakao(accessToken: String) async throws -> KakaoSocialLoginResponse
+    func logout() async throws
+    func deleteMyAccount() async throws
 }
 
 enum AuthenticationServiceError: LocalizedError {
@@ -11,6 +13,8 @@ enum AuthenticationServiceError: LocalizedError {
     case serverError(statusCode: Int, message: String?)
     case decodingFailed
     case requestEncodingFailed
+    case sessionExpired
+    case networkFailure(message: String)
 
     var errorDescription: String? {
         switch self {
@@ -20,24 +24,33 @@ enum AuthenticationServiceError: LocalizedError {
             return "서버 응답을 확인할 수 없어요."
         case .serverError(let statusCode, let message):
             if let message, !message.isEmpty {
-                print("로그인 처리에 실패했어요. (status: \(statusCode), message: \(message))")
-                return "로그인 처리에 실패했어요."
+                print("인증 요청 처리에 실패했어요. (status: \(statusCode), message: \(message))")
+                return "요청 처리에 실패했어요."
             }
-            print("로그인 처리에 실패했어요. (status: \(statusCode)")
-            return "로그인 처리에 실패했어요."
+            print("인증 요청 처리에 실패했어요. (status: \(statusCode)")
+            return "요청 처리에 실패했어요."
         case .decodingFailed:
-            return "로그인 응답 파싱에 실패했어요."
+            return "응답 파싱에 실패했어요."
         case .requestEncodingFailed:
-            return "로그인 요청 생성에 실패했어요."
+            return "요청 생성에 실패했어요."
+        case .sessionExpired:
+            return "세션이 만료되었어요. 다시 로그인해 주세요."
+        case .networkFailure(let message):
+            return message
         }
     }
 }
 
 struct AuthenticationService: AuthenticationServicing {
-    private let session: URLSession
+    private let apiClient: APIClienting
+    private let tokenStore: TokenStoring
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(
+        apiClient: APIClienting = APIClient.shared,
+        tokenStore: TokenStoring = TokenStore.shared
+    ) {
+        self.apiClient = apiClient
+        self.tokenStore = tokenStore
     }
 
     func login(email: String, password: String) async -> Bool {
@@ -52,79 +65,86 @@ struct AuthenticationService: AuthenticationServicing {
             throw AuthenticationServiceError.invalidKakaoAccessToken
         }
 
-        var request = URLRequest(url: APIConfiguration.endpoint(path: "/oauth2/kakao"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
+        let requestBody: Data
         do {
-            request.httpBody = try JSONEncoder().encode(
+            requestBody = try JSONEncoder().encode(
                 KakaoSocialLoginRequest(accessToken: trimmedToken)
             )
         } catch {
             throw AuthenticationServiceError.requestEncodingFailed
         }
 
-        debugLogOutgoingRequest(request)
-        let (data, response) = try await session.data(for: request)
-        debugLogIncomingResponse(response, data: data)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AuthenticationServiceError.invalidResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let responseMessage = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw AuthenticationServiceError.serverError(
-                statusCode: httpResponse.statusCode,
-                message: responseMessage
-            )
-        }
-
         do {
-            return try JSONDecoder().decode(KakaoSocialLoginResponse.self, from: data)
-        } catch {
-            throw AuthenticationServiceError.decodingFailed
-        }
-    }
-
-    private func debugLogOutgoingRequest(_ request: URLRequest) {
-        #if DEBUG
-        let method = request.httpMethod ?? "UNKNOWN"
-        let url = request.url?.absoluteString ?? "nil"
-        let headers = request.allHTTPHeaderFields ?? [:]
-        let bodyString = request.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
-
-        print(
-            """
-            [Network][Request]
-            method: \(method)
-            url: \(url)
-            headers: \(headers)
-            body: \(bodyString)
-            """
-        )
-        #endif
-    }
-
-    private func debugLogIncomingResponse(_ response: URLResponse?, data: Data) {
-        #if DEBUG
-        if let httpResponse = response as? HTTPURLResponse {
-            let bodyString = String(data: data, encoding: .utf8) ?? "<non-utf8 body>"
-            print(
-                """
-                [Network][Response]
-                status: \(httpResponse.statusCode)
-                url: \(httpResponse.url?.absoluteString ?? "nil")
-                headers: \(httpResponse.allHeaderFields)
-                body: \(bodyString)
-                """
+            var request = APIRequest(
+                path: "/oauth2/kakao",
+                method: .post,
+                requiresAuthorization: false,
+                body: requestBody
             )
-            return
+            request.headers["Content-Type"] = "application/json"
+            request.headers["Accept"] = "application/json"
+
+            let response = try await apiClient.request(
+                request,
+                responseType: KakaoSocialLoginResponse.self
+            )
+
+            tokenStore.save(
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken
+            )
+            return response
+        } catch {
+            throw mapError(error)
+        }
+    }
+
+    func logout() async throws {
+        do {
+            let request = APIRequest(
+                path: "/users/logout",
+                method: .post,
+                requiresAuthorization: true
+            )
+            try await apiClient.request(request)
+            tokenStore.clearTokens()
+        } catch {
+            throw mapError(error)
+        }
+    }
+
+    func deleteMyAccount() async throws {
+        do {
+            let request = APIRequest(
+                path: "/users/my",
+                method: .delete,
+                requiresAuthorization: true
+            )
+            try await apiClient.request(request)
+            tokenStore.clearTokens()
+        } catch {
+            throw mapError(error)
+        }
+    }
+
+    private func mapError(_ error: Error) -> AuthenticationServiceError {
+        if let authError = error as? AuthenticationServiceError {
+            return authError
         }
 
-        print("[Network][Response] invalid response: \(String(describing: response))")
-        #endif
+        if let apiError = error as? APIClientError {
+            switch apiError {
+            case .invalidResponse:
+                return .invalidResponse
+            case .missingAccessToken, .missingRefreshToken, .unauthorized:
+                return .sessionExpired
+            case .serverError(let statusCode, let message):
+                return .serverError(statusCode: statusCode, message: message)
+            case .decodingFailed:
+                return .decodingFailed
+            }
+        }
+
+        return .networkFailure(message: "네트워크 요청 중 오류가 발생했어요.")
     }
 }
