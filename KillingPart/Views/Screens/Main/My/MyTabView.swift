@@ -6,26 +6,32 @@ struct MyTabView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: AppSpacing.m) {
-                topToggleTabs
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-                TabView(selection: $selectedTab) {
-                    MyCollectionView(onSessionEnded: onLogout)
-                        .tag(MyTopTab.myCollection)
+                VStack(spacing: AppSpacing.m) {
+                    topToggleTabs
 
-                    PlayKillingPartView()
-                        .tag(MyTopTab.playKillingPart)
+                    TabView(selection: $selectedTab) {
+                        MyCollectionView(onSessionEnded: onLogout)
+                            .tag(MyTopTab.myCollection)
 
-                    MusicCalendarView()
-                        .tag(MyTopTab.musicCalendar)
+                        PlayKillingPartView()
+                            .tag(MyTopTab.playKillingPart)
+
+                        MusicCalendarView()
+                            .tag(MyTopTab.musicCalendar)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, AppSpacing.m)
+                .padding(.top, AppSpacing.m)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .padding(.horizontal, AppSpacing.m)
-            .padding(.top, AppSpacing.m)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .navigationTitle("마이")
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 
@@ -39,7 +45,7 @@ struct MyTabView: View {
                 } label: {
                     Text(tab.title)
                         .font(AppFont.paperlogy6SemiBold(size: 14))
-                        .foregroundStyle(selectedTab == tab ? Color.black : .secondary)
+                        .foregroundStyle(.white)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, AppSpacing.s)
@@ -47,10 +53,19 @@ struct MyTabView: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(
                                     selectedTab == tab
-                                        ? AppColors.primary300
-                                        : Color(.secondarySystemBackground)
+                                        ? AppColors.primary600.opacity(0.28)
+                                        : Color.white.opacity(0.07)
                                 )
                         )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    selectedTab == tab
+                                        ? AppColors.primary600.opacity(0.85)
+                                        : Color.white.opacity(0.12),
+                                    lineWidth: 1
+                                )
+                        }
                 }
                 .buttonStyle(.plain)
             }
@@ -58,8 +73,8 @@ struct MyTabView: View {
         .padding(AppSpacing.xs)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+                .fill(Color.white.opacity(0.05))
+                .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 4)
         )
     }
 }
@@ -79,4 +94,11 @@ private enum MyTopTab: CaseIterable {
             return "뮤직캘린더"
         }
     }
+}
+
+
+#Preview {
+    MyTabView(onLogout: {
+        print("로그아웃")
+    })
 }

@@ -16,5 +16,9 @@ struct MainTabView: View {
                 }
         }
         .tint(AppColors.primary600)
+        .preferredColorScheme(.dark)
+        .toolbarColorScheme(.dark, for: .tabBar)
+        .toolbarBackground(.black, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 }

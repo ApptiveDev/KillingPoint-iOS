@@ -21,25 +21,31 @@ struct MyCollectionView: View {
             VStack(alignment: .leading, spacing: AppSpacing.m) {
                 Text("내 컬렉션")
                     .font(AppFont.paperlogy7Bold(size: 24))
+                    .foregroundStyle(.white)
 
                 Text("저장한 킬링파트를 모아보는 공간입니다.")
                     .font(AppFont.paperlogy4Regular(size: 15))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.75))
 
                 ForEach(1...4, id: \.self) { index in
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(AppColors.primary200)
+                        .fill(Color.white.opacity(0.08))
                         .frame(height: 110)
                         .overlay(alignment: .leading) {
                             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                                 Text("Collection \(index)")
                                     .font(AppFont.paperlogy6SemiBold(size: 16))
+                                    .foregroundStyle(.white)
 
                                 Text("아티스트와 코멘트가 표시될 카드 영역")
                                     .font(AppFont.paperlogy4Regular(size: 13))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.white.opacity(0.68))
                             }
                             .padding(AppSpacing.m)
+                        }
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
                         }
                 }
 
@@ -63,25 +69,47 @@ struct MyCollectionView: View {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
                     .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.red.opacity(0.95))
             }
 
-            PrimaryButton(
-                title: "로그아웃",
-                isLoading: viewModel.isProcessing,
-                action: { viewModel.logout(onSuccess: onSessionEnded) }
-            )
+            Button {
+                viewModel.logout(onSuccess: onSessionEnded)
+            } label: {
+                HStack(spacing: AppSpacing.s) {
+                    if viewModel.isProcessing {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text("로그아웃")
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, AppSpacing.m)
+                .background(Color.white.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(AppColors.primary600.opacity(0.65), lineWidth: 1)
+                }
+            }
+            .disabled(viewModel.isProcessing)
 
             Button(role: .destructive) {
                 isWithdrawAlertPresented = true
             } label: {
                 Text("회원 탈퇴")
                     .font(AppFont.paperlogy6SemiBold(size: 15))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppSpacing.m)
-                    .background(Color.red.opacity(0.08))
+                    .background(Color.red.opacity(0.22))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                    }
             }
             .disabled(viewModel.isProcessing)
         }
