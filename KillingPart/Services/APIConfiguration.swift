@@ -16,10 +16,21 @@ enum APIConfiguration {
         return baseURL
     }()
 
-    static func endpoint(path: String) -> URL {
+    static func endpoint(path: String, queryItems: [URLQueryItem] = []) -> URL {
         let components = path.split(separator: "/").map(String.init)
-        return components.reduce(baseURL) { partialURL, component in
+        let urlWithPath = components.reduce(baseURL) { partialURL, component in
             partialURL.appendingPathComponent(component)
         }
+
+        guard !queryItems.isEmpty else {
+            return urlWithPath
+        }
+
+        guard var urlComponents = URLComponents(url: urlWithPath, resolvingAgainstBaseURL: false) else {
+            return urlWithPath
+        }
+
+        urlComponents.queryItems = queryItems
+        return urlComponents.url ?? urlWithPath
     }
 }

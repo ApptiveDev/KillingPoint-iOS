@@ -11,20 +11,26 @@ import Foundation
 final class MyCollectionViewModel: ObservableObject {
     @Published private(set) var isProcessing = false
     @Published private(set) var user: UserModel?
+    @Published private(set) var myFeeds: [DiaryFeedModel] = []
     @Published var errorMessage: String?
 
     private let authenticationService: AuthenticationServicing
     private let userService: UserServicing
+    private let diaryService: DiaryServicing
 
     private var hasLoadedProfile = false
+    private var hasLoadedMyFeeds = false
     private var isLoadingProfile = false
+    private var isLoadingMyFeeds = false
 
     init(
         authenticationService: AuthenticationServicing,
-        userService: UserServicing = UserService()
+        userService: UserServicing = UserService(),
+        diaryService: DiaryServicing = DiaryService()
     ) {
         self.authenticationService = authenticationService
         self.userService = userService
+        self.diaryService = diaryService
     }
 
     var displayName: String {
@@ -42,9 +48,25 @@ final class MyCollectionViewModel: ObservableObject {
         user?.profileImageURL
     }
 
+    func loadInitialDataIfNeeded() async {
+        async let profileLoad: Void = loadMyProfileIfNeeded()
+        async let feedLoad: Void = loadMyFeedsIfNeeded()
+        _ = await (profileLoad, feedLoad)
+    }
+
     func loadMyProfileIfNeeded() async {
         guard !hasLoadedProfile else { return }
         await loadMyProfile()
+    }
+
+    func loadMyFeedsIfNeeded(page: Int = 0, size: Int = 5) async {
+        guard !hasLoadedMyFeeds else { return }
+        await loadMyFeeds(page: page, size: size)
+    }
+
+    func formattedUpdateDate(from rawUpdateDate: String) -> String {
+        let datePart = rawUpdateDate.split(separator: "T").first.map(String.init) ?? rawUpdateDate
+        return datePart.replacingOccurrences(of: "-", with: ".")
     }
 
     func logout(onSuccess: @escaping () -> Void) {
@@ -99,7 +121,28 @@ final class MyCollectionViewModel: ObservableObject {
         }
     }
 
+    private func loadMyFeeds(page: Int, size: Int) async {
+        guard !isLoadingMyFeeds else { return }
+
+        isLoadingMyFeeds = true
+        errorMessage = nil
+
+        defer { isLoadingMyFeeds = false }
+
+        do {
+            let response = try await diaryService.fetchMyFeeds(page: page, size: size)
+            myFeeds = response.content
+            hasLoadedMyFeeds = true
+        } catch {
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
     private func resolveErrorMessage(from error: Error) -> String {
+        if let diaryServiceError = error as? DiaryServiceError {
+            return diaryServiceError.errorDescription ?? "요청 처리에 실패했어요."
+        }
+
         if let userServiceError = error as? UserServiceError {
             return userServiceError.errorDescription ?? "요청 처리에 실패했어요."
         }
