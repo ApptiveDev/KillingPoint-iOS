@@ -9,11 +9,15 @@ struct MyCollectionView: View {
 
     init(
         onSessionEnded: @escaping () -> Void,
-        authenticationService: AuthenticationServicing = AuthenticationService()
+        authenticationService: AuthenticationServicing = AuthenticationService(),
+        userService: UserServicing = UserService()
     ) {
         self.onSessionEnded = onSessionEnded
         _viewModel = StateObject(
-            wrappedValue: MyCollectionViewModel(authenticationService: authenticationService)
+            wrappedValue: MyCollectionViewModel(
+                authenticationService: authenticationService,
+                userService: userService
+            )
         )
     }
 
@@ -34,6 +38,9 @@ struct MyCollectionView: View {
                 viewModel.deleteMyAccount(onSuccess: onSessionEnded)
             }
             Button("취소", role: .cancel) {}
+        }
+        .task {
+            await viewModel.loadMyProfileIfNeeded()
         }
     }
 
@@ -85,21 +92,14 @@ struct MyCollectionView: View {
 
     private var profileCard: some View {
         HStack(spacing: AppSpacing.m) {
-            Circle()
-                .fill(Color.white.opacity(0.12))
-                .frame(width: 56, height: 56)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
+            profileImage(size: 56, iconSize: 22)
 
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                Text("킬링파트 사용자")
+                Text(viewModel.displayName)
                     .font(AppFont.paperlogy6SemiBold(size: 16))
                     .foregroundStyle(.white)
 
-                Text("@killingpart_user")
+                Text(viewModel.displayTag)
                     .font(AppFont.paperlogy4Regular(size: 13))
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -160,18 +160,11 @@ struct MyCollectionView: View {
             }
 
             VStack(spacing: AppSpacing.m) {
-                Circle()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(width: 92, height: 92)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 34))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
+                profileImage(size: 92, iconSize: 34)
 
                 VStack(alignment: .leading, spacing: AppSpacing.s) {
-                    profileInfoRow(title: "이름", value: "킬링파트 사용자")
-                    profileInfoRow(title: "아이디", value: "@killingpart_user")
+                    profileInfoRow(title: "이름", value: viewModel.displayName)
+                    profileInfoRow(title: "아이디", value: viewModel.displayTag)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -209,6 +202,39 @@ struct MyCollectionView: View {
     }
 
     @ViewBuilder
+    private func profileImage(size: CGFloat, iconSize: CGFloat) -> some View {
+        if let profileImageURL = viewModel.profileImageURL {
+            AsyncImage(url: profileImageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .empty, .failure:
+                    profileImagePlaceholder(size: size, iconSize: iconSize)
+                @unknown default:
+                    profileImagePlaceholder(size: size, iconSize: iconSize)
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+        } else {
+            profileImagePlaceholder(size: size, iconSize: iconSize)
+        }
+    }
+
+    private func profileImagePlaceholder(size: CGFloat, iconSize: CGFloat) -> some View {
+        Circle()
+            .fill(Color.white.opacity(0.12))
+            .frame(width: size, height: size)
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: iconSize))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+    }
+
+    @ViewBuilder
     private func profileInfoRow(title: String, value: String) -> some View {
         HStack(spacing: AppSpacing.s) {
             Text(title)
@@ -227,68 +253,4 @@ struct MyCollectionView: View {
 private enum MyCollectionScreenMode {
     case collectionList
     case profileSettings
-}
-
-@MainActor
-private final class MyCollectionViewModel: ObservableObject {
-    @Published private(set) var isProcessing = false
-    @Published var errorMessage: String?
-
-    private let authenticationService: AuthenticationServicing
-
-    init(authenticationService: AuthenticationServicing) {
-        self.authenticationService = authenticationService
-    }
-
-    func logout(onSuccess: @escaping () -> Void) {
-        guard !isProcessing else { return }
-
-        isProcessing = true
-        errorMessage = nil
-
-        Task {
-            defer { isProcessing = false }
-
-            do {
-                try await authenticationService.logout()
-                onSuccess()
-            } catch {
-                errorMessage = resolveErrorMessage(from: error)
-            }
-        }
-    }
-
-    func deleteMyAccount(onSuccess: @escaping () -> Void) {
-        guard !isProcessing else { return }
-
-        isProcessing = true
-        errorMessage = nil
-
-        Task {
-            defer { isProcessing = false }
-
-            do {
-                try await authenticationService.deleteMyAccount()
-                onSuccess()
-            } catch {
-                errorMessage = resolveErrorMessage(from: error)
-            }
-        }
-    }
-
-    private func resolveErrorMessage(from error: Error) -> String {
-        if let authError = error as? AuthenticationServiceError {
-            return authError.errorDescription ?? "요청 처리에 실패했어요."
-        }
-
-        if let apiError = error as? APIClientError {
-            return apiError.errorDescription ?? "요청 처리에 실패했어요."
-        }
-
-        if let localizedError = error as? LocalizedError {
-            return localizedError.errorDescription ?? "요청 처리에 실패했어요."
-        }
-
-        return "요청 처리에 실패했어요."
-    }
 }
