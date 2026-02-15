@@ -35,12 +35,9 @@ struct MyTabView: View {
                     .clipped()
                 }
                 .padding(.horizontal, AppSpacing.m)
-                .padding(.top, AppSpacing.m)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(.black, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
