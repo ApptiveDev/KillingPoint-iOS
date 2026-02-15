@@ -13,3 +13,9 @@ struct UserModel: Decodable {
         URL(string: profileImageUrl)
     }
 }
+
+struct UserStaticsModel: Decodable {
+    let fanCount: Int
+    let pickCount: Int
+    let killingPartCount: Int
+}

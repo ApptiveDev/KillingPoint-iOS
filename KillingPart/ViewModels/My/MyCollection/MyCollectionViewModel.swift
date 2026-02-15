@@ -11,6 +11,7 @@ import Foundation
 final class MyCollectionViewModel: ObservableObject {
     @Published private(set) var isProcessing = false
     @Published private(set) var user: UserModel?
+    @Published private(set) var userStatics: UserStaticsModel?
     @Published private(set) var myFeeds: [DiaryFeedModel] = []
     @Published var errorMessage: String?
 
@@ -19,8 +20,10 @@ final class MyCollectionViewModel: ObservableObject {
     private let diaryService: DiaryServicing
 
     private var hasLoadedProfile = false
+    private var hasLoadedUserStatics = false
     private var hasLoadedMyFeeds = false
     private var isLoadingProfile = false
+    private var isLoadingUserStatics = false
     private var isLoadingMyFeeds = false
 
     init(
@@ -46,6 +49,18 @@ final class MyCollectionViewModel: ObservableObject {
 
     var profileImageURL: URL? {
         user?.profileImageURL
+    }
+
+    var killingPartStatText: String {
+        "\(userStatics?.killingPartCount ?? 0),킬링파트"
+    }
+
+    var fanStatText: String {
+        "\(userStatics?.fanCount ?? 0),팬덤"
+    }
+
+    var pickStatText: String {
+        "\(userStatics?.pickCount ?? 0),PICKS"
     }
 
     func loadInitialDataIfNeeded() async {
@@ -114,8 +129,26 @@ final class MyCollectionViewModel: ObservableObject {
         defer { isLoadingProfile = false }
 
         do {
-            user = try await userService.fetchMyUser()
+            let fetchedUser = try await userService.fetchMyUser()
+            user = fetchedUser
             hasLoadedProfile = true
+
+            await loadUserStaticsIfNeeded(userId: fetchedUser.userId)
+        } catch {
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    private func loadUserStaticsIfNeeded(userId: Int) async {
+        guard !hasLoadedUserStatics else { return }
+        guard !isLoadingUserStatics else { return }
+
+        isLoadingUserStatics = true
+        defer { isLoadingUserStatics = false }
+
+        do {
+            userStatics = try await userService.fetchUserStatics(userId: userId)
+            hasLoadedUserStatics = true
         } catch {
             errorMessage = resolveErrorMessage(from: error)
         }

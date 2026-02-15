@@ -205,20 +205,34 @@ struct MyCollectionView: View {
     }
 
     private var profileCard: some View {
-        HStack(spacing: AppSpacing.m) {
-            profileImage(size: 56, iconSize: 22)
+        VStack(alignment: .leading, spacing: AppSpacing.s) {
+            HStack(alignment: .top, spacing: AppSpacing.m) {
+                profileImage(size: 56, iconSize: 22)
 
-            VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                Text(viewModel.displayName)
-                    .font(AppFont.paperlogy6SemiBold(size: 16))
-                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    Text(viewModel.displayName)
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
+                        .foregroundStyle(.white)
 
-                Text(viewModel.displayTag)
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(.white.opacity(0.7))
+                    Text(viewModel.displayTag)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+
+                Spacer(minLength: AppSpacing.xs)
+
+                VStack(alignment: .trailing, spacing: AppSpacing.xs) {
+                    Text(viewModel.killingPartStatText)
+                        .font(AppFont.paperlogy5Medium(size: 12))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Text(viewModel.fanStatText)
+                        .font(AppFont.paperlogy5Medium(size: 12))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Text(viewModel.pickStatText)
+                        .font(AppFont.paperlogy5Medium(size: 12))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
             }
-
-            Spacer()
 
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -226,12 +240,12 @@ struct MyCollectionView: View {
                 }
             } label: {
                 Text("프로필 설정")
-                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .font(AppFont.paperlogy5Medium(size: 14))
                     .foregroundStyle(.white)
-                    .padding(.vertical, AppSpacing.xs)
-                    .padding(.horizontal, AppSpacing.s)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppSpacing.s)
                     .background(Color.white.opacity(0.1))
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
         }

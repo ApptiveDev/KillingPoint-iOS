@@ -2,6 +2,7 @@ import Foundation
 
 protocol UserServicing {
     func fetchMyUser() async throws -> UserModel
+    func fetchUserStatics(userId: Int) async throws -> UserStaticsModel
 }
 
 enum UserServiceError: LocalizedError {
@@ -43,6 +44,20 @@ struct UserService: UserServicing {
             )
 
             return try await apiClient.request(request, responseType: UserModel.self)
+        } catch {
+            throw mapError(error)
+        }
+    }
+
+    func fetchUserStatics(userId: Int) async throws -> UserStaticsModel {
+        do {
+            let request = APIRequest(
+                path: "/users/\(userId)/statics",
+                method: .get,
+                requiresAuthorization: true
+            )
+
+            return try await apiClient.request(request, responseType: UserStaticsModel.self)
         } catch {
             throw mapError(error)
         }
