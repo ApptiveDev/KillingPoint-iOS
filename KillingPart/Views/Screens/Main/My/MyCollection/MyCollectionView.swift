@@ -206,31 +206,47 @@ struct MyCollectionView: View {
 
     private var profileCard: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
-            HStack(alignment: .top, spacing: AppSpacing.m) {
+            HStack(alignment: .center, spacing: AppSpacing.m) {
                 profileImage(size: 56, iconSize: 22)
 
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(viewModel.displayName)
                         .font(AppFont.paperlogy6SemiBold(size: 16))
-                        .foregroundStyle(.white)
-
+                        .foregroundStyle(Color.kpPrimary)
+                        .lineLimit(1)
                     Text(viewModel.displayTag)
                         .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Color.kpPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.85)
                 }
 
-                Spacer(minLength: AppSpacing.xs)
+                
 
-                VStack(alignment: .trailing, spacing: AppSpacing.xs) {
+                VStack(alignment: .center, spacing: AppSpacing.xs) {
                     Text(viewModel.killingPartStatText)
+                        .font(AppFont.paperlogy5Medium(size: 16))
+                        .foregroundStyle(Color.kpPrimary)
+                    Text("킬링파트")
                         .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(Color.kpPrimary)
+                }
+                VStack(alignment: .center, spacing: AppSpacing.xs) {
                     Text(viewModel.fanStatText)
+                        .font(AppFont.paperlogy5Medium(size: 16))
+                        .foregroundStyle(Color.kpPrimary)
+                    Text("팬덤")
                         .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(Color.kpPrimary)
+                }
+                VStack(alignment: .center, spacing: AppSpacing.xs) {
                     Text(viewModel.pickStatText)
+                        .font(AppFont.paperlogy5Medium(size: 16))
+                        .foregroundStyle(Color.kpPrimary)
+                    Text("PICKS")
                         .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(Color.kpPrimary)
                 }
             }
 
@@ -239,12 +255,12 @@ struct MyCollectionView: View {
                     screenMode = .profileSettings
                 }
             } label: {
-                Text("프로필 설정")
+                Text("프로필 편집")
                     .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.kpPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppSpacing.s)
-                    .background(Color.white.opacity(0.1))
+                    .background(Color.kpGray700)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
@@ -353,12 +369,12 @@ struct MyCollectionView: View {
 
     private func profileImagePlaceholder(size: CGFloat, iconSize: CGFloat) -> some View {
         Circle()
-            .fill(Color.white.opacity(0.12))
+            .fill(Color.kpPrimary)
             .frame(width: size, height: size)
             .overlay {
                 Image(systemName: "person.fill")
                     .font(.system(size: iconSize))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(.black)
             }
     }
 

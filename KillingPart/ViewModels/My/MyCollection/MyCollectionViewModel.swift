@@ -52,15 +52,15 @@ final class MyCollectionViewModel: ObservableObject {
     }
 
     var killingPartStatText: String {
-        "\(userStatics?.killingPartCount ?? 0),킬링파트"
+        "\(userStatics?.killingPartCount ?? 0)"
     }
 
     var fanStatText: String {
-        "\(userStatics?.fanCount ?? 0),팬덤"
+        "\(userStatics?.fanCount ?? 0)"
     }
 
     var pickStatText: String {
-        "\(userStatics?.pickCount ?? 0),PICKS"
+        "\(userStatics?.pickCount ?? 0)"
     }
 
     func loadInitialDataIfNeeded() async {
