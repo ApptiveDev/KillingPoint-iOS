@@ -51,14 +51,6 @@ struct MyCollectionView: View {
             VStack(alignment: .leading, spacing: AppSpacing.m) {
                 profileCard
 
-                Text("내 피드")
-                    .font(AppFont.paperlogy7Bold(size: 24))
-                    .foregroundStyle(.white)
-
-                Text("내가 기록한 킬링파트 피드를 모아보는 공간입니다.")
-                    .font(AppFont.paperlogy4Regular(size: 15))
-                    .foregroundStyle(.white.opacity(0.75))
-
                 if viewModel.myFeeds.isEmpty {
                     emptyFeedPlaceholder
                 } else {
@@ -104,7 +96,7 @@ struct MyCollectionView: View {
     }
 
     private func feedCard(_ feed: DiaryFeedModel) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+        VStack(alignment: .center, spacing: AppSpacing.xs) {
             HStack {
                 likeBadge(isLiked: feed.isLiked, likeCount: feed.likeCount)
                 Spacer()
@@ -130,12 +122,7 @@ struct MyCollectionView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppSpacing.s)
-        .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        }
     }
 
     @ViewBuilder
@@ -174,10 +161,9 @@ struct MyCollectionView: View {
 
     private func scopeBadge(scope: DiaryScope) -> some View {
         Image(systemName: scopeIconName(scope))
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.kpGray600)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.white)
             .padding(6)
-            .background(Color.black.opacity(0.45), in: Circle())
     }
 
     private func scopeIconName(_ scope: DiaryScope) -> String {
@@ -194,14 +180,13 @@ struct MyCollectionView: View {
     private func likeBadge(isLiked: Bool, likeCount: Int) -> some View {
         HStack(spacing: 4) {
             Image(systemName: "heart.fill")
-                .foregroundStyle(isLiked ? Color.kpPrimary : Color.kpGray300)
+                .foregroundStyle(Color.kpPrimary)
             Text("\(likeCount)")
                 .foregroundStyle(Color.kpGray300)
         }
-        .font(.system(size: 11, weight: .semibold))
+        .font(.system(size: 13, weight: .semibold))
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Color.black.opacity(0.45), in: Capsule())
     }
 
     private var profileCard: some View {
