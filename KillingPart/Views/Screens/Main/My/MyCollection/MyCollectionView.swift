@@ -205,72 +205,17 @@ struct MyCollectionView: View {
     }
 
     private var profileCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.s) {
-            HStack(alignment: .center, spacing: AppSpacing.m) {
-                profileImage(size: 56, iconSize: 22)
-
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text(viewModel.displayName)
-                        .font(AppFont.paperlogy6SemiBold(size: 16))
-                        .foregroundStyle(Color.kpPrimary)
-                        .lineLimit(1)
-                    Text(viewModel.displayTag)
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(Color.kpPrimary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .minimumScaleFactor(0.85)
-                }
-
-                
-
-                VStack(alignment: .center, spacing: AppSpacing.xs) {
-                    Text(viewModel.killingPartStatText)
-                        .font(AppFont.paperlogy5Medium(size: 16))
-                        .foregroundStyle(Color.kpPrimary)
-                    Text("킬링파트")
-                        .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(Color.kpPrimary)
-                }
-                VStack(alignment: .center, spacing: AppSpacing.xs) {
-                    Text(viewModel.fanStatText)
-                        .font(AppFont.paperlogy5Medium(size: 16))
-                        .foregroundStyle(Color.kpPrimary)
-                    Text("팬덤")
-                        .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(Color.kpPrimary)
-                }
-                VStack(alignment: .center, spacing: AppSpacing.xs) {
-                    Text(viewModel.pickStatText)
-                        .font(AppFont.paperlogy5Medium(size: 16))
-                        .foregroundStyle(Color.kpPrimary)
-                    Text("PICKS")
-                        .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(Color.kpPrimary)
-                }
+        MyCollectionProfileCard(
+            displayName: viewModel.displayName,
+            displayTag: viewModel.displayTag,
+            profileImageURL: viewModel.profileImageURL,
+            killingPartStatText: viewModel.killingPartStatText,
+            fanStatText: viewModel.fanStatText,
+            pickStatText: viewModel.pickStatText
+        ) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                screenMode = .profileSettings
             }
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    screenMode = .profileSettings
-                }
-            } label: {
-                Text("프로필 편집")
-                    .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(Color.kpPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, AppSpacing.s)
-                    .background(Color.kpGray700)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(AppSpacing.m)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         }
     }
 
@@ -304,7 +249,11 @@ struct MyCollectionView: View {
             }
 
             VStack(spacing: AppSpacing.m) {
-                profileImage(size: 92, iconSize: 34)
+                MyCollectionProfileImageView(
+                    profileImageURL: viewModel.profileImageURL,
+                    size: 92,
+                    iconSize: 34
+                )
 
                 VStack(alignment: .leading, spacing: AppSpacing.s) {
                     profileInfoRow(title: "이름", value: viewModel.displayName)
@@ -343,39 +292,6 @@ struct MyCollectionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.bottom, AppSpacing.l)
-    }
-
-    @ViewBuilder
-    private func profileImage(size: CGFloat, iconSize: CGFloat) -> some View {
-        if let profileImageURL = viewModel.profileImageURL {
-            AsyncImage(url: profileImageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .empty, .failure:
-                    profileImagePlaceholder(size: size, iconSize: iconSize)
-                @unknown default:
-                    profileImagePlaceholder(size: size, iconSize: iconSize)
-                }
-            }
-            .frame(width: size, height: size)
-            .clipShape(Circle())
-        } else {
-            profileImagePlaceholder(size: size, iconSize: iconSize)
-        }
-    }
-
-    private func profileImagePlaceholder(size: CGFloat, iconSize: CGFloat) -> some View {
-        Circle()
-            .fill(Color.kpPrimary)
-            .frame(width: size, height: size)
-            .overlay {
-                Image(systemName: "person.fill")
-                    .font(.system(size: iconSize))
-                    .foregroundStyle(.black)
-            }
     }
 
     @ViewBuilder
