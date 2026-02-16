@@ -7,12 +7,12 @@ struct MainTabView: View {
         TabView {
             MyTabView(onLogout: onLogout)
                 .tabItem {
-                    Label("마이", systemImage: "person.fill")
+                    Label("MY", systemImage: "house")
                 }
 
             AddTabView()
                 .tabItem {
-                    Label("추가", systemImage: "plus.circle.fill")
+                    Label("추가", systemImage: "plus.square")
                 }
         }
         .tint(AppColors.primary600)

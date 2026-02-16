@@ -56,7 +56,10 @@ struct MyCollectionView: View {
                 } else {
                     LazyVGrid(columns: feedGridColumns, spacing: AppSpacing.s) {
                         ForEach(viewModel.myFeeds) { feed in
-                            feedCard(feed)
+                            MyCollectionFeedCard(
+                                feed: feed,
+                                formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
+                            )
                         }
                     }
                 }
@@ -93,100 +96,6 @@ struct MyCollectionView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             }
-    }
-
-    private func feedCard(_ feed: DiaryFeedModel) -> some View {
-        VStack(alignment: .center, spacing: AppSpacing.xs) {
-            HStack {
-                likeBadge(isLiked: feed.isLiked, likeCount: feed.likeCount)
-                Spacer()
-                scopeBadge(scope: feed.scope)
-            }
-
-            albumImage(url: feed.albumImageURL)
-
-            Text(feed.musicTitle)
-                .font(AppFont.paperlogy6SemiBold(size: 14))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-
-            Text(feed.artist)
-                .font(AppFont.paperlogy4Regular(size: 13))
-                .foregroundStyle(.white.opacity(0.78))
-                .lineLimit(1)
-
-            Text(viewModel.formattedUpdateDate(from: feed.updateDate))
-                .font(AppFont.paperlogy4Regular(size: 12))
-                .foregroundStyle(Color.kpGray300)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(AppSpacing.s)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    @ViewBuilder
-    private func albumImage(url: URL?) -> some View {
-        if let url {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .empty, .failure:
-                    albumImagePlaceholder
-                @unknown default:
-                    albumImagePlaceholder
-                }
-            }
-            .aspectRatio(1, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        } else {
-            albumImagePlaceholder
-                .aspectRatio(1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-    }
-
-    private var albumImagePlaceholder: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.08))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(Color.kpGray300)
-            }
-    }
-
-    private func scopeBadge(scope: DiaryScope) -> some View {
-        Image(systemName: scopeIconName(scope))
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color.white)
-            .padding(6)
-    }
-
-    private func scopeIconName(_ scope: DiaryScope) -> String {
-        switch scope {
-        case .private:
-            return "lock.fill"
-        case .public:
-            return "globe.asia.australia.fill"
-        case .killingPart:
-            return "music.note"
-        }
-    }
-
-    private func likeBadge(isLiked: Bool, likeCount: Int) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "heart.fill")
-                .foregroundStyle(Color.kpPrimary)
-            Text("\(likeCount)")
-                .foregroundStyle(Color.kpGray300)
-        }
-        .font(.system(size: 13, weight: .semibold))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
     }
 
     private var profileCard: some View {
