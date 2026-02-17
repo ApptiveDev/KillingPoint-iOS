@@ -11,6 +11,7 @@ enum HTTPMethod: String {
 struct APIRequest {
     let path: String
     let method: HTTPMethod
+    var queryItems: [URLQueryItem]
     var requiresAuthorization: Bool
     var headers: [String: String]
     var body: Data?
@@ -18,12 +19,14 @@ struct APIRequest {
     init(
         path: String,
         method: HTTPMethod,
+        queryItems: [URLQueryItem] = [],
         requiresAuthorization: Bool = false,
         headers: [String: String] = [:],
         body: Data? = nil
     ) {
         self.path = path
         self.method = method
+        self.queryItems = queryItems
         self.requiresAuthorization = requiresAuthorization
         self.headers = headers
         self.body = body
@@ -119,7 +122,9 @@ final class APIClient: APIClienting {
     }
 
     private func buildRequest(from request: APIRequest) throws -> URLRequest {
-        var urlRequest = URLRequest(url: APIConfiguration.endpoint(path: request.path))
+        var urlRequest = URLRequest(
+            url: APIConfiguration.endpoint(path: request.path, queryItems: request.queryItems)
+        )
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
 

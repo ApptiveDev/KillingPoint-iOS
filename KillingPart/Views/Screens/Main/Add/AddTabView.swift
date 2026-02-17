@@ -1,40 +1,36 @@
 import SwiftUI
 
 struct AddTabView: View {
+    @StateObject private var viewModel = AddTabViewModel()
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                VStack(alignment: .leading, spacing: AppSpacing.l) {
-                    Text("Add")
-                        .font(AppFont.paperlogy7Bold(size: 28))
-                        .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: AppSpacing.m) {
+                    AddSearchFieldView(
+                        query: $viewModel.query,
+                        hasQuery: viewModel.hasQuery,
+                        onSubmit: viewModel.submitSearch,
+                        onQueryChanged: viewModel.handleQueryChanged,
+                        onClear: viewModel.clearSearch
+                    )
 
-                    Text("추가 탭입니다. 생성 플로우를 여기에 연결하세요.")
-                        .font(AppFont.paperlogy4Regular(size: 16))
-                        .foregroundStyle(.white.opacity(0.75))
-
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.08))
-                        .frame(height: 160)
-                        .overlay {
-                            Text("Create Content")
-                                .font(AppFont.paperlogy6SemiBold(size: 16))
-                                .foregroundStyle(.white)
-                        }
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(AppColors.primary600.opacity(0.4), lineWidth: 1)
-                        }
-
-                    Spacer()
+                    AddSearchContentView(
+                        isLoading: viewModel.isLoading,
+                        errorMessage: viewModel.errorMessage,
+                        shouldShowEmptyState: viewModel.shouldShowEmptyState,
+                        tracks: viewModel.tracks,
+                        onRetry: viewModel.retrySearch
+                    )
                 }
-                .padding(AppSpacing.l)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 20)
+                .padding(.horizontal, AppSpacing.l)
+                .padding(.bottom, AppSpacing.l)
             }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(.black, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }
