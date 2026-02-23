@@ -79,8 +79,23 @@ struct MyCollectionView: View {
                                 feed: feed,
                                 formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
                             )
+                            .onAppear {
+                                Task {
+                                    await viewModel.loadMoreMyFeedsIfNeeded(currentFeedID: feed.id)
+                                }
+                            }
                         }
                     }
+                }
+
+                if viewModel.isLoadingMoreFeeds {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(.white.opacity(0.88))
+                        Spacer()
+                    }
+                    .padding(.top, AppSpacing.s)
                 }
 
                 if let errorMessage = viewModel.errorMessage {
