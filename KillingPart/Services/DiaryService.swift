@@ -28,20 +28,29 @@ enum DiaryServiceError: LocalizedError {
 }
 
 struct DiaryService: DiaryServicing {
+    static let defaultPage = 0
+    static let defaultSize = 5
+
     private let apiClient: APIClienting
 
     init(apiClient: APIClienting = APIClient.shared) {
         self.apiClient = apiClient
     }
 
-    func fetchMyFeeds(page: Int = 0, size: Int = 5) async throws -> MyDiaryFeedsResponse {
+    func fetchMyFeeds(
+        page: Int = Self.defaultPage,
+        size: Int = Self.defaultSize
+    ) async throws -> MyDiaryFeedsResponse {
+        let resolvedPage = max(page, Self.defaultPage)
+        let resolvedSize = size > 0 ? size : Self.defaultSize
+
         do {
             let request = APIRequest(
                 path: "/diaries/my",
                 method: .get,
                 queryItems: [
-                    URLQueryItem(name: "page", value: String(page)),
-                    URLQueryItem(name: "size", value: String(size))
+                    URLQueryItem(name: "page", value: String(resolvedPage)),
+                    URLQueryItem(name: "size", value: String(resolvedSize))
                 ],
                 requiresAuthorization: true
             )

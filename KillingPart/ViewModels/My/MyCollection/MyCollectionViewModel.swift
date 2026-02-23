@@ -13,6 +13,7 @@ final class MyCollectionViewModel: ObservableObject {
     @Published private(set) var user: UserModel?
     @Published private(set) var userStatics: UserStaticsModel?
     @Published private(set) var myFeeds: [DiaryFeedModel] = []
+    @Published private(set) var isLoadingMoreFeeds = false
     @Published var errorMessage: String?
 
     private let authenticationService: AuthenticationServicing
@@ -25,6 +26,9 @@ final class MyCollectionViewModel: ObservableObject {
     private var isLoadingProfile = false
     private var isLoadingUserStatics = false
     private var isLoadingMyFeeds = false
+    private let defaultFeedPageSize = DiaryService.defaultSize
+    private var nextFeedPage = 0
+    private var hasNextFeedPage = true
 
     init(
         authenticationService: AuthenticationServicing,
@@ -74,9 +78,21 @@ final class MyCollectionViewModel: ObservableObject {
         await loadMyProfile()
     }
 
-    func loadMyFeedsIfNeeded(page: Int = 0, size: Int = 5) async {
+    func loadMyFeedsIfNeeded() async {
         guard !hasLoadedMyFeeds else { return }
-        await loadMyFeeds(page: page, size: size)
+        await loadMyFeeds(
+            page: DiaryService.defaultPage,
+            size: defaultFeedPageSize,
+            mode: .initial
+        )
+    }
+
+    func loadMoreMyFeedsIfNeeded(currentFeedID: DiaryFeedModel.ID) async {
+        guard hasLoadedMyFeeds else { return }
+        guard hasNextFeedPage else { return }
+        guard let lastFeedID = myFeeds.last?.id, lastFeedID == currentFeedID else { return }
+
+        await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
     }
 
     func formattedUpdateDate(from rawUpdateDate: String) -> String {
@@ -154,21 +170,46 @@ final class MyCollectionViewModel: ObservableObject {
         }
     }
 
-    private func loadMyFeeds(page: Int, size: Int) async {
+    private func loadMyFeeds(page: Int, size: Int, mode: FeedLoadMode) async {
         guard !isLoadingMyFeeds else { return }
 
         isLoadingMyFeeds = true
-        errorMessage = nil
+        if mode == .initial {
+            errorMessage = nil
+        } else {
+            isLoadingMoreFeeds = true
+        }
 
-        defer { isLoadingMyFeeds = false }
+        defer {
+            isLoadingMyFeeds = false
+            if mode == .pagination {
+                isLoadingMoreFeeds = false
+            }
+        }
 
         do {
             let response = try await diaryService.fetchMyFeeds(page: page, size: size)
-            myFeeds = response.content
+            if mode == .initial {
+                myFeeds = response.content
+            } else {
+                let existingFeedIDs = Set(myFeeds.map(\.id))
+                let newFeeds = response.content.filter { !existingFeedIDs.contains($0.id) }
+                myFeeds.append(contentsOf: newFeeds)
+            }
+
             hasLoadedMyFeeds = true
+            let totalPages = max(response.page.totalPages, 0)
+            let fetchedPage = max(response.page.number, 0)
+            nextFeedPage = fetchedPage + 1
+            hasNextFeedPage = nextFeedPage < totalPages
         } catch {
             errorMessage = resolveErrorMessage(from: error)
         }
+    }
+
+    private enum FeedLoadMode {
+        case initial
+        case pagination
     }
 
     private func resolveErrorMessage(from error: Error) -> String {
