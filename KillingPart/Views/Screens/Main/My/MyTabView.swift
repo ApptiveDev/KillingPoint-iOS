@@ -4,7 +4,6 @@ struct MyTabView: View {
     let onLogout: () -> Void
     @State private var selectedTab: MyTopTab = .myCollection
     @State private var tabTransitionDirection: Edge = .trailing
-    @Namespace private var tabSelectionAnimation
     private let tabAnimation = Animation.interactiveSpring(
         response: 0.32,
         dampingFraction: 0.85,
@@ -42,47 +41,34 @@ struct MyTabView: View {
     }
 
     private var topToggleTabs: some View {
-        HStack(spacing: AppSpacing.xs) {
+        Picker("마이 탭", selection: segmentedSelectionBinding) {
             ForEach(MyTopTab.allCases, id: \.self) { tab in
-                Button {
-                    let previousIndex = selectedTab.order
-                    let nextIndex = tab.order
-
-                    guard previousIndex != nextIndex else { return }
-
-                    tabTransitionDirection = nextIndex > previousIndex ? .trailing : .leading
-
-                    withAnimation(tabAnimation) {
-                        selectedTab = tab
-                    }
-                } label: {
-                    Text(tab.title)
-                        .font(AppFont.paperlogy6SemiBold(size: 14))
-                        .foregroundStyle(selectedTab == tab ? Color.black : Color.kpGray400)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .background(
-                            Group {
-                                if selectedTab == tab {
-                                    RoundedRectangle(cornerRadius: 42)
-                                        .fill(Color.white)
-                                        .matchedGeometryEffect(
-                                            id: "selected-tab-background",
-                                            in: tabSelectionAnimation
-                                        )
-                                }
-                            }
-                        )
-                }
-                .buttonStyle(.plain)
+                Text(tab.title)
+                    .font(AppFont.paperlogy6SemiBold(size: 16))
+                    .tag(tab)
             }
         }
-        .padding(AppSpacing.xs)
-        .background(
-            RoundedRectangle(cornerRadius: 42)
-                .fill(Color.white.opacity(0.05))
-                .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 4)
+        .pickerStyle(.segmented)
+        .controlSize(.large)
+        .scaleEffect(x: 1, y: 1.08, anchor: .center)
+        .padding(.vertical, AppSpacing.xs)
+    }
+
+    private var segmentedSelectionBinding: Binding<MyTopTab> {
+        Binding(
+            get: { selectedTab },
+            set: { newTab in
+                let previousIndex = selectedTab.order
+                let nextIndex = newTab.order
+
+                guard previousIndex != nextIndex else { return }
+
+                tabTransitionDirection = nextIndex > previousIndex ? .trailing : .leading
+
+                withAnimation(tabAnimation) {
+                    selectedTab = newTab
+                }
+            }
         )
     }
 
