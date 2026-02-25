@@ -7,7 +7,12 @@ struct AddTrackListView: View {
         ScrollView {
             LazyVStack(spacing: AppSpacing.s) {
                 ForEach(tracks) { track in
-                    AddTrackRowView(track: track)
+                    NavigationLink {
+                        AddSearchDetailView(track: track)
+                    } label: {
+                        AddTrackRowView(track: track)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, AppSpacing.xs)
@@ -37,6 +42,10 @@ private struct AddTrackRowView: View {
             }
 
             Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
         }
         .padding(AppSpacing.s)
         .background(Color.white.opacity(0.06))
