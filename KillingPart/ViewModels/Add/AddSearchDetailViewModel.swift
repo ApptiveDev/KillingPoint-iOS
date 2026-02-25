@@ -14,6 +14,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     private let youtubeService: YoutubeServicing
     private var hasLoaded = false
     private let minimumClipDuration: Double = 1
+    private let maximumClipDurationLimit: Double = 30
 
     init(
         track: SpotifySimpleTrack,
@@ -84,8 +85,10 @@ final class AddSearchDetailViewModel: ObservableObject {
         }
 
         let minGap = maxDuration >= minimumClipDuration ? minimumClipDuration : 0
+        let maxGap = min(maxDuration, maximumClipDurationLimit)
+        let lowerBound = max(endSeconds - maxGap, 0)
         let upperBound = max(endSeconds - minGap, 0)
-        startSeconds = min(max(value, 0), upperBound)
+        startSeconds = min(max(value, lowerBound), upperBound)
     }
 
     func updateEnd(_ value: Double) {
@@ -95,8 +98,10 @@ final class AddSearchDetailViewModel: ObservableObject {
         }
 
         let minGap = maxDuration >= minimumClipDuration ? minimumClipDuration : 0
+        let maxGap = min(maxDuration, maximumClipDurationLimit)
         let lowerBound = min(maxDuration, startSeconds + minGap)
-        endSeconds = max(min(value, maxDuration), lowerBound)
+        let upperBound = min(maxDuration, startSeconds + maxGap)
+        endSeconds = max(min(value, upperBound), lowerBound)
     }
 
     private func loadVideos() async {
@@ -124,7 +129,7 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     private func resetClipRange() {
         startSeconds = 0
-        endSeconds = maxDuration
+        endSeconds = min(maxDuration, maximumClipDurationLimit)
     }
 
     private func resolveErrorMessage(from error: Error) -> String {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 
 struct AddSearchDetailView: View {
@@ -184,34 +185,34 @@ private struct AddSearchDetailTrimSection: View {
                 .font(AppFont.paperlogy4Regular(size: 12))
                 .foregroundStyle(.white.opacity(0.72))
 
-                VStack(spacing: AppSpacing.xs) {
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.startSeconds },
-                            set: { viewModel.updateStart($0) }
-                        ),
-                        in: 0...max(viewModel.maximumStartSeconds, 0),
-                        step: 1
-                    )
-                    .tint(AppColors.primary600)
+                AddSearchDetailWaveformTrimView(
+                    startSeconds: Binding(
+                        get: { viewModel.startSeconds },
+                        set: { viewModel.updateStart($0) }
+                    ),
+                    endSeconds: Binding(
+                        get: { viewModel.endSeconds },
+                        set: { viewModel.updateEnd($0) }
+                    ),
+                    duration: viewModel.maxDuration
+                )
+                .frame(height: 104)
 
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.endSeconds },
-                            set: { viewModel.updateEnd($0) }
-                        ),
-                        in: viewModel.minimumEndSeconds...max(
-                            viewModel.maxDuration,
-                            viewModel.minimumEndSeconds
-                        ),
-                        step: 1
-                    )
-                    .tint(AppColors.primary600.opacity(0.82))
+                HStack {
+                    Text("선택 구간 길이 \(viewModel.clipDurationText)")
+                        .font(AppFont.paperlogy5Medium(size: 13))
+                        .foregroundStyle(AppColors.primary600)
+
+                    Spacer()
+
+                    Text("최대 30초")
+                        .font(AppFont.paperlogy4Regular(size: 12))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
 
-                Text("선택 구간 길이 \(viewModel.clipDurationText)")
-                    .font(AppFont.paperlogy5Medium(size: 13))
-                    .foregroundStyle(AppColors.primary600)
+                Text("<, > 핸들을 좌우로 드래그해서 구간을 조절하고, 음파는 가로 스크롤할 수 있어요.")
+                    .font(AppFont.paperlogy4Regular(size: 11))
+                    .foregroundStyle(.white.opacity(0.55))
             } else {
                 Text("영상을 찾지 못해 구간 자르기를 사용할 수 없어요.")
                     .font(AppFont.paperlogy4Regular(size: 13))
@@ -225,6 +226,228 @@ private struct AddSearchDetailTrimSection: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         }
+    }
+}
+
+private struct AddSearchDetailWaveformTrimView: View {
+    @Binding var startSeconds: Double
+    @Binding var endSeconds: Double
+    let duration: Double
+
+    private let horizontalPadding: CGFloat = 18
+    private let pointsPerSecond: CGFloat = 18
+    private let trackHeight: CGFloat = 104
+    private let barWidth: CGFloat = 4
+    private let barSpacing: CGFloat = 3
+    private let handleWidth: CGFloat = 34
+    private let handleCornerRadius: CGFloat = 14
+
+    @State private var startDragBase: Double?
+    @State private var endDragBase: Double?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let viewportWidth = max(proxy.size.width, 1)
+            let contentWidth = max(
+                viewportWidth,
+                CGFloat(max(duration, 1)) * pointsPerSecond + horizontalPadding * 2
+            )
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                trimTrack(contentWidth: contentWidth)
+                    .frame(width: contentWidth, height: trackHeight)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func trimTrack(contentWidth: CGFloat) -> some View {
+        let startX = xPosition(for: startSeconds, contentWidth: contentWidth)
+        let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
+        let selectedWidth = max(endX - startX, 1)
+        let trailingWidth = max(contentWidth - endX, 0)
+
+        ZStack(alignment: .leading) {
+            waveformBars(contentWidth: contentWidth)
+                .zIndex(0)
+
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.black.opacity(0.4))
+                    .frame(width: max(startX, 0))
+
+                Rectangle()
+                    .fill(AppColors.primary600.opacity(0.25))
+                    .frame(width: selectedWidth)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.4))
+                    .frame(width: trailingWidth)
+            }
+            .allowsHitTesting(false)
+            .zIndex(1)
+
+            trimHandle(direction: .left)
+                .position(x: startX, y: trackHeight / 2)
+                .highPriorityGesture(startHandleDragGesture(contentWidth: contentWidth))
+                .zIndex(4)
+
+            trimHandle(direction: .right)
+                .position(x: endX, y: trackHeight / 2)
+                .highPriorityGesture(endHandleDragGesture(contentWidth: contentWidth))
+                .zIndex(4)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func waveformBars(contentWidth: CGFloat) -> some View {
+        let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
+        let totalBarWidth = barWidth + barSpacing
+        let barCount = max(Int(usableWidth / totalBarWidth), 1)
+
+        return HStack(alignment: .center, spacing: barSpacing) {
+            ForEach(0..<barCount, id: \.self) { index in
+                Capsule()
+                    .fill(Color.white.opacity(barOpacity(for: index)))
+                    .frame(width: barWidth, height: barHeight(for: index))
+            }
+        }
+        .frame(width: usableWidth, height: trackHeight, alignment: .leading)
+        .padding(.horizontal, horizontalPadding)
+    }
+
+    private func trimHandle(direction: HandleDirection) -> some View {
+        let roundedSide: AddSearchDetailHandleRoundedSide = direction == .left ? .left : .right
+
+        return ZStack {
+            Rectangle()
+                .fill(AppColors.primary600)
+
+            Image(systemName: direction.systemSymbolName)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(.black.opacity(0.92))
+        }
+        .frame(width: handleWidth, height: trackHeight)
+        .clipShape(
+            AddSearchDetailHandleShape(
+                roundedSide: roundedSide,
+                radius: handleCornerRadius
+            )
+        )
+        .overlay {
+            AddSearchDetailHandleShape(
+                roundedSide: roundedSide,
+                radius: handleCornerRadius
+            )
+            .stroke(Color.white.opacity(0.82), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.35), radius: 5, x: 0, y: 2)
+    }
+
+    private func startHandleDragGesture(contentWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if startDragBase == nil {
+                    startDragBase = startSeconds
+                }
+
+                let deltaSeconds = seconds(forTranslation: value.translation.width, contentWidth: contentWidth)
+                startSeconds = (startDragBase ?? startSeconds) + deltaSeconds
+            }
+            .onEnded { _ in
+                startDragBase = nil
+            }
+    }
+
+    private func endHandleDragGesture(contentWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if endDragBase == nil {
+                    endDragBase = endSeconds
+                }
+
+                let deltaSeconds = seconds(forTranslation: value.translation.width, contentWidth: contentWidth)
+                endSeconds = (endDragBase ?? endSeconds) + deltaSeconds
+            }
+            .onEnded { _ in
+                endDragBase = nil
+            }
+    }
+
+    private func seconds(forTranslation translation: CGFloat, contentWidth: CGFloat) -> Double {
+        guard duration > 0 else { return 0 }
+        let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
+        return Double(translation / usableWidth) * duration
+    }
+
+    private func xPosition(for seconds: Double, contentWidth: CGFloat) -> CGFloat {
+        guard duration > 0 else { return horizontalPadding }
+        let clampedSeconds = min(max(seconds, 0), duration)
+        let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
+        let ratio = clampedSeconds / duration
+        return horizontalPadding + CGFloat(ratio) * usableWidth
+    }
+
+    private func barHeight(for index: Int) -> CGFloat {
+        let primary = abs(sin(Double(index) * 0.43))
+        let secondary = abs(cos(Double(index) * 0.17))
+        let tertiary = abs(sin(Double(index) * 0.09))
+        let mix = min(primary * 0.55 + secondary * 0.3 + tertiary * 0.25, 1)
+        return 14 + CGFloat(mix) * (trackHeight - 26)
+    }
+
+    private func barOpacity(for index: Int) -> Double {
+        let pulse = abs(sin(Double(index) * 0.21))
+        return 0.18 + pulse * 0.38
+    }
+
+    private enum HandleDirection {
+        case left
+        case right
+
+        var systemSymbolName: String {
+            switch self {
+            case .left:
+                return "chevron.left"
+            case .right:
+                return "chevron.right"
+            }
+        }
+    }
+}
+
+private enum AddSearchDetailHandleRoundedSide {
+    case left
+    case right
+}
+
+private struct AddSearchDetailHandleShape: Shape {
+    let roundedSide: AddSearchDetailHandleRoundedSide
+    let radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let corners: UIRectCorner
+        switch roundedSide {
+        case .left:
+            corners = [.topLeft, .bottomLeft]
+        case .right:
+            corners = [.topRight, .bottomRight]
+        }
+
+        let bezierPath = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(bezierPath.cgPath)
     }
 }
 
