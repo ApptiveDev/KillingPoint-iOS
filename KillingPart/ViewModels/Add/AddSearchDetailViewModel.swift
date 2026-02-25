@@ -104,6 +104,34 @@ final class AddSearchDetailViewModel: ObservableObject {
         endSeconds = max(min(value, upperBound), lowerBound)
     }
 
+    func updateRange(start: Double, end: Double) {
+        guard maxDuration > 0 else {
+            startSeconds = 0
+            endSeconds = 0
+            return
+        }
+
+        let minGap = maxDuration >= minimumClipDuration ? minimumClipDuration : 0
+        let maxGap = min(maxDuration, maximumClipDurationLimit)
+
+        var clampedStart = min(max(start, 0), maxDuration)
+        var clampedEnd = min(max(end, 0), maxDuration)
+        if clampedEnd < clampedStart {
+            swap(&clampedStart, &clampedEnd)
+        }
+
+        var gap = clampedEnd - clampedStart
+        gap = min(max(gap, minGap), maxGap)
+
+        if clampedStart + gap > maxDuration {
+            clampedStart = max(maxDuration - gap, 0)
+        }
+        clampedEnd = clampedStart + gap
+
+        startSeconds = clampedStart
+        endSeconds = clampedEnd
+    }
+
     private func loadVideos() async {
         isLoading = true
         errorMessage = nil

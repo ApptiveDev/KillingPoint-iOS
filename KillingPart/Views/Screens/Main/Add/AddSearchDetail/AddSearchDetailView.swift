@@ -198,9 +198,12 @@ private struct AddSearchDetailTrimSection: View {
                         get: { viewModel.endSeconds },
                         set: { viewModel.updateEnd($0) }
                     ),
-                    duration: viewModel.maxDuration
+                    duration: viewModel.maxDuration,
+                    onUpdateRange: { start, end in
+                        viewModel.updateRange(start: start, end: end)
+                    }
                 )
-                .frame(height: 104)
+                .frame(height: 138)
 
                 HStack {
                     Text("선택 구간 길이 \(viewModel.clipDurationText)")
@@ -237,10 +240,13 @@ private struct AddSearchDetailWaveformTrimView: View {
     @Binding var startSeconds: Double
     @Binding var endSeconds: Double
     let duration: Double
+    let onUpdateRange: (_ start: Double, _ end: Double) -> Void
 
     private let horizontalPadding: CGFloat = 18
     private let pointsPerSecond: CGFloat = 18
     private let trackHeight: CGFloat = 104
+    private let overviewHeight: CGFloat = 24
+    private let overviewHorizontalInset: CGFloat = 8
     private let barWidth: CGFloat = 4
     private let barSpacing: CGFloat = 3
     private let handleWidth: CGFloat = 34
@@ -257,21 +263,24 @@ private struct AddSearchDetailWaveformTrimView: View {
                 CGFloat(max(duration, 1)) * pointsPerSecond + horizontalPadding * 2
             )
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                trimTrack(contentWidth: contentWidth)
-                    .frame(width: contentWidth, height: trackHeight)
+            VStack(spacing: AppSpacing.xs) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    trimTrack(contentWidth: contentWidth)
+                        .frame(width: contentWidth, height: trackHeight)
+                }
+
+                overviewBar(width: viewportWidth)
             }
         }
     }
 
-    @ViewBuilder
     private func trimTrack(contentWidth: CGFloat) -> some View {
         let startX = xPosition(for: startSeconds, contentWidth: contentWidth)
         let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
         let selectedWidth = max(endX - startX, 1)
         let trailingWidth = max(contentWidth - endX, 0)
 
-        ZStack(alignment: .leading) {
+        return ZStack(alignment: .leading) {
             waveformBars(contentWidth: contentWidth)
                 .zIndex(0)
 
@@ -310,6 +319,73 @@ private struct AddSearchDetailWaveformTrimView: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func overviewBar(width: CGFloat) -> some View {
+        let safeDuration = max(duration, 0.0001)
+        let usableWidth = max(width - overviewHorizontalInset * 2, 1)
+        let clipDuration = min(max(currentClipDuration, 1), duration)
+        let selectionWidth = min(
+            max(CGFloat(clipDuration / safeDuration) * usableWidth, 14),
+            usableWidth
+        )
+
+        let rawStartX = overviewHorizontalInset + CGFloat(startSeconds / safeDuration) * usableWidth
+        let maxStartX = overviewHorizontalInset + usableWidth - selectionWidth
+        let clampedStartX = min(max(rawStartX, overviewHorizontalInset), maxStartX)
+
+        return ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.06))
+
+            overviewBars(width: usableWidth)
+                .padding(.horizontal, overviewHorizontalInset)
+
+            RoundedRectangle(cornerRadius: 7)
+                .fill(AppColors.primary600.opacity(0.35))
+                .frame(width: selectionWidth, height: overviewHeight - 8)
+                .offset(x: clampedStartX)
+
+            Rectangle()
+                .fill(AppColors.primary600.opacity(0.9))
+                .frame(width: 2, height: overviewHeight - 8)
+                .offset(x: clampedStartX)
+
+            Rectangle()
+                .fill(AppColors.primary600.opacity(0.9))
+                .frame(width: 2, height: overviewHeight - 8)
+                .offset(x: clampedStartX + selectionWidth - 2)
+        }
+        .frame(height: overviewHeight)
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    let target = timeForOverviewX(value.location.x, width: width)
+                    moveSelectionCenter(to: target)
+                }
+        )
+    }
+
+    private func overviewBars(width: CGFloat) -> some View {
+        let totalBarWidth: CGFloat = 4
+        let count = max(Int(width / totalBarWidth), 1)
+
+        return HStack(alignment: .center, spacing: 2) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(Color.white.opacity(0.22))
+                    .frame(
+                        width: 2,
+                        height: 5 + abs(sin(Double(index) * 0.28)) * (overviewHeight - 10)
+                    )
+            }
+        }
+        .frame(width: width, height: overviewHeight - 4, alignment: .leading)
     }
 
     private func waveformBars(contentWidth: CGFloat) -> some View {
@@ -411,6 +487,36 @@ private struct AddSearchDetailWaveformTrimView: View {
     private func barOpacity(for index: Int) -> Double {
         let pulse = abs(sin(Double(index) * 0.21))
         return 0.18 + pulse * 0.38
+    }
+
+    private var currentClipDuration: Double {
+        max(endSeconds - startSeconds, 0)
+    }
+
+    private func timeForOverviewX(_ x: CGFloat, width: CGFloat) -> Double {
+        guard duration > 0 else { return 0 }
+        let usableWidth = max(width - overviewHorizontalInset * 2, 1)
+        let clamped = min(max(x - overviewHorizontalInset, 0), usableWidth)
+        return Double(clamped / usableWidth) * duration
+    }
+
+    private func moveSelectionCenter(to seconds: Double) {
+        guard duration > 0 else { return }
+
+        let clipDuration = min(duration, max(currentClipDuration, 1))
+        var newStart = seconds - clipDuration / 2
+        var newEnd = seconds + clipDuration / 2
+
+        if newStart < 0 {
+            newStart = 0
+            newEnd = clipDuration
+        }
+        if newEnd > duration {
+            newEnd = duration
+            newStart = max(duration - clipDuration, 0)
+        }
+
+        onUpdateRange(newStart, newEnd)
     }
 
     private enum HandleDirection {
