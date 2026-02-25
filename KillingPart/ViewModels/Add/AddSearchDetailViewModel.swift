@@ -139,7 +139,6 @@ final class AddSearchDetailViewModel: ObservableObject {
 
         do {
             let fetchedVideos = try await youtubeService.searchVideos(
-                trackID: track.id,
                 title: track.title,
                 artist: track.artist
             )

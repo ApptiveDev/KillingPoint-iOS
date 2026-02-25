@@ -1,26 +1,18 @@
 import Foundation
 
-struct YoutubeSearchQuery {
-    let id: String
-    let artist: String
+struct YoutubeSearchRequest: Encodable {
     let title: String
-
-    var queryItems: [URLQueryItem] {
-        [
-            URLQueryItem(name: "id", value: id),
-            URLQueryItem(name: "artist", value: artist),
-            URLQueryItem(name: "title", value: title)
-        ]
-    }
+    let artist: String
 }
 
 struct YoutubeVideo: Identifiable, Decodable, Equatable {
     let id: String
     let title: String
     let duration: Double
-    private let urlString: String
+    private let urlString: String?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case title
         case duration
         case url
@@ -44,33 +36,67 @@ struct YoutubeVideo: Identifiable, Decodable, Equatable {
             duration = parsedDuration
         }
 
-        urlString = try container.decode(String.self, forKey: .url)
-        id = Self.extractVideoID(from: urlString) ?? urlString
+        urlString = try? container.decodeIfPresent(String.self, forKey: .url)
+
+        if
+            let decodedID = (try? container.decodeIfPresent(String.self, forKey: .id))?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            !decodedID.isEmpty
+        {
+            id = decodedID
+        } else if let urlString, let extractedVideoID = Self.extractVideoID(from: urlString) {
+            id = extractedVideoID
+        } else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .id,
+                in: container,
+                debugDescription: "Missing youtube video id."
+            )
+        }
     }
 
     var thumbnailURL: URL? {
-        guard let videoID = Self.extractVideoID(from: urlString) ?? fallbackVideoID else {
+        guard let videoID = normalizedVideoID else {
             return nil
         }
         return URL(string: "https://i.ytimg.com/vi/\(videoID)/hqdefault.jpg")
     }
 
     var embedURL: URL? {
-        if let embedURL = URL(string: urlString) {
+        if let urlString, let embedURL = URL(string: urlString) {
             return embedURL
         }
-        guard let videoID = Self.extractVideoID(from: id) ?? fallbackVideoID else {
+
+        guard let videoID = normalizedVideoID else {
             return nil
         }
+
         return URL(string: "https://www.youtube.com/embed/\(videoID)?playsinline=1")
     }
 
-    private var fallbackVideoID: String? {
-        id.contains("http") ? nil : id
+    private var normalizedVideoID: String? {
+        if let extractedFromID = Self.extractVideoID(from: id) {
+            return extractedFromID
+        }
+
+        if !id.isEmpty, !id.contains("http"), !id.contains("/") {
+            return id
+        }
+
+        if let urlString, let extractedFromURL = Self.extractVideoID(from: urlString) {
+            return extractedFromURL
+        }
+
+        return nil
     }
 
     private static func extractVideoID(from value: String) -> String? {
-        guard let components = URLComponents(string: value) else {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else {
+            return nil
+        }
+
+        guard let components = URLComponents(string: trimmedValue) else {
             return nil
         }
 
@@ -83,9 +109,22 @@ struct YoutubeVideo: Identifiable, Decodable, Equatable {
             }
         }
 
+        if
+            let host = components.host?.lowercased(),
+            host.contains("youtu.be"),
+            let firstPath = pathComponents.first,
+            !firstPath.isEmpty
+        {
+            return firstPath
+        }
+
         if let watchVideoID = components.queryItems?.first(where: { $0.name == "v" })?.value,
            !watchVideoID.isEmpty {
             return watchVideoID
+        }
+
+        if components.scheme == nil, components.host == nil, !trimmedValue.contains("/") {
+            return trimmedValue
         }
 
         return nil

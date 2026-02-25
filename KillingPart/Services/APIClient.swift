@@ -15,6 +15,7 @@ struct APIRequest {
     var requiresAuthorization: Bool
     var headers: [String: String]
     var body: Data?
+    var baseURL: URL?
 
     init(
         path: String,
@@ -22,7 +23,8 @@ struct APIRequest {
         queryItems: [URLQueryItem] = [],
         requiresAuthorization: Bool = false,
         headers: [String: String] = [:],
-        body: Data? = nil
+        body: Data? = nil,
+        baseURL: URL? = nil
     ) {
         self.path = path
         self.method = method
@@ -30,6 +32,7 @@ struct APIRequest {
         self.requiresAuthorization = requiresAuthorization
         self.headers = headers
         self.body = body
+        self.baseURL = baseURL
     }
 }
 
@@ -122,8 +125,13 @@ final class APIClient: APIClienting {
     }
 
     private func buildRequest(from request: APIRequest) throws -> URLRequest {
+        let requestBaseURL = request.baseURL ?? APIConfiguration.baseURL
         var urlRequest = URLRequest(
-            url: APIConfiguration.endpoint(path: request.path, queryItems: request.queryItems)
+            url: APIConfiguration.endpoint(
+                baseURL: requestBaseURL,
+                path: request.path,
+                queryItems: request.queryItems
+            )
         )
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
