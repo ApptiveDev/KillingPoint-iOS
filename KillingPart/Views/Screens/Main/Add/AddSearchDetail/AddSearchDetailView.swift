@@ -43,9 +43,6 @@ private struct AddSearchDetailVideoSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
-            Text("유튜브 영상")
-                .font(AppFont.paperlogy6SemiBold(size: 16))
-                .foregroundStyle(.white.opacity(0.9))
 
             Group {
                 if viewModel.isLoading {
@@ -63,15 +60,6 @@ private struct AddSearchDetailVideoSection: View {
                                 RoundedRectangle(cornerRadius: 16)
                                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
                             }
-
-                        Text(video.title)
-                            .font(AppFont.paperlogy5Medium(size: 14))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-
-                        Text("길이 \(viewModel.selectedVideoDurationText)")
-                            .font(AppFont.paperlogy4Regular(size: 12))
-                            .foregroundStyle(.white.opacity(0.7))
                     }
                 } else if let errorMessage = viewModel.errorMessage {
                     errorView(message: errorMessage)
@@ -144,22 +132,24 @@ private struct AddSearchDetailTrackInfoSection: View {
     let track: SpotifySimpleTrack
 
     var body: some View {
-        HStack(spacing: AppSpacing.s) {
+        HStack(spacing: AppSpacing.m) {
             AddSearchDetailAlbumArtworkView(url: track.albumImageURL)
+                .zIndex(2)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .center, spacing: 6) {
                 Text(track.title)
                     .font(AppFont.paperlogy6SemiBold(size: 16))
                     .foregroundStyle(.white)
                     .lineLimit(2)
+                    .multilineTextAlignment(.center)
 
                 Text(track.artist)
                     .font(AppFont.paperlogy4Regular(size: 13))
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(2)
+                    .multilineTextAlignment(.center)
             }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(AppSpacing.m)
         .background(Color.white.opacity(0.06))
@@ -217,9 +207,6 @@ private struct AddSearchDetailTrimSection: View {
                         .foregroundStyle(.white.opacity(0.7))
                 }
 
-                Text("<, > 핸들을 좌우로 드래그해서 구간을 조절하고, 음파는 가로 스크롤할 수 있어요.")
-                    .font(AppFont.paperlogy4Regular(size: 11))
-                    .foregroundStyle(.white.opacity(0.55))
             } else {
                 Text("영상을 찾지 못해 구간 자르기를 사용할 수 없어요.")
                     .font(AppFont.paperlogy4Regular(size: 13))
@@ -631,8 +618,38 @@ private struct AddSearchDetailVideoCandidateSection: View {
 
 private struct AddSearchDetailAlbumArtworkView: View {
     let url: URL?
+    @State private var isRotating = false
+
+    private let coverSize: CGFloat = 124
+    private var diskSize: CGFloat { coverSize }
+    private let centerLabelSize: CGFloat = 28
 
     var body: some View {
+        ZStack(alignment: .leading) {
+            disk
+                .frame(width: diskSize, height: diskSize)
+                .rotationEffect(.degrees(isRotating ? 360 : 0))
+                .animation(.linear(duration: 3.6).repeatForever(autoreverses: false), value: isRotating)
+                .onAppear {
+                    isRotating = true
+                }
+                .offset(x: coverSize * 0.5)
+                .zIndex(0)
+
+            albumCover
+                .frame(width: coverSize, height: coverSize)
+                .clipShape(RoundedRectangle(cornerRadius: 16))   // 👈 추가
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    }
+                .zIndex(2)
+        }
+        .frame(width: coverSize + diskSize * 0.48, height: coverSize, alignment: .leading)
+        .padding(AppSpacing.s)
+    }
+
+    private var albumCover: some View {
         Group {
             if let url {
                 AsyncImage(url: url) { phase in
@@ -640,25 +657,94 @@ private struct AddSearchDetailAlbumArtworkView: View {
                     case .success(let image):
                         image.resizable().scaledToFill()
                     case .empty, .failure:
-                        placeholder
+                        coverPlaceholder
                     @unknown default:
-                        placeholder
+                        coverPlaceholder
                     }
                 }
             } else {
-                placeholder
+                coverPlaceholder
             }
         }
-        .frame(width: 64, height: 64)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
-    private var placeholder: some View {
+    private var disk: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.18),
+                            Color.black.opacity(0.95),
+                            Color.white.opacity(0.06),
+                            Color.black.opacity(0.98)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            ForEach(0..<11, id: \.self) { index in
+                Circle()
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .padding(CGFloat(index) * 5 + 10)
+            }
+
+            Circle()
+                .stroke(Color.white.opacity(0.26), lineWidth: 1)
+
+            centerLabel
+        }
+    }
+
+    private var coverPlaceholder: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.12))
+            .fill(Color.white.opacity(0.18))
             .overlay {
                 Image(systemName: "music.note")
-                    .foregroundStyle(.white.opacity(0.72))
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+    }
+
+    private var centerLabel: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.86))
+
+            Group {
+                if let url {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        case .empty, .failure:
+                            centerPlaceholder
+                        @unknown default:
+                            centerPlaceholder
+                        }
+                    }
+                } else {
+                    centerPlaceholder
+                }
+            }
+            .clipShape(Circle())
+            .padding(5)
+
+            Circle()
+                .fill(Color.black.opacity(0.9))
+                .frame(width: 7, height: 7)
+        }
+        .frame(width: centerLabelSize, height: centerLabelSize)
+    }
+
+    private var centerPlaceholder: some View {
+        Circle()
+            .fill(Color.white.opacity(0.2))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
             }
     }
 }
@@ -852,5 +938,17 @@ private struct YoutubePlayerView: UIViewRepresentable {
         }
 
         return "https://\(bundleID.lowercased())"
+    }
+}
+
+#Preview {
+    NavigationStack {
+        AddSearchDetailView(track: SpotifySimpleTrack(
+            id: "preview-track-id",
+            title: "Ditto",
+            artist: "NewJeans",
+            albumImageUrl: nil,
+            albumId: "preview-album-id"
+        ))
     }
 }
