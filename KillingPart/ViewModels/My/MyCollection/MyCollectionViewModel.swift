@@ -29,6 +29,8 @@ final class MyCollectionViewModel: ObservableObject {
     private let defaultFeedPageSize = DiaryService.defaultSize
     private var nextFeedPage = 0
     private var hasNextFeedPage = true
+    private var hasPendingBottomPaginationRequest = false
+    private var hasPendingFocusRefetchRequest = false
 
     init(
         authenticationService: AuthenticationServicing,
@@ -73,6 +75,22 @@ final class MyCollectionViewModel: ObservableObject {
         _ = await (profileLoad, feedLoad)
     }
 
+    func refetchCollectionDataOnFocus() async {
+        guard !isLoadingProfile, !isLoadingUserStatics, !isLoadingMyFeeds else {
+            hasPendingFocusRefetchRequest = true
+            return
+        }
+
+        hasPendingFocusRefetchRequest = false
+        hasPendingBottomPaginationRequest = false
+        hasLoadedProfile = false
+        hasLoadedUserStatics = false
+
+        async let profileLoad: Void = loadMyProfile()
+        async let feedLoad: Void = refreshCollectionData()
+        _ = await (profileLoad, feedLoad)
+    }
+
     func loadMyProfileIfNeeded() async {
         guard !hasLoadedProfile else { return }
         await loadMyProfile()
@@ -87,12 +105,29 @@ final class MyCollectionViewModel: ObservableObject {
         )
     }
 
-    func loadMoreMyFeedsIfNeeded(currentFeedID: DiaryFeedModel.ID) async {
+    func loadMoreMyFeedsFromBottomIfNeeded() async {
         guard hasLoadedMyFeeds else { return }
         guard hasNextFeedPage else { return }
-        guard let lastFeedID = myFeeds.last?.id, lastFeedID == currentFeedID else { return }
+        guard !isLoadingMyFeeds else {
+            hasPendingBottomPaginationRequest = true
+            return
+        }
 
         await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
+    }
+
+    func refreshCollectionData() async {
+        hasLoadedMyFeeds = false
+        nextFeedPage = DiaryService.defaultPage
+        hasNextFeedPage = true
+        hasPendingBottomPaginationRequest = false
+        errorMessage = nil
+
+        await loadMyFeeds(
+            page: DiaryService.defaultPage,
+            size: defaultFeedPageSize,
+            mode: .initial
+        )
     }
 
     func formattedUpdateDate(from rawUpdateDate: String) -> String {
@@ -142,7 +177,10 @@ final class MyCollectionViewModel: ObservableObject {
         isLoadingProfile = true
         errorMessage = nil
 
-        defer { isLoadingProfile = false }
+        defer {
+            isLoadingProfile = false
+            triggerPendingFocusRefetchIfNeeded()
+        }
 
         do {
             let fetchedUser = try await userService.fetchMyUser()
@@ -151,6 +189,7 @@ final class MyCollectionViewModel: ObservableObject {
 
             await loadUserStaticsIfNeeded(userId: fetchedUser.userId)
         } catch {
+            if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -160,12 +199,16 @@ final class MyCollectionViewModel: ObservableObject {
         guard !isLoadingUserStatics else { return }
 
         isLoadingUserStatics = true
-        defer { isLoadingUserStatics = false }
+        defer {
+            isLoadingUserStatics = false
+            triggerPendingFocusRefetchIfNeeded()
+        }
 
         do {
             userStatics = try await userService.fetchUserStatics(userId: userId)
             hasLoadedUserStatics = true
         } catch {
+            if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -185,6 +228,8 @@ final class MyCollectionViewModel: ObservableObject {
             if mode == .pagination {
                 isLoadingMoreFeeds = false
             }
+            triggerPendingFocusRefetchIfNeeded()
+            triggerPendingBottomPaginationIfNeeded()
         }
 
         do {
@@ -195,14 +240,22 @@ final class MyCollectionViewModel: ObservableObject {
                 let existingFeedIDs = Set(myFeeds.map(\.id))
                 let newFeeds = response.content.filter { !existingFeedIDs.contains($0.id) }
                 myFeeds.append(contentsOf: newFeeds)
+                if newFeeds.isEmpty {
+                    hasLoadedMyFeeds = true
+                    hasNextFeedPage = false
+                    return
+                }
             }
 
             hasLoadedMyFeeds = true
             let totalPages = max(response.page.totalPages, 0)
             let fetchedPage = max(response.page.number, 0)
             nextFeedPage = fetchedPage + 1
-            hasNextFeedPage = nextFeedPage < totalPages
+            let hasNextByPage = nextFeedPage < totalPages
+            let hasNextByCount = response.content.count >= size
+            hasNextFeedPage = hasNextByPage || hasNextByCount
         } catch {
+            if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -234,5 +287,39 @@ final class MyCollectionViewModel: ObservableObject {
         }
 
         return "요청 처리에 실패했어요."
+    }
+
+    private func isRequestCancelled(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
+    private func triggerPendingBottomPaginationIfNeeded() {
+        guard hasPendingBottomPaginationRequest else { return }
+        guard !hasPendingFocusRefetchRequest else { return }
+        hasPendingBottomPaginationRequest = false
+        guard hasLoadedMyFeeds else { return }
+        guard hasNextFeedPage else { return }
+        guard !isLoadingMyFeeds else { return }
+
+        Task {
+            await loadMoreMyFeedsFromBottomIfNeeded()
+        }
+    }
+
+    private func triggerPendingFocusRefetchIfNeeded() {
+        guard hasPendingFocusRefetchRequest else { return }
+        guard !isLoadingProfile else { return }
+        guard !isLoadingUserStatics else { return }
+        guard !isLoadingMyFeeds else { return }
+
+        hasPendingFocusRefetchRequest = false
+        Task {
+            await refetchCollectionDataOnFocus()
+        }
     }
 }

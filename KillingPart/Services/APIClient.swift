@@ -15,6 +15,7 @@ struct APIRequest {
     var requiresAuthorization: Bool
     var headers: [String: String]
     var body: Data?
+    var baseURL: URL?
 
     init(
         path: String,
@@ -22,7 +23,8 @@ struct APIRequest {
         queryItems: [URLQueryItem] = [],
         requiresAuthorization: Bool = false,
         headers: [String: String] = [:],
-        body: Data? = nil
+        body: Data? = nil,
+        baseURL: URL? = nil
     ) {
         self.path = path
         self.method = method
@@ -30,12 +32,14 @@ struct APIRequest {
         self.requiresAuthorization = requiresAuthorization
         self.headers = headers
         self.body = body
+        self.baseURL = baseURL
     }
 }
 
 protocol APIClienting {
     func request(_ request: APIRequest) async throws
     func request<T: Decodable>(_ request: APIRequest, responseType: T.Type) async throws -> T
+    func requestWithResponse(_ request: APIRequest) async throws -> HTTPURLResponse
 }
 
 enum APIClientError: LocalizedError {
@@ -101,6 +105,17 @@ final class APIClient: APIClienting {
         }
     }
 
+    func requestWithResponse(_ request: APIRequest) async throws -> HTTPURLResponse {
+        let (data, response) = try await execute(request, allowTokenRefresh: true)
+        guard (200..<300).contains(response.statusCode) else {
+            throw APIClientError.serverError(
+                statusCode: response.statusCode,
+                message: responseMessage(from: data)
+            )
+        }
+        return response
+    }
+
     private func execute(
         _ request: APIRequest,
         allowTokenRefresh: Bool
@@ -122,8 +137,13 @@ final class APIClient: APIClienting {
     }
 
     private func buildRequest(from request: APIRequest) throws -> URLRequest {
+        let requestBaseURL = request.baseURL ?? APIConfiguration.baseURL
         var urlRequest = URLRequest(
-            url: APIConfiguration.endpoint(path: request.path, queryItems: request.queryItems)
+            url: APIConfiguration.endpoint(
+                baseURL: requestBaseURL,
+                path: request.path,
+                queryItems: request.queryItems
+            )
         )
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
@@ -167,6 +187,9 @@ final class APIClient: APIClienting {
 
             return (data, httpResponse)
         } catch {
+            if isRequestCancelled(error) {
+                throw error
+            }
             print("[Network][Error] request failed: \(error.localizedDescription)")
             throw error
         }
@@ -297,6 +320,15 @@ final class APIClient: APIClienting {
         let prefix = token.prefix(8)
         let suffix = token.suffix(4)
         return "\(prefix)...\(suffix)"
+    }
+
+    private func isRequestCancelled(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 

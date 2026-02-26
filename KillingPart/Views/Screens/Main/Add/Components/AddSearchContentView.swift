@@ -2,10 +2,13 @@ import SwiftUI
 
 struct AddSearchContentView: View {
     let isLoading: Bool
+    let isLoadingMore: Bool
     let errorMessage: String?
     let shouldShowEmptyState: Bool
     let tracks: [SpotifySimpleTrack]
     let onRetry: () -> Void
+    let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
+    let onDiarySaved: () -> Void
 
     var body: some View {
         Group {
@@ -16,7 +19,12 @@ struct AddSearchContentView: View {
             } else if shouldShowEmptyState {
                 AddSearchEmptyResultView()
             } else {
-                AddTrackListView(tracks: tracks)
+                AddTrackListView(
+                    tracks: tracks,
+                    isLoadingMore: isLoadingMore,
+                    onTrackAppear: onTrackAppear,
+                    onDiarySaved: onDiarySaved
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -30,7 +38,7 @@ private struct AddSearchLoadingView: View {
                 .progressViewStyle(.circular)
                 .tint(AppColors.primary600)
 
-            Text("Spotify 검색 중...")
+            Text("검색 중...")
                 .font(AppFont.paperlogy5Medium(size: 14))
                 .foregroundStyle(.white.opacity(0.75))
         }
