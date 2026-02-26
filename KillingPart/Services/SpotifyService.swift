@@ -1,7 +1,7 @@
 import Foundation
 
 protocol SpotifyServicing {
-    func searchTracks(query: String, limit: Int) async throws -> [SpotifySimpleTrack]
+    func searchTracks(query: String, limit: Int, offset: Int) async throws -> [SpotifySimpleTrack]
 }
 
 enum SpotifyServiceError: LocalizedError {
@@ -40,15 +40,17 @@ struct SpotifyService: SpotifyServicing {
         self.session = session
     }
 
-    func searchTracks(query: String, limit: Int = 5) async throws -> [SpotifySimpleTrack] {
+    func searchTracks(query: String, limit: Int = 5, offset: Int = 0) async throws -> [SpotifySimpleTrack] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return [] }
+        let safeOffset = max(offset, 0)
 
         let token = try await fetchAccessToken(forceRefresh: false)
         do {
             return try await searchTracksWithBearerToken(
                 trimmedQuery,
                 limit: limit,
+                offset: safeOffset,
                 bearerToken: token
             )
         } catch let error as SpotifyServiceError {
@@ -63,6 +65,7 @@ struct SpotifyService: SpotifyServicing {
         return try await searchTracksWithBearerToken(
             trimmedQuery,
             limit: limit,
+            offset: safeOffset,
             bearerToken: refreshedToken
         )
     }
@@ -70,6 +73,7 @@ struct SpotifyService: SpotifyServicing {
     private func searchTracksWithBearerToken(
         _ query: String,
         limit: Int,
+        offset: Int,
         bearerToken: String
     ) async throws -> [SpotifySimpleTrack] {
         var components = URLComponents(string: "https://api.spotify.com/v1/search")
@@ -77,7 +81,8 @@ struct SpotifyService: SpotifyServicing {
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "type", value: "track"),
             URLQueryItem(name: "market", value: "KR"),
-            URLQueryItem(name: "limit", value: String(limit))
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset))
         ]
 
         guard let url = components?.url else {

@@ -2,10 +2,12 @@ import SwiftUI
 
 struct AddSearchContentView: View {
     let isLoading: Bool
+    let isLoadingMore: Bool
     let errorMessage: String?
     let shouldShowEmptyState: Bool
     let tracks: [SpotifySimpleTrack]
     let onRetry: () -> Void
+    let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
 
     var body: some View {
         Group {
@@ -16,7 +18,11 @@ struct AddSearchContentView: View {
             } else if shouldShowEmptyState {
                 AddSearchEmptyResultView()
             } else {
-                AddTrackListView(tracks: tracks)
+                AddTrackListView(
+                    tracks: tracks,
+                    isLoadingMore: isLoadingMore,
+                    onTrackAppear: onTrackAppear
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

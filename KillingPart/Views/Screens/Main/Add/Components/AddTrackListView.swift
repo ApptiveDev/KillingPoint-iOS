@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AddTrackListView: View {
     let tracks: [SpotifySimpleTrack]
+    let isLoadingMore: Bool
+    let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
 
     var body: some View {
         ScrollView {
@@ -13,6 +15,19 @@ struct AddTrackListView: View {
                         AddTrackRowView(track: track)
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        onTrackAppear(track.id)
+                    }
+                }
+
+                if isLoadingMore {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(.white.opacity(0.85))
+                        Spacer()
+                    }
+                    .padding(.top, AppSpacing.s)
                 }
             }
             .padding(.top, AppSpacing.xs)

@@ -19,10 +19,12 @@ struct AddTabView: View {
 
                     AddSearchContentView(
                         isLoading: viewModel.isLoading,
+                        isLoadingMore: viewModel.isLoadingMore,
                         errorMessage: viewModel.errorMessage,
                         shouldShowEmptyState: viewModel.shouldShowEmptyState,
                         tracks: viewModel.tracks,
-                        onRetry: viewModel.retrySearch
+                        onRetry: viewModel.retrySearch,
+                        onTrackAppear: viewModel.loadMoreIfNeeded
                     )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
