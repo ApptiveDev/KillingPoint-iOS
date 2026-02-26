@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct AddSearchDetailCommentSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
+    @FocusState private var isCommentEditorFocused: Bool
 
     private let scopeOptions: [DiaryScope] = [.private, .killingPart, .public]
     private static let todayFormatter: DateFormatter = {
@@ -21,6 +23,10 @@ struct AddSearchDetailCommentSection: View {
             scopeSelector
         }
         .padding(AppSpacing.m)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            dismissKeyboard()
+        }
     }
 
     private var scopeSelector: some View {
@@ -86,6 +92,7 @@ struct AddSearchDetailCommentSection: View {
                     .font(AppFont.paperlogy4Regular(size: 14))
                     .foregroundColor(.white)
                     .scrollContentBackground(.hidden)
+                    .focused($isCommentEditorFocused)
                     .padding(.horizontal, AppSpacing.xs)
                     .padding(.vertical, AppSpacing.xs)
                     .padding(.bottom, AppSpacing.l)
@@ -116,5 +123,15 @@ struct AddSearchDetailCommentSection: View {
         case .public:
             return "globe"
         }
+    }
+
+    private func dismissKeyboard() {
+        isCommentEditorFocused = false
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 }
