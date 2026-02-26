@@ -30,6 +30,7 @@ final class MyCollectionViewModel: ObservableObject {
     private var nextFeedPage = 0
     private var hasNextFeedPage = true
     private var hasPendingBottomPaginationRequest = false
+    private var hasPendingFocusRefetchRequest = false
 
     init(
         authenticationService: AuthenticationServicing,
@@ -75,10 +76,13 @@ final class MyCollectionViewModel: ObservableObject {
     }
 
     func refetchCollectionDataOnFocus() async {
-        guard !isLoadingProfile else { return }
-        guard !isLoadingUserStatics else { return }
-        guard !isLoadingMyFeeds else { return }
+        guard !isLoadingProfile, !isLoadingUserStatics, !isLoadingMyFeeds else {
+            hasPendingFocusRefetchRequest = true
+            return
+        }
 
+        hasPendingFocusRefetchRequest = false
+        hasPendingBottomPaginationRequest = false
         hasLoadedProfile = false
         hasLoadedUserStatics = false
 
@@ -173,7 +177,10 @@ final class MyCollectionViewModel: ObservableObject {
         isLoadingProfile = true
         errorMessage = nil
 
-        defer { isLoadingProfile = false }
+        defer {
+            isLoadingProfile = false
+            triggerPendingFocusRefetchIfNeeded()
+        }
 
         do {
             let fetchedUser = try await userService.fetchMyUser()
@@ -192,7 +199,10 @@ final class MyCollectionViewModel: ObservableObject {
         guard !isLoadingUserStatics else { return }
 
         isLoadingUserStatics = true
-        defer { isLoadingUserStatics = false }
+        defer {
+            isLoadingUserStatics = false
+            triggerPendingFocusRefetchIfNeeded()
+        }
 
         do {
             userStatics = try await userService.fetchUserStatics(userId: userId)
@@ -218,6 +228,7 @@ final class MyCollectionViewModel: ObservableObject {
             if mode == .pagination {
                 isLoadingMoreFeeds = false
             }
+            triggerPendingFocusRefetchIfNeeded()
             triggerPendingBottomPaginationIfNeeded()
         }
 
@@ -289,6 +300,7 @@ final class MyCollectionViewModel: ObservableObject {
 
     private func triggerPendingBottomPaginationIfNeeded() {
         guard hasPendingBottomPaginationRequest else { return }
+        guard !hasPendingFocusRefetchRequest else { return }
         hasPendingBottomPaginationRequest = false
         guard hasLoadedMyFeeds else { return }
         guard hasNextFeedPage else { return }
@@ -296,6 +308,18 @@ final class MyCollectionViewModel: ObservableObject {
 
         Task {
             await loadMoreMyFeedsFromBottomIfNeeded()
+        }
+    }
+
+    private func triggerPendingFocusRefetchIfNeeded() {
+        guard hasPendingFocusRefetchRequest else { return }
+        guard !isLoadingProfile else { return }
+        guard !isLoadingUserStatics else { return }
+        guard !isLoadingMyFeeds else { return }
+
+        hasPendingFocusRefetchRequest = false
+        Task {
+            await refetchCollectionDataOnFocus()
         }
     }
 }

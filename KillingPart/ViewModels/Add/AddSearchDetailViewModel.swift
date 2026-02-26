@@ -182,6 +182,7 @@ final class AddSearchDetailViewModel: ObservableObject {
 
         do {
             _ = try await diaryService.createDiary(request: request)
+            NotificationCenter.default.post(name: .diaryCreated, object: nil)
             return true
         } catch {
             if Task.isCancelled { return false }

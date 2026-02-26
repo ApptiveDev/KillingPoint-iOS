@@ -44,7 +44,18 @@ struct DiaryFeedModel: Decodable, Identifiable {
     var id: Int { diaryId }
 
     var albumImageURL: URL? {
-        URL(string: albumImageUrl)
+        let trimmed = albumImageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let parsed = URL(string: trimmed), parsed.scheme != nil {
+            return parsed
+        }
+
+        if trimmed.hasPrefix("//"), let parsed = URL(string: "https:\(trimmed)") {
+            return parsed
+        }
+
+        return URL(string: "https://\(trimmed)")
     }
 }
 

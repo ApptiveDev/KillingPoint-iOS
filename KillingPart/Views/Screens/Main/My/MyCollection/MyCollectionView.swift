@@ -50,6 +50,11 @@ struct MyCollectionView: View {
                 await viewModel.refetchCollectionDataOnFocus()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
+            Task {
+                await viewModel.refetchCollectionDataOnFocus()
+            }
+        }
     }
 
     private var screenTransition: AnyTransition {
