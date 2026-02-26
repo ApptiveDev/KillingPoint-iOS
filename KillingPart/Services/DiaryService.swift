@@ -61,6 +61,7 @@ struct DiaryService: DiaryServicing {
 
             return try await apiClient.request(request, responseType: MyDiaryFeedsResponse.self)
         } catch {
+            if isRequestCancelled(error) { throw error }
             throw mapError(error)
         }
     }
@@ -90,6 +91,7 @@ struct DiaryService: DiaryServicing {
                 location: location
             )
         } catch {
+            if isRequestCancelled(error) { throw error }
             throw mapError(error)
         }
     }
@@ -123,5 +125,14 @@ struct DiaryService: DiaryServicing {
             return nil
         }
         return Int(lastComponent)
+    }
+
+    private func isRequestCancelled(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }

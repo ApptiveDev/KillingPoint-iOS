@@ -107,6 +107,9 @@ struct MyCollectionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
+        .refreshable {
+            await viewModel.refreshCollectionData()
+        }
     }
 
     private var feedGridColumns: [GridItem] {

@@ -95,6 +95,19 @@ final class MyCollectionViewModel: ObservableObject {
         await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
     }
 
+    func refreshCollectionData() async {
+        hasLoadedMyFeeds = false
+        nextFeedPage = DiaryService.defaultPage
+        hasNextFeedPage = true
+        errorMessage = nil
+
+        await loadMyFeeds(
+            page: DiaryService.defaultPage,
+            size: defaultFeedPageSize,
+            mode: .initial
+        )
+    }
+
     func formattedUpdateDate(from rawUpdateDate: String) -> String {
         let datePart = rawUpdateDate.split(separator: "T").first.map(String.init) ?? rawUpdateDate
         return datePart.replacingOccurrences(of: "-", with: ".")
@@ -151,6 +164,7 @@ final class MyCollectionViewModel: ObservableObject {
 
             await loadUserStaticsIfNeeded(userId: fetchedUser.userId)
         } catch {
+            if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -166,6 +180,7 @@ final class MyCollectionViewModel: ObservableObject {
             userStatics = try await userService.fetchUserStatics(userId: userId)
             hasLoadedUserStatics = true
         } catch {
+            if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -203,6 +218,7 @@ final class MyCollectionViewModel: ObservableObject {
             nextFeedPage = fetchedPage + 1
             hasNextFeedPage = nextFeedPage < totalPages
         } catch {
+            if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -234,5 +250,14 @@ final class MyCollectionViewModel: ObservableObject {
         }
 
         return "요청 처리에 실패했어요."
+    }
+
+    private func isRequestCancelled(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }

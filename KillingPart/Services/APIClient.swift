@@ -187,6 +187,9 @@ final class APIClient: APIClienting {
 
             return (data, httpResponse)
         } catch {
+            if isRequestCancelled(error) {
+                throw error
+            }
             print("[Network][Error] request failed: \(error.localizedDescription)")
             throw error
         }
@@ -317,6 +320,15 @@ final class APIClient: APIClienting {
         let prefix = token.prefix(8)
         let suffix = token.suffix(4)
         return "\(prefix)...\(suffix)"
+    }
+
+    private func isRequestCancelled(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 
