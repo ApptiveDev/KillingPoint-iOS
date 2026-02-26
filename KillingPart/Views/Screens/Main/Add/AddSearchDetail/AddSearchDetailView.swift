@@ -41,9 +41,18 @@ struct AddSearchDetailView: View {
         .task {
             await viewModel.loadIfNeeded()
         }
-        .navigationTitle("음악 상세")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Image("killingpartLogoGray")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 30)
+                    .accessibilityLabel("KillingPart")
+            }
+        }
     }
 
     private var detailInputSection: some View {
