@@ -45,8 +45,10 @@ struct MyCollectionView: View {
             }
             Button("취소", role: .cancel) {}
         }
-        .task {
-            await viewModel.loadInitialDataIfNeeded()
+        .onAppear {
+            Task {
+                await viewModel.refetchCollectionDataOnFocus()
+            }
         }
     }
 
@@ -80,8 +82,9 @@ struct MyCollectionView: View {
                                 formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
                             )
                             .onAppear {
+                                guard feed.id == viewModel.myFeeds.last?.id else { return }
                                 Task {
-                                    await viewModel.loadMoreMyFeedsIfNeeded(currentFeedID: feed.id)
+                                    await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
                                 }
                             }
                         }
@@ -115,9 +118,6 @@ struct MyCollectionView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
-        }
-        .refreshable {
-            await viewModel.refreshCollectionData()
         }
     }
 

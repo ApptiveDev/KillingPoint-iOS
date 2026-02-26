@@ -29,6 +29,7 @@ final class MyCollectionViewModel: ObservableObject {
     private let defaultFeedPageSize = DiaryService.defaultSize
     private var nextFeedPage = 0
     private var hasNextFeedPage = true
+    private var hasPendingBottomPaginationRequest = false
 
     init(
         authenticationService: AuthenticationServicing,
@@ -73,6 +74,19 @@ final class MyCollectionViewModel: ObservableObject {
         _ = await (profileLoad, feedLoad)
     }
 
+    func refetchCollectionDataOnFocus() async {
+        guard !isLoadingProfile else { return }
+        guard !isLoadingUserStatics else { return }
+        guard !isLoadingMyFeeds else { return }
+
+        hasLoadedProfile = false
+        hasLoadedUserStatics = false
+
+        async let profileLoad: Void = loadMyProfile()
+        async let feedLoad: Void = refreshCollectionData()
+        _ = await (profileLoad, feedLoad)
+    }
+
     func loadMyProfileIfNeeded() async {
         guard !hasLoadedProfile else { return }
         await loadMyProfile()
@@ -90,17 +104,10 @@ final class MyCollectionViewModel: ObservableObject {
     func loadMoreMyFeedsFromBottomIfNeeded() async {
         guard hasLoadedMyFeeds else { return }
         guard hasNextFeedPage else { return }
-
-        await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
-    }
-
-    func loadMoreMyFeedsIfNeeded(currentFeedID: DiaryFeedModel.ID) async {
-        guard hasLoadedMyFeeds else { return }
-        guard hasNextFeedPage else { return }
-        guard let currentIndex = myFeeds.firstIndex(where: { $0.id == currentFeedID }) else { return }
-
-        let thresholdIndex = max(myFeeds.count - 3, 0)
-        guard currentIndex >= thresholdIndex else { return }
+        guard !isLoadingMyFeeds else {
+            hasPendingBottomPaginationRequest = true
+            return
+        }
 
         await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
     }
@@ -109,6 +116,7 @@ final class MyCollectionViewModel: ObservableObject {
         hasLoadedMyFeeds = false
         nextFeedPage = DiaryService.defaultPage
         hasNextFeedPage = true
+        hasPendingBottomPaginationRequest = false
         errorMessage = nil
 
         await loadMyFeeds(
@@ -210,6 +218,7 @@ final class MyCollectionViewModel: ObservableObject {
             if mode == .pagination {
                 isLoadingMoreFeeds = false
             }
+            triggerPendingBottomPaginationIfNeeded()
         }
 
         do {
@@ -220,6 +229,11 @@ final class MyCollectionViewModel: ObservableObject {
                 let existingFeedIDs = Set(myFeeds.map(\.id))
                 let newFeeds = response.content.filter { !existingFeedIDs.contains($0.id) }
                 myFeeds.append(contentsOf: newFeeds)
+                if newFeeds.isEmpty {
+                    hasLoadedMyFeeds = true
+                    hasNextFeedPage = false
+                    return
+                }
             }
 
             hasLoadedMyFeeds = true
@@ -271,5 +285,17 @@ final class MyCollectionViewModel: ObservableObject {
 
         let nsError = error as NSError
         return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
+    private func triggerPendingBottomPaginationIfNeeded() {
+        guard hasPendingBottomPaginationRequest else { return }
+        hasPendingBottomPaginationRequest = false
+        guard hasLoadedMyFeeds else { return }
+        guard hasNextFeedPage else { return }
+        guard !isLoadingMyFeeds else { return }
+
+        Task {
+            await loadMoreMyFeedsFromBottomIfNeeded()
+        }
     }
 }
