@@ -621,8 +621,14 @@ private struct AddSearchDetailAlbumArtworkView: View {
     @State private var isRotating = false
 
     private let coverSize: CGFloat = 124
-    private var diskSize: CGFloat { coverSize }
-    private let centerLabelSize: CGFloat = 28
+    private var fixedLayoutDiskSize: CGFloat { coverSize }
+    private var diskSize: CGFloat { coverSize * 0.9 }
+    private var centerLabelSize: CGFloat { diskSize * 0.34 }
+    private var grooveCount: Int { 9 }
+    private var grooveBaseInset: CGFloat { diskSize * 0.08 }
+    private var grooveStepInset: CGFloat { diskSize * 0.04 }
+    private var centerImageInset: CGFloat { centerLabelSize * 0.12 }
+    private var centerHoleSize: CGFloat { max(diskSize * 0.05, 4) }
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -633,20 +639,20 @@ private struct AddSearchDetailAlbumArtworkView: View {
                 .onAppear {
                     isRotating = true
                 }
-                .offset(x: coverSize * 0.5)
+                .offset(x: coverSize * 0.55)
                 .zIndex(0)
 
             albumCover
                 .frame(width: coverSize, height: coverSize)
-                .clipShape(RoundedRectangle(cornerRadius: 16))   // 👈 추가
+                .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay {
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(Color.white.opacity(0.12), lineWidth: 1)
                     }
                 .zIndex(2)
         }
-        .frame(width: coverSize + diskSize * 0.48, height: coverSize, alignment: .leading)
-        .padding(AppSpacing.s)
+        .frame(width: coverSize + fixedLayoutDiskSize * 0.48, height: coverSize, alignment: .leading)
+        
     }
 
     private var albumCover: some View {
@@ -684,14 +690,14 @@ private struct AddSearchDetailAlbumArtworkView: View {
                     )
                 )
 
-            ForEach(0..<11, id: \.self) { index in
+            ForEach(0..<grooveCount, id: \.self) { index in
                 Circle()
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                    .padding(CGFloat(index) * 5 + 10)
+                    .stroke(Color.white.opacity(0.08), lineWidth: max(diskSize * 0.006, 0.8))
+                    .padding(grooveBaseInset + CGFloat(index) * grooveStepInset)
             }
 
             Circle()
-                .stroke(Color.white.opacity(0.26), lineWidth: 1)
+                .stroke(Color.white.opacity(0.26), lineWidth: max(diskSize * 0.008, 1))
 
             centerLabel
         }
@@ -729,11 +735,11 @@ private struct AddSearchDetailAlbumArtworkView: View {
                 }
             }
             .clipShape(Circle())
-            .padding(5)
+            .padding(centerImageInset)
 
             Circle()
                 .fill(Color.black.opacity(0.9))
-                .frame(width: 7, height: 7)
+                .frame(width: centerHoleSize, height: centerHoleSize)
         }
         .frame(width: centerLabelSize, height: centerLabelSize)
     }
