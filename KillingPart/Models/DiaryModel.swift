@@ -1,9 +1,22 @@
 import Foundation
 
-enum DiaryScope: String, Decodable {
+enum DiaryScope: String, Codable, CaseIterable, Identifiable {
     case `public` = "PUBLIC"
     case `private` = "PRIVATE"
     case killingPart = "KILLING_PART"
+
+    var id: String { rawValue }
+
+    var addSearchDetailDisplayName: String {
+        switch self {
+        case .private:
+            return "전체 비공개"
+        case .killingPart:
+            return "킬링파트만 공개"
+        case .public:
+            return "전체 공개"
+        }
+    }
 }
 
 struct DiaryFeedModel: Decodable, Identifiable {
@@ -45,4 +58,22 @@ struct DiaryFeedPageModel: Decodable {
 struct MyDiaryFeedsResponse: Decodable {
     let content: [DiaryFeedModel]
     let page: DiaryFeedPageModel
+}
+
+struct DiaryCreateRequest: Encodable {
+    let artist: String
+    let musicTitle: String
+    let albumImageUrl: String
+    let videoUrl: String
+    let scope: DiaryScope
+    let content: String
+    let duration: String
+    let totalDuration: String
+    let start: String
+    let end: String
+}
+
+struct DiaryCreateResult {
+    let diaryId: Int?
+    let location: String?
 }

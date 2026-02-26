@@ -39,6 +39,7 @@ struct APIRequest {
 protocol APIClienting {
     func request(_ request: APIRequest) async throws
     func request<T: Decodable>(_ request: APIRequest, responseType: T.Type) async throws -> T
+    func requestWithResponse(_ request: APIRequest) async throws -> HTTPURLResponse
 }
 
 enum APIClientError: LocalizedError {
@@ -102,6 +103,17 @@ final class APIClient: APIClienting {
         } catch {
             throw APIClientError.decodingFailed
         }
+    }
+
+    func requestWithResponse(_ request: APIRequest) async throws -> HTTPURLResponse {
+        let (data, response) = try await execute(request, allowTokenRefresh: true)
+        guard (200..<300).contains(response.statusCode) else {
+            throw APIClientError.serverError(
+                statusCode: response.statusCode,
+                message: responseMessage(from: data)
+            )
+        }
+        return response
     }
 
     private func execute(
