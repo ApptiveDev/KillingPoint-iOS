@@ -40,6 +40,8 @@ struct AddSearchDetailView: View {
 
 private struct AddSearchDetailVideoSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
+    private let videoAspectRatio: CGFloat = 16 / 9
+    private let videoCornerRadius: CGFloat = 16
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
@@ -53,11 +55,12 @@ private struct AddSearchDetailVideoSection: View {
                             videoURL: video.embedURL,
                             startSeconds: viewModel.startSeconds
                         )
-                            .frame(height: 220)
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(videoAspectRatio, contentMode: .fit)
                             .allowsHitTesting(false)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: videoCornerRadius)
                                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
                             }
                     }
@@ -68,6 +71,7 @@ private struct AddSearchDetailVideoSection: View {
                 }
             }
         }
+        .padding(.horizontal, AppSpacing.xl)
     }
 
     private var loadingView: some View {
@@ -80,9 +84,10 @@ private struct AddSearchDetailVideoSection: View {
                 .font(AppFont.paperlogy4Regular(size: 13))
                 .foregroundStyle(.white.opacity(0.72))
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
+        .aspectRatio(videoAspectRatio, contentMode: .fit)
         .background(Color.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
     }
 
     private func errorView(message: String) -> some View {
@@ -107,9 +112,10 @@ private struct AddSearchDetailVideoSection: View {
             .buttonStyle(.plain)
         }
         .padding(AppSpacing.m)
-        .frame(maxWidth: .infinity, minHeight: 220, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .aspectRatio(videoAspectRatio, contentMode: .fit)
         .background(Color.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
     }
 
     private var emptyView: some View {
@@ -122,9 +128,10 @@ private struct AddSearchDetailVideoSection: View {
                 .font(AppFont.paperlogy4Regular(size: 13))
                 .foregroundStyle(.white.opacity(0.72))
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
+        .aspectRatio(videoAspectRatio, contentMode: .fit)
         .background(Color.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
     }
 }
 
@@ -152,12 +159,17 @@ private struct AddSearchDetailTrackInfoSection: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(AppSpacing.m)
-        .background(Color.white.opacity(0.06))
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.15),  // 오른쪽이 더 밝게
+                    Color.white.opacity(0.02)   // 왼쪽이 더 어둡게
+                ],
+                startPoint: .trailing,   // 👉 오른쪽 시작
+                endPoint: .leading       // 👉 왼쪽 끝
+            )
+        )
         .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        }
     }
 }
 
@@ -165,20 +177,12 @@ private struct AddSearchDetailTrimSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.s) {
-            Text("구간 자르기")
-                .font(AppFont.paperlogy6SemiBold(size: 16))
+        VStack(alignment: .center, spacing: AppSpacing.s) {
+            Text("킬링파트 자르기")
+                .font(AppFont.paperlogy4Regular(size: 16))
                 .foregroundStyle(.white.opacity(0.9))
 
             if viewModel.hasPlayableVideo {
-                HStack {
-                    Text("시작 \(viewModel.startTimeText)")
-                    Spacer()
-                    Text("끝 \(viewModel.endTimeText)")
-                }
-                .font(AppFont.paperlogy4Regular(size: 12))
-                .foregroundStyle(.white.opacity(0.72))
-
                 AddSearchDetailWaveformTrimView(
                     startSeconds: Binding(
                         get: { viewModel.startSeconds },
@@ -189,11 +193,13 @@ private struct AddSearchDetailTrimSection: View {
                         set: { viewModel.updateEnd($0) }
                     ),
                     duration: viewModel.maxDuration,
+                    startTimeText: viewModel.startTimeText,
+                    endTimeText: viewModel.endTimeText,
                     onUpdateRange: { start, end in
                         viewModel.updateRange(start: start, end: end)
                     }
                 )
-                .frame(height: 138)
+                .frame(height: 160)
 
                 HStack {
                     Text("선택 구간 길이 \(viewModel.clipDurationText)")
@@ -211,15 +217,11 @@ private struct AddSearchDetailTrimSection: View {
                 Text("영상을 찾지 못해 구간 자르기를 사용할 수 없어요.")
                     .font(AppFont.paperlogy4Regular(size: 13))
                     .foregroundStyle(.white.opacity(0.72))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)   // 👈 핵심
             }
         }
         .padding(AppSpacing.m)
-        .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        }
     }
 }
 
@@ -227,11 +229,15 @@ private struct AddSearchDetailWaveformTrimView: View {
     @Binding var startSeconds: Double
     @Binding var endSeconds: Double
     let duration: Double
+    let startTimeText: String
+    let endTimeText: String
     let onUpdateRange: (_ start: Double, _ end: Double) -> Void
 
     private let horizontalPadding: CGFloat = 18
     private let pointsPerSecond: CGFloat = 18
     private let trackHeight: CGFloat = 104
+    private let handleLabelHeight: CGFloat = 18
+    private let handleLabelWidth: CGFloat = 76
     private let overviewHeight: CGFloat = 24
     private let overviewHorizontalInset: CGFloat = 8
     private let barWidth: CGFloat = 4
@@ -252,8 +258,13 @@ private struct AddSearchDetailWaveformTrimView: View {
 
             VStack(spacing: AppSpacing.xs) {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    trimTrack(contentWidth: contentWidth)
-                        .frame(width: contentWidth, height: trackHeight)
+                    VStack(spacing: AppSpacing.xs) {
+                        trimTrack(contentWidth: contentWidth)
+                            .frame(width: contentWidth, height: trackHeight)
+
+                        handleTimeLabels(contentWidth: contentWidth)
+                            .frame(width: contentWidth, height: handleLabelHeight)
+                    }
                 }
 
                 overviewBar(width: viewportWidth)
@@ -306,6 +317,39 @@ private struct AddSearchDetailWaveformTrimView: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func handleTimeLabels(contentWidth: CGFloat) -> some View {
+        let startX = xPosition(for: startSeconds, contentWidth: contentWidth)
+        let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
+
+        return ZStack(alignment: .topLeading) {
+            handleTimeLabel("\(startTimeText)")
+                .position(
+                    x: clampedLabelCenter(for: startX, contentWidth: contentWidth),
+                    y: handleLabelHeight / 2
+                )
+
+            handleTimeLabel("\(endTimeText)")
+                .position(
+                    x: clampedLabelCenter(for: endX, contentWidth: contentWidth),
+                    y: handleLabelHeight / 2
+                )
+        }
+    }
+
+    private func handleTimeLabel(_ text: String) -> some View {
+        Text(text)
+            .font(AppFont.paperlogy4Regular(size: 11))
+            .foregroundStyle(.white.opacity(0.74))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: handleLabelWidth)
+    }
+
+    private func clampedLabelCenter(for x: CGFloat, contentWidth: CGFloat) -> CGFloat {
+        let half = handleLabelWidth / 2
+        return min(max(x, half), contentWidth - half)
     }
 
     private func overviewBar(width: CGFloat) -> some View {
