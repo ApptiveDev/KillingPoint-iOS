@@ -24,7 +24,8 @@ struct AddTabView: View {
                         shouldShowEmptyState: viewModel.shouldShowEmptyState,
                         tracks: viewModel.tracks,
                         onRetry: viewModel.retrySearch,
-                        onTrackAppear: viewModel.loadMoreIfNeeded
+                        onTrackAppear: viewModel.loadMoreIfNeeded,
+                        onDiarySaved: viewModel.clearSearch
                     )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

@@ -4,8 +4,13 @@ struct AddSearchDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: AddSearchDetailViewModel
     @State private var isForwardStepTransition = true
+    private let onSaved: (() -> Void)?
 
-    init(track: SpotifySimpleTrack) {
+    init(
+        track: SpotifySimpleTrack,
+        onSaved: (() -> Void)? = nil
+    ) {
+        self.onSaved = onSaved
         _viewModel = StateObject(wrappedValue: AddSearchDetailViewModel(track: track))
     }
 
@@ -143,6 +148,7 @@ struct AddSearchDetailView: View {
         Task {
             let isSuccess = await viewModel.submitDiary()
             if isSuccess {
+                onSaved?()
                 dismiss()
             }
         }

@@ -8,6 +8,7 @@ struct AddSearchContentView: View {
     let tracks: [SpotifySimpleTrack]
     let onRetry: () -> Void
     let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
+    let onDiarySaved: () -> Void
 
     var body: some View {
         Group {
@@ -21,7 +22,8 @@ struct AddSearchContentView: View {
                 AddTrackListView(
                     tracks: tracks,
                     isLoadingMore: isLoadingMore,
-                    onTrackAppear: onTrackAppear
+                    onTrackAppear: onTrackAppear,
+                    onDiarySaved: onDiarySaved
                 )
             }
         }

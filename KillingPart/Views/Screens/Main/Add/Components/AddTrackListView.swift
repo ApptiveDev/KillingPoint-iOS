@@ -4,13 +4,17 @@ struct AddTrackListView: View {
     let tracks: [SpotifySimpleTrack]
     let isLoadingMore: Bool
     let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
+    let onDiarySaved: () -> Void
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: AppSpacing.s) {
                 ForEach(tracks) { track in
                     NavigationLink {
-                        AddSearchDetailView(track: track)
+                        AddSearchDetailView(
+                            track: track,
+                            onSaved: onDiarySaved
+                        )
                     } label: {
                         AddTrackRowView(track: track)
                     }
