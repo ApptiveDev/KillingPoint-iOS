@@ -1,22 +1,14 @@
 import Foundation
 
 enum APIConfiguration {
-    static let baseURL: URL = {
-        guard
-            let baseURLString = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String,
-            let baseURL = URL(string: baseURLString),
-            baseURL.scheme != nil,
-            baseURL.host != nil
-        else {
-            preconditionFailure(
-                "BASE_URL is missing or invalid (\(Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String ?? "nil")). Check your xcconfig values."
-            )
-        }
-
-        return baseURL
-    }()
+    static let baseURL: URL = resolveURL(forInfoDictionaryKey: "BASE_URL")
+    static let musicBaseURL: URL = resolveURL(forInfoDictionaryKey: "MUSIC_BASE_URL")
 
     static func endpoint(path: String, queryItems: [URLQueryItem] = []) -> URL {
+        endpoint(baseURL: baseURL, path: path, queryItems: queryItems)
+    }
+
+    static func endpoint(baseURL: URL, path: String, queryItems: [URLQueryItem] = []) -> URL {
         let components = path.split(separator: "/").map(String.init)
         let urlWithPath = components.reduce(baseURL) { partialURL, component in
             partialURL.appendingPathComponent(component)
@@ -32,5 +24,20 @@ enum APIConfiguration {
 
         urlComponents.queryItems = queryItems
         return urlComponents.url ?? urlWithPath
+    }
+
+    private static func resolveURL(forInfoDictionaryKey key: String) -> URL {
+        guard
+            let urlString = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+            let resolvedURL = URL(string: urlString),
+            resolvedURL.scheme != nil,
+            resolvedURL.host != nil
+        else {
+            preconditionFailure(
+                "\(key) is missing or invalid (\(Bundle.main.object(forInfoDictionaryKey: key) as? String ?? "nil")). Check your xcconfig values."
+            )
+        }
+
+        return resolvedURL
     }
 }

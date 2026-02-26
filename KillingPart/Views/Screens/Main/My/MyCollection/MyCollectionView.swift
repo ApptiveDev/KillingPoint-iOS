@@ -45,8 +45,15 @@ struct MyCollectionView: View {
             }
             Button("취소", role: .cancel) {}
         }
-        .task {
-            await viewModel.loadInitialDataIfNeeded()
+        .onAppear {
+            Task {
+                await viewModel.refetchCollectionDataOnFocus()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
+            Task {
+                await viewModel.refetchCollectionDataOnFocus()
+            }
         }
     }
 
@@ -79,8 +86,33 @@ struct MyCollectionView: View {
                                 feed: feed,
                                 formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
                             )
+                            .onAppear {
+                                guard feed.id == viewModel.myFeeds.last?.id else { return }
+                                Task {
+                                    await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
+                                }
+                            }
                         }
                     }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id("my-collection-bottom-trigger-\(viewModel.myFeeds.count)")
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
+                            }
+                        }
+                }
+
+                if viewModel.isLoadingMoreFeeds {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(.white.opacity(0.88))
+                        Spacer()
+                    }
+                    .padding(.top, AppSpacing.s)
                 }
 
                 if let errorMessage = viewModel.errorMessage {

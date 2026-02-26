@@ -13,7 +13,6 @@ import KakaoSDKCommon
 struct KillingPartApp: App {
     init() {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
-            AppFont.registerPaperlogyFonts()
             configureKakaoSDK()
         }
     }
