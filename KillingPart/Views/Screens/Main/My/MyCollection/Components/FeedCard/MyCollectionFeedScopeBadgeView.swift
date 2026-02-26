@@ -15,7 +15,7 @@ struct MyCollectionFeedScopeBadgeView: View {
         case .private:
             return "lock.fill"
         case .public:
-            return "globe.asia.australia.fill"
+            return "globe"
         case .killingPart:
             return "music.note"
         }

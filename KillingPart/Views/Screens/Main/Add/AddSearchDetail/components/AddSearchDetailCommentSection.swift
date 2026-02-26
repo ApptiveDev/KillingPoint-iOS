@@ -4,6 +4,16 @@ struct AddSearchDetailCommentSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
 
     private let scopeOptions: [DiaryScope] = [.private, .killingPart, .public]
+    private static let todayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "yyyy.MM.dd"
+        return formatter
+    }()
+
+    private var todayText: String {
+        Self.todayFormatter.string(from: Date())
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.m) {
@@ -15,13 +25,12 @@ struct AddSearchDetailCommentSection: View {
 
     private var scopeSelector: some View {
         HStack(alignment: .center, spacing: AppSpacing.xs) {
-            
-            Image(systemName: "globe")
-                       .font(.system(size: 14, weight: .medium))
-                       .foregroundStyle(.white.opacity(0.8))
+            Image(systemName: scopeIconName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
             Text("공개상태:")
-                       .font(AppFont.paperlogy5Medium(size: 14))
-                       .foregroundStyle(.white.opacity(0.8))
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white.opacity(0.8))
 
             Menu {
                 ForEach(scopeOptions) { scope in
@@ -66,7 +75,7 @@ struct AddSearchDetailCommentSection: View {
         VStack(alignment: .leading, spacing: AppSpacing.xs) {
             ZStack(alignment: .topLeading) {
                 if viewModel.diaryContent.isEmpty {
-                    Text("이 음악의 킬링파트와 감상을 자유롭게 남겨주세요.")
+                    Text("코멘트 추가...")
                         .font(AppFont.paperlogy4Regular(size: 14))
                         .foregroundStyle(.white.opacity(0.38))
                         .padding(.horizontal, AppSpacing.s)
@@ -79,6 +88,7 @@ struct AddSearchDetailCommentSection: View {
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, AppSpacing.xs)
                     .padding(.vertical, AppSpacing.xs)
+                    .padding(.bottom, AppSpacing.l)
                     .frame(minHeight: 190)
             }
             .background(Color.white.opacity(0.07))
@@ -87,6 +97,24 @@ struct AddSearchDetailCommentSection: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             }
+            .overlay(alignment: .bottomLeading) {
+                Text(todayText)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.52))
+                    .padding(.leading, AppSpacing.s)
+                    .padding(.bottom, AppSpacing.s)
+            }
+        }
+    }
+
+    private var scopeIconName: String {
+        switch viewModel.selectedScope {
+        case .private:
+            return "lock.fill"
+        case .killingPart:
+            return "music.note"
+        case .public:
+            return "globe"
         }
     }
 }
