@@ -87,10 +87,20 @@ final class MyCollectionViewModel: ObservableObject {
         )
     }
 
+    func loadMoreMyFeedsFromBottomIfNeeded() async {
+        guard hasLoadedMyFeeds else { return }
+        guard hasNextFeedPage else { return }
+
+        await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
+    }
+
     func loadMoreMyFeedsIfNeeded(currentFeedID: DiaryFeedModel.ID) async {
         guard hasLoadedMyFeeds else { return }
         guard hasNextFeedPage else { return }
-        guard let lastFeedID = myFeeds.last?.id, lastFeedID == currentFeedID else { return }
+        guard let currentIndex = myFeeds.firstIndex(where: { $0.id == currentFeedID }) else { return }
+
+        let thresholdIndex = max(myFeeds.count - 3, 0)
+        guard currentIndex >= thresholdIndex else { return }
 
         await loadMyFeeds(page: nextFeedPage, size: defaultFeedPageSize, mode: .pagination)
     }
@@ -216,7 +226,9 @@ final class MyCollectionViewModel: ObservableObject {
             let totalPages = max(response.page.totalPages, 0)
             let fetchedPage = max(response.page.number, 0)
             nextFeedPage = fetchedPage + 1
-            hasNextFeedPage = nextFeedPage < totalPages
+            let hasNextByPage = nextFeedPage < totalPages
+            let hasNextByCount = response.content.count >= size
+            hasNextFeedPage = hasNextByPage || hasNextByCount
         } catch {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)

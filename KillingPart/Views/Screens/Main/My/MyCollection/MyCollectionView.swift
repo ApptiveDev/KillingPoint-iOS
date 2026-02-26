@@ -86,6 +86,15 @@ struct MyCollectionView: View {
                             }
                         }
                     }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id("my-collection-bottom-trigger-\(viewModel.myFeeds.count)")
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
+                            }
+                        }
                 }
 
                 if viewModel.isLoadingMoreFeeds {
