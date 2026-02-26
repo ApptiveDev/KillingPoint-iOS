@@ -15,7 +15,8 @@ struct AddSearchDetailVideoSection: View {
                     VStack(alignment: .leading, spacing: AppSpacing.s) {
                         YoutubePlayerView(
                             videoURL: video.embedURL,
-                            startSeconds: viewModel.startSeconds
+                            startSeconds: viewModel.startSeconds,
+                            endSeconds: viewModel.endSeconds
                         )
                             .frame(maxWidth: .infinity)
                             .aspectRatio(videoAspectRatio, contentMode: .fit)

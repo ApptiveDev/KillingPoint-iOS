@@ -5,6 +5,7 @@ import WebKit
 struct YoutubePlayerView: UIViewRepresentable {
     let videoURL: URL?
     let startSeconds: Double
+    let endSeconds: Double
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -29,25 +30,48 @@ struct YoutubePlayerView: UIViewRepresentable {
             return
         }
 
-        let targetStart = Double(max(Int(startSeconds.rounded(.down)), 0))
+        let targetStart = normalizedSeconds(startSeconds)
+        let targetEnd = max(normalizedSeconds(endSeconds), targetStart + 0.1)
         if context.coordinator.loadedVideoID != videoID {
             context.coordinator.loadedVideoID = videoID
             context.coordinator.lastSyncedStart = targetStart
+            context.coordinator.lastSyncedEnd = targetEnd
             webView.loadHTMLString(
-                makePlayerHTML(videoID: videoID, startSeconds: targetStart),
+                makePlayerHTML(
+                    videoID: videoID,
+                    startSeconds: targetStart,
+                    endSeconds: targetEnd
+                ),
                 baseURL: appRefererURL
             )
             return
         }
 
-        guard context.coordinator.lastSyncedStart != targetStart else { return }
+        let isSameStart = isApproximatelyEqual(
+            context.coordinator.lastSyncedStart,
+            targetStart
+        )
+        let isSameEnd = isApproximatelyEqual(
+            context.coordinator.lastSyncedEnd,
+            targetEnd
+        )
+        guard !(isSameStart && isSameEnd) else { return }
         context.coordinator.lastSyncedStart = targetStart
+        context.coordinator.lastSyncedEnd = targetEnd
+
+        let targetStartJS = jsNumber(targetStart)
+        let targetEndJS = jsNumber(targetEnd)
         webView.evaluateJavaScript(
             """
-            window.kpDesiredStart = \(targetStart);
+            window.kpDesiredStart = \(targetStartJS);
+            window.kpDesiredEnd = \(targetEndJS);
             if (window.kpPlayerReady && window.kpPlayer) {
-                window.kpPlayer.seekTo(window.kpDesiredStart, true);
-                window.kpPlayer.playVideo();
+                if (window.kpApplyDesiredRange) {
+                    window.kpApplyDesiredRange(true);
+                } else {
+                    window.kpPlayer.seekTo(window.kpDesiredStart, true);
+                    window.kpPlayer.playVideo();
+                }
             }
             """,
             completionHandler: nil
@@ -61,6 +85,7 @@ struct YoutubePlayerView: UIViewRepresentable {
     final class Coordinator {
         var loadedVideoID: String?
         var lastSyncedStart: Double?
+        var lastSyncedEnd: Double?
     }
 
     private var appRefererURL: URL? {
@@ -70,10 +95,12 @@ struct YoutubePlayerView: UIViewRepresentable {
         return URL(string: appRefererURLString)
     }
 
-    private func makePlayerHTML(videoID: String, startSeconds: Double) -> String {
+    private func makePlayerHTML(videoID: String, startSeconds: Double, endSeconds: Double) -> String {
         let safeVideoID = escapeForJavaScript(videoID)
         let safeReferer = escapeForJavaScript(appRefererURLString ?? "")
         let initialStart = max(Int(startSeconds.rounded(.down)), 0)
+        let initialStartJS = jsNumber(startSeconds)
+        let initialEndJS = jsNumber(endSeconds)
 
         return """
         <!doctype html>
@@ -99,23 +126,71 @@ struct YoutubePlayerView: UIViewRepresentable {
         <body>
             <div id="player"></div>
             <script>
-                window.kpDesiredStart = \(initialStart);
+                window.kpDesiredStart = \(initialStartJS);
+                window.kpDesiredEnd = \(initialEndJS);
                 window.kpPlayer = null;
                 window.kpPlayerReady = false;
+                window.kpLoopTimer = null;
 
-                function kpApplyDesiredStart() {
+                function kpNormalizedStart() {
+                    var targetStart = Number(window.kpDesiredStart || 0);
+                    if (isNaN(targetStart) || targetStart < 0) {
+                        targetStart = 0;
+                    }
+                    return targetStart;
+                }
+
+                function kpNormalizedEnd(targetStart) {
+                    var targetEnd = Number(window.kpDesiredEnd || targetStart);
+                    if (isNaN(targetEnd)) {
+                        targetEnd = targetStart;
+                    }
+                    if (targetEnd <= targetStart) {
+                        targetEnd = targetStart + 0.1;
+                    }
+                    return targetEnd;
+                }
+
+                window.kpApplyDesiredRange = function(forceSeek) {
                     if (!window.kpPlayerReady || !window.kpPlayer) {
                         return;
                     }
 
-                    var target = Number(window.kpDesiredStart || 0);
-                    if (isNaN(target) || target < 0) {
-                        target = 0;
+                    var targetStart = kpNormalizedStart();
+                    var targetEnd = kpNormalizedEnd(targetStart);
+                    var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
+
+                    if (isNaN(current) || forceSeek || current < targetStart || current >= targetEnd) {
+                        window.kpPlayer.seekTo(targetStart, true);
                     }
 
-                    window.kpPlayer.seekTo(target, true);
                     window.kpPlayer.playVideo();
-                }
+                };
+
+                window.kpStartRangeLoop = function() {
+                    if (window.kpLoopTimer) {
+                        clearInterval(window.kpLoopTimer);
+                    }
+
+                    window.kpLoopTimer = setInterval(function() {
+                        if (!window.kpPlayerReady || !window.kpPlayer) {
+                            return;
+                        }
+
+                        var state = Number(window.kpPlayer.getPlayerState ? window.kpPlayer.getPlayerState() : -1);
+                        if (state !== 1 && state !== 3) {
+                            return;
+                        }
+
+                        var targetStart = kpNormalizedStart();
+                        var targetEnd = kpNormalizedEnd(targetStart);
+                        var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
+                        if (isNaN(current) || current < targetStart || current >= targetEnd) {
+                            window.kpPlayer.seekTo(targetStart, true);
+                            window.kpPlayer.playVideo();
+                        }
+                    }, 200);
+                };
 
                 var tag = document.createElement('script');
                 tag.src = 'https://www.youtube.com/iframe_api';
@@ -142,11 +217,24 @@ struct YoutubePlayerView: UIViewRepresentable {
                         events: {
                             onReady: function() {
                                 window.kpPlayerReady = true;
-                                kpApplyDesiredStart();
+                                window.kpApplyDesiredRange(true);
+                                window.kpStartRangeLoop();
+                            },
+                            onStateChange: function(event) {
+                                if (Number(event.data) === 0) {
+                                    window.kpApplyDesiredRange(true);
+                                }
                             }
                         }
                     });
                 };
+
+                window.addEventListener('beforeunload', function() {
+                    if (window.kpLoopTimer) {
+                        clearInterval(window.kpLoopTimer);
+                        window.kpLoopTimer = null;
+                    }
+                });
             </script>
         </body>
         </html>
@@ -191,5 +279,19 @@ struct YoutubePlayerView: UIViewRepresentable {
         }
 
         return "https://\(bundleID.lowercased())"
+    }
+
+    private func normalizedSeconds(_ value: Double) -> Double {
+        let safe = max(value, 0)
+        return (safe * 1000).rounded() / 1000
+    }
+
+    private func isApproximatelyEqual(_ lhs: Double?, _ rhs: Double) -> Bool {
+        guard let lhs else { return false }
+        return abs(lhs - rhs) < 0.001
+    }
+
+    private func jsNumber(_ value: Double) -> String {
+        String(format: "%.3f", value)
     }
 }
