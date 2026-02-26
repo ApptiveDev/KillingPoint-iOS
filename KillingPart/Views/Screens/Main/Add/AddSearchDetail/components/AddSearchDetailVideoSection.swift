@@ -43,7 +43,7 @@ struct AddSearchDetailVideoSection: View {
                 .progressViewStyle(.circular)
                 .tint(AppColors.primary600)
 
-            Text("유튜브 영상 검색 중...")
+            Text("로딩 중...")
                 .font(AppFont.paperlogy4Regular(size: 13))
                 .foregroundStyle(.white.opacity(0.72))
         }

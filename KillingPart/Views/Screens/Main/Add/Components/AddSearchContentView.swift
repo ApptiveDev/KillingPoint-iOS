@@ -38,7 +38,7 @@ private struct AddSearchLoadingView: View {
                 .progressViewStyle(.circular)
                 .tint(AppColors.primary600)
 
-            Text("Spotify 검색 중...")
+            Text("검색 중...")
                 .font(AppFont.paperlogy5Medium(size: 14))
                 .foregroundStyle(.white.opacity(0.75))
         }

@@ -29,7 +29,7 @@ struct AddSearchDetailTrimSection: View {
                 .frame(height: 160)
 
                 HStack {
-                    Text("선택 구간 길이 \(viewModel.clipDurationText)")
+                    Text("선택 구간 \(viewModel.startTimeText) ~ \(viewModel.endTimeText)")
                         .font(AppFont.paperlogy5Medium(size: 13))
                         .foregroundStyle(AppColors.primary600)
 
