@@ -299,14 +299,6 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     private func formatTime(seconds: Double) -> String {
         let safeSeconds = max(Int(seconds.rounded(.down)), 0)
-        let hours = safeSeconds / 3600
-        let minutes = (safeSeconds % 3600) / 60
-        let remainingSeconds = safeSeconds % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
-        }
-
-        return String(format: "%02d:%02d", minutes, remainingSeconds)
+        return String(safeSeconds)
     }
 }
