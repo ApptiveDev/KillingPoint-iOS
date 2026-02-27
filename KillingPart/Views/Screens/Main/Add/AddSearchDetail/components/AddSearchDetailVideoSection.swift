@@ -48,9 +48,6 @@ struct AddSearchDetailVideoSection: View {
                 .foregroundStyle(.white.opacity(0.72))
         }
         .frame(maxWidth: .infinity)
-        .aspectRatio(videoAspectRatio, contentMode: .fit)
-        .background(Color.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
     }
 
     private func errorView(message: String) -> some View {

@@ -19,13 +19,12 @@ struct MyCollectionProfileCard: View {
                 )
                 VStack(alignment: .leading, spacing: AppSpacing.s) {
                     HStack(alignment: .center, spacing: AppSpacing.m) {
-                        
                         VStack(alignment: .leading, spacing: AppSpacing.xs) {
                             Text(displayName)
                                 .font(AppFont.paperlogy6SemiBold(size: 16))
                                 .foregroundStyle(Color.kpPrimary)
                                 .lineLimit(1)
-                            
+
                             Text(displayTag)
                                 .font(AppFont.paperlogy4Regular(size: 13))
                                 .foregroundStyle(Color.kpPrimary)
@@ -33,10 +32,13 @@ struct MyCollectionProfileCard: View {
                                 .truncationMode(.tail)
                                 .minimumScaleFactor(0.85)
                         }
-                        
-                        MyCollectionProfileStatItemView(value: killingPartStatText, title: "킬링파트")
-                        MyCollectionProfileStatItemView(value: fanStatText, title: "팬덤")
-                        MyCollectionProfileStatItemView(value: pickStatText, title: "PICKS")
+
+                        HStack(alignment: .center, spacing: AppSpacing.m) {
+                            MyCollectionProfileStatItemView(value: killingPartStatText, title: "킬링파트")
+                            MyCollectionProfileStatItemView(value: fanStatText, title: "팬덤")
+                            MyCollectionProfileStatItemView(value: pickStatText, title: "PICKS")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
                     MyCollectionEditProfileButton(action: onEditProfileTap)
                 }
