@@ -12,31 +12,40 @@ struct MyTabView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
+            GeometryReader { geometry in
+                ZStack {
+                    Image("my_background")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                        .ignoresSafeArea()
 
-                VStack(spacing: AppSpacing.m) {
-                    topToggleTabs
+                    VStack(spacing: AppSpacing.m) {
+                        topToggleTabs
 
-                    ZStack {
-                        if selectedTab == .myCollection {
-                            MyCollectionView(onSessionEnded: onLogout)
-                                .transition(tabContentTransition)
-                        } else if selectedTab == .playKillingPart {
-                            PlayKillingPartView()
-                                .transition(tabContentTransition)
-                        } else {
-                            MusicCalendarView()
-                                .transition(tabContentTransition)
+                        ZStack {
+                            if selectedTab == .myCollection {
+                                MyCollectionView(onSessionEnded: onLogout)
+                                    .transition(tabContentTransition)
+                            } else if selectedTab == .playKillingPart {
+                                PlayKillingPartView()
+                                    .transition(tabContentTransition)
+                            } else {
+                                MusicCalendarView()
+                                    .transition(tabContentTransition)
+                            }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .clipped()
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+                    
+                    .padding(.horizontal, AppSpacing.m)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
-                .padding(.horizontal, AppSpacing.m)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .toolbar(.hidden, for: .navigationBar)
             }
-            .toolbar(.hidden, for: .navigationBar)
         }
     }
 

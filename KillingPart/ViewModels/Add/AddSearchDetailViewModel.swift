@@ -15,7 +15,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published var endSeconds: Double = 0
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
-    @Published var selectedScope: DiaryScope = .private
+    @Published var selectedScope: DiaryScope = .public
     @Published private(set) var isSavingDiary = false
     @Published var saveErrorMessage: String?
 
@@ -50,19 +50,19 @@ final class AddSearchDetailViewModel: ObservableObject {
     }
 
     var startTimeText: String {
-        formatTime(seconds: startSeconds)
+        TimeFormatter.secondsString(from: startSeconds)
     }
 
     var endTimeText: String {
-        formatTime(seconds: endSeconds)
+        TimeFormatter.secondsString(from: endSeconds)
     }
 
     var clipDurationText: String {
-        formatTime(seconds: clipDuration)
+        TimeFormatter.secondsString(from: clipDuration)
     }
 
     var selectedVideoDurationText: String {
-        formatTime(seconds: maxDuration)
+        TimeFormatter.secondsString(from: maxDuration)
     }
 
     var maximumStartSeconds: Double {
@@ -295,18 +295,5 @@ final class AddSearchDetailViewModel: ObservableObject {
         let videoID = selectedVideo.id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !videoID.isEmpty else { return nil }
         return "https://www.youtube.com/watch?v=\(videoID)"
-    }
-
-    private func formatTime(seconds: Double) -> String {
-        let safeSeconds = max(Int(seconds.rounded(.down)), 0)
-        let hours = safeSeconds / 3600
-        let minutes = (safeSeconds % 3600) / 60
-        let remainingSeconds = safeSeconds % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
-        }
-
-        return String(format: "%02d:%02d", minutes, remainingSeconds)
     }
 }
