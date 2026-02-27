@@ -13,6 +13,8 @@ struct MyTabView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
+                let bottomContentInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
+
                 ZStack {
                     Image("my_background")
                         .resizable()
@@ -38,13 +40,15 @@ struct MyTabView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .clipped()
+                        .padding(.bottom, bottomContentInset)
                     }
-                    
                     .padding(.horizontal, AppSpacing.m)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.bottom, bottomContentInset)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .toolbar(.hidden, for: .navigationBar)
+                .padding(.bottom, bottomContentInset)
             }
         }
     }
