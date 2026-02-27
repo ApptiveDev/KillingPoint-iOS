@@ -5,7 +5,7 @@ struct AddSearchDetailCommentSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
     @FocusState private var isCommentEditorFocused: Bool
 
-    private let scopeOptions: [DiaryScope] = [.private, .killingPart, .public]
+    private let scopeOptions: [DiaryScope] = [.public, .killingPart, .private]
     private static let todayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")

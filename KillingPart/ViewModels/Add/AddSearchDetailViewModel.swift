@@ -15,7 +15,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published var endSeconds: Double = 0
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
-    @Published var selectedScope: DiaryScope = .private
+    @Published var selectedScope: DiaryScope = .public
     @Published private(set) var isSavingDiary = false
     @Published var saveErrorMessage: String?
 
