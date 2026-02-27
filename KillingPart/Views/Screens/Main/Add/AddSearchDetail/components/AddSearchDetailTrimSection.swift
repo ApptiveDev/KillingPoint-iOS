@@ -3,6 +3,14 @@ import SwiftUI
 struct AddSearchDetailTrimSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
 
+    private var startDisplayTimeText: String {
+        displayTimeText(seconds: viewModel.startSeconds)
+    }
+
+    private var endDisplayTimeText: String {
+        displayTimeText(seconds: viewModel.endSeconds)
+    }
+
     var body: some View {
         VStack(alignment: .center, spacing: AppSpacing.s) {
             Text("킬링파트 자르기")
@@ -20,8 +28,8 @@ struct AddSearchDetailTrimSection: View {
                         set: { viewModel.updateEnd($0) }
                     ),
                     duration: viewModel.maxDuration,
-                    startTimeText: viewModel.startTimeText,
-                    endTimeText: viewModel.endTimeText,
+                    startTimeText: startDisplayTimeText,
+                    endTimeText: endDisplayTimeText,
                     onUpdateRange: { start, end in
                         viewModel.updateRange(start: start, end: end)
                     }
@@ -29,7 +37,7 @@ struct AddSearchDetailTrimSection: View {
                 .frame(height: 160)
 
                 HStack {
-                    Text("선택 구간 \(viewModel.startTimeText) ~ \(viewModel.endTimeText)")
+                    Text("선택 구간 \(startDisplayTimeText) ~ \(endDisplayTimeText)")
                         .font(AppFont.paperlogy5Medium(size: 13))
                         .foregroundStyle(AppColors.primary600)
 
@@ -49,5 +57,13 @@ struct AddSearchDetailTrimSection: View {
             }
         }
         .padding(AppSpacing.m)
+    }
+
+    private func displayTimeText(seconds: Double) -> String {
+        let safeSeconds = max(Int(seconds.rounded(.down)), 0)
+        let minutes = safeSeconds / 60
+        let remainingSeconds = safeSeconds % 60
+        let secondText = remainingSeconds < 10 ? "0\(remainingSeconds)" : "\(remainingSeconds)"
+        return "\(minutes):\(secondText)초"
     }
 }
