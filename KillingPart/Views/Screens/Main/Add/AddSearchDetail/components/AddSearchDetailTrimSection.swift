@@ -49,11 +49,19 @@ struct AddSearchDetailTrimSection: View {
                 }
 
             } else {
-                Text("영상을 찾지 못해 구간 자르기를 사용할 수 없어요.")
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(.white.opacity(0.72))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)   // 👈 핵심
+                if viewModel.isLoading {
+                    Text("음악을 가져오고 있어요...")
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("음악을 가져오지 못했어요")
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                }
             }
         }
         .padding(AppSpacing.m)
