@@ -4,11 +4,11 @@ struct AddSearchDetailTrimSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
 
     private var startDisplayTimeText: String {
-        displayTimeText(seconds: viewModel.startSeconds)
+        TimeFormatter.minuteSecondText(from: viewModel.startSeconds)
     }
 
     private var endDisplayTimeText: String {
-        displayTimeText(seconds: viewModel.endSeconds)
+        TimeFormatter.minuteSecondText(from: viewModel.endSeconds)
     }
 
     var body: some View {
@@ -57,13 +57,5 @@ struct AddSearchDetailTrimSection: View {
             }
         }
         .padding(AppSpacing.m)
-    }
-
-    private func displayTimeText(seconds: Double) -> String {
-        let safeSeconds = max(Int(seconds.rounded(.down)), 0)
-        let minutes = safeSeconds / 60
-        let remainingSeconds = safeSeconds % 60
-        let secondText = remainingSeconds < 10 ? "0\(remainingSeconds)" : "\(remainingSeconds)"
-        return "\(minutes):\(secondText)초"
     }
 }

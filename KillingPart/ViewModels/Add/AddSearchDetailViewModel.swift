@@ -50,19 +50,19 @@ final class AddSearchDetailViewModel: ObservableObject {
     }
 
     var startTimeText: String {
-        formatTime(seconds: startSeconds)
+        TimeFormatter.secondsString(from: startSeconds)
     }
 
     var endTimeText: String {
-        formatTime(seconds: endSeconds)
+        TimeFormatter.secondsString(from: endSeconds)
     }
 
     var clipDurationText: String {
-        formatTime(seconds: clipDuration)
+        TimeFormatter.secondsString(from: clipDuration)
     }
 
     var selectedVideoDurationText: String {
-        formatTime(seconds: maxDuration)
+        TimeFormatter.secondsString(from: maxDuration)
     }
 
     var maximumStartSeconds: Double {
@@ -295,10 +295,5 @@ final class AddSearchDetailViewModel: ObservableObject {
         let videoID = selectedVideo.id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !videoID.isEmpty else { return nil }
         return "https://www.youtube.com/watch?v=\(videoID)"
-    }
-
-    private func formatTime(seconds: Double) -> String {
-        let safeSeconds = max(Int(seconds.rounded(.down)), 0)
-        return String(safeSeconds)
     }
 }
