@@ -4,6 +4,7 @@ import UIKit
 struct AddSearchFieldView: View {
     @Binding var query: String
     let hasQuery: Bool
+    let dismissKeyboardSignal: Int
     let onSubmit: () -> Void
     let onQueryChanged: () -> Void
     let onClear: () -> Void
@@ -12,6 +13,7 @@ struct AddSearchFieldView: View {
         NativeSearchField(
             text: $query,
             placeholder: "곡 또는 아티스트 검색",
+            dismissKeyboardSignal: dismissKeyboardSignal,
             onSubmit: onSubmit,
             onQueryChanged: onQueryChanged,
             onClear: onClear
@@ -29,6 +31,7 @@ struct AddSearchFieldView: View {
 private struct NativeSearchField: UIViewRepresentable {
     @Binding var text: String
     let placeholder: String
+    let dismissKeyboardSignal: Int
     let onSubmit: () -> Void
     let onQueryChanged: () -> Void
     let onClear: () -> Void
@@ -63,11 +66,17 @@ private struct NativeSearchField: UIViewRepresentable {
         if uiView.text != text {
             uiView.text = text
         }
+
+        if context.coordinator.lastDismissKeyboardSignal != dismissKeyboardSignal {
+            context.coordinator.lastDismissKeyboardSignal = dismissKeyboardSignal
+            uiView.resignFirstResponder()
+        }
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             text: $text,
+            dismissKeyboardSignal: dismissKeyboardSignal,
             onSubmit: onSubmit,
             onQueryChanged: onQueryChanged,
             onClear: onClear
@@ -76,17 +85,20 @@ private struct NativeSearchField: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         @Binding private var text: String
+        var lastDismissKeyboardSignal: Int
         private let onSubmit: () -> Void
         private let onQueryChanged: () -> Void
         private let onClear: () -> Void
 
         init(
             text: Binding<String>,
+            dismissKeyboardSignal: Int,
             onSubmit: @escaping () -> Void,
             onQueryChanged: @escaping () -> Void,
             onClear: @escaping () -> Void
         ) {
             _text = text
+            self.lastDismissKeyboardSignal = dismissKeyboardSignal
             self.onSubmit = onSubmit
             self.onQueryChanged = onQueryChanged
             self.onClear = onClear

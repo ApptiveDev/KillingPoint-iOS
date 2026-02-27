@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AddTabView: View {
     @StateObject private var viewModel = AddTabViewModel()
+    @State private var dismissKeyboardSignal = 0
 
     var body: some View {
         NavigationStack {
@@ -12,6 +13,7 @@ struct AddTabView: View {
                     AddSearchFieldView(
                         query: $viewModel.query,
                         hasQuery: viewModel.hasQuery,
+                        dismissKeyboardSignal: dismissKeyboardSignal,
                         onSubmit: viewModel.submitSearch,
                         onQueryChanged: viewModel.handleQueryChanged,
                         onClear: viewModel.clearSearch
@@ -26,6 +28,13 @@ struct AddTabView: View {
                         onRetry: viewModel.retrySearch,
                         onTrackAppear: viewModel.loadMoreIfNeeded,
                         onDiarySaved: viewModel.clearSearch
+                    )
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        TapGesture()
+                            .onEnded {
+                                dismissKeyboardSignal += 1
+                            }
                     )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

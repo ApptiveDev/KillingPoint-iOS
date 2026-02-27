@@ -37,6 +37,7 @@ struct AddTrackListView: View {
             .padding(.top, AppSpacing.xs)
             .padding(.bottom, AppSpacing.l)
         }
+        .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
     }
 }
