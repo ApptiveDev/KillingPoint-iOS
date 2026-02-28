@@ -166,6 +166,31 @@ struct MyCollectionDiary: View {
             let endMarkerX = min(max(endX, markerRadius), width - markerRadius)
 
             let labelY: CGFloat = 24
+            let labelWidth: CGFloat = 38
+            let halfLabelWidth = labelWidth / 2
+            let minimumLabelGap = labelWidth + 4
+
+            let clampedStartLabelX = min(max(startX, halfLabelWidth), width - halfLabelWidth)
+            let clampedEndLabelX = min(max(endX, halfLabelWidth), width - halfLabelWidth)
+
+            let initialLeftLabelX = min(clampedStartLabelX, clampedEndLabelX)
+            let initialRightLabelX = max(clampedStartLabelX, clampedEndLabelX)
+            let initialLabelGap = initialRightLabelX - initialLeftLabelX
+
+            let adjustedLabelCenterX = min(
+                max((initialLeftLabelX + initialRightLabelX) / 2, minimumLabelGap / 2),
+                width - (minimumLabelGap / 2)
+            )
+            let leftLabelX = initialLabelGap < minimumLabelGap
+                ? adjustedLabelCenterX - (minimumLabelGap / 2)
+                : initialLeftLabelX
+            let rightLabelX = initialLabelGap < minimumLabelGap
+                ? adjustedLabelCenterX + (minimumLabelGap / 2)
+                : initialRightLabelX
+
+            let isStartLeft = clampedStartLabelX <= clampedEndLabelX
+            let startLabelX = isStartLeft ? leftLabelX : rightLabelX
+            let endLabelX = isStartLeft ? rightLabelX : leftLabelX
 
             ZStack(alignment: .topLeading) {
                 Capsule()
@@ -181,14 +206,14 @@ struct MyCollectionDiary: View {
                 Text(viewModel.startMinuteSecondText)
                     .font(AppFont.paperlogy6SemiBold(size: 10))
                     .foregroundStyle(AppColors.primary600.opacity(0.98))
-                    .fixedSize()
-                    .position(x: startX, y: labelY)
+                    .frame(width: labelWidth, alignment: .center)
+                    .position(x: startLabelX, y: labelY)
 
                 Text(viewModel.endMinuteSecondText)
                     .font(AppFont.paperlogy5Medium(size: 10))
                     .foregroundStyle(AppColors.primary600.opacity(0.9))
-                    .fixedSize()
-                    .position(x: endX, y: labelY)
+                    .frame(width: labelWidth, alignment: .center)
+                    .position(x: endLabelX, y: labelY)
             }
         }
         .frame(height: 40)
