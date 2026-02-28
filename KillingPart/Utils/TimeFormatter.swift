@@ -8,7 +8,7 @@ enum TimeFormatter {
         let minutes = safeSeconds / 60
         let remainingSeconds = safeSeconds % 60
         let secondText = remainingSeconds < 10 ? "0\(remainingSeconds)" : "\(remainingSeconds)"
-        return "\(minutes):\(secondText)초"
+        return "\(minutes):\(secondText)"
     }
 
     private static func normalizedSeconds(from seconds: Double) -> Int {

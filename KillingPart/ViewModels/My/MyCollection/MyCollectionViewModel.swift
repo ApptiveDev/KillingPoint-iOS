@@ -135,6 +135,10 @@ final class MyCollectionViewModel: ObservableObject {
         return datePart.replacingOccurrences(of: "-", with: ".")
     }
 
+    func removeMyFeedLocally(diaryId: Int) {
+        myFeeds.removeAll { $0.diaryId == diaryId }
+    }
+
     func logout(onSuccess: @escaping () -> Void) {
         guard !isProcessing else { return }
 
