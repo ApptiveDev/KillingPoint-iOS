@@ -6,6 +6,7 @@ struct MyCollectionDiary: View {
     @FocusState private var isCommentEditorFocused: Bool
 
     let diaryId: Int
+    let displayTag: String
     let onDiaryChanged: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
@@ -15,11 +16,13 @@ struct MyCollectionDiary: View {
 
     init(
         diaryId: Int,
+        displayTag: String,
         diary: DiaryFeedModel,
         onDiaryChanged: ((Int) -> Void)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.diaryId = diaryId
+        self.displayTag = displayTag
         self.onDiaryChanged = onDiaryChanged
         _viewModel = StateObject(
             wrappedValue: MyCollectionDiaryViewModel(
@@ -86,7 +89,7 @@ struct MyCollectionDiary: View {
             }
         }
         .confirmationDialog(
-            "일기를 삭제할까요?",
+            "일기 삭제",
             isPresented: $isDeleteDialogPresented,
             titleVisibility: .visible
         ) {
@@ -102,6 +105,8 @@ struct MyCollectionDiary: View {
             .disabled(viewModel.isProcessing)
 
             Button("취소", role: .cancel) {}
+        } message: {
+            Text("일기를 삭제하시겠습니까?\n삭제된 일기는 복구할 수 없습니다.")
         }
     }
 
@@ -378,7 +383,7 @@ struct MyCollectionDiary: View {
     }
 
     private var tagText: String {
-        let raw = (viewModel.diary.tag ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = displayTag.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return "@killingpart_user" }
         return raw.hasPrefix("@") ? raw : "@\(raw)"
     }

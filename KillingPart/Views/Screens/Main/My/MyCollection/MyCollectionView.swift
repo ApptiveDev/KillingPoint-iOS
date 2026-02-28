@@ -61,6 +61,7 @@ struct MyCollectionView: View {
             if let diary = viewModel.myFeeds.first(where: { $0.diaryId == route.diaryId }) {
                 MyCollectionDiary(
                     diaryId: route.diaryId,
+                    displayTag: viewModel.displayTag,
                     diary: diary
                 ) { changedDiaryId in
                     viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
