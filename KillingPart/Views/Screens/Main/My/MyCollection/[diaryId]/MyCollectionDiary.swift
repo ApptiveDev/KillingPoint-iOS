@@ -7,20 +7,26 @@ struct MyCollectionDiary: View {
 
     let diaryId: Int
     let displayTag: String
-    let onDiaryChanged: ((Int) -> Void)?
+    let onDiaryUpdated: (() -> Void)?
+    let onDiaryDeleted: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
+    @State private var keyboardHeight: CGFloat = 0
+
+    private let commentFocusAnchorID = "my-collection-diary-comment-focus-anchor"
 
     init(
         diaryId: Int,
         displayTag: String,
         diary: DiaryFeedModel,
-        onDiaryChanged: ((Int) -> Void)? = nil,
+        onDiaryUpdated: (() -> Void)? = nil,
+        onDiaryDeleted: ((Int) -> Void)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.diaryId = diaryId
         self.displayTag = displayTag
-        self.onDiaryChanged = onDiaryChanged
+        self.onDiaryUpdated = onDiaryUpdated
+        self.onDiaryDeleted = onDiaryDeleted
         _viewModel = StateObject(
             wrappedValue: MyCollectionDiaryViewModel(
                 diary: diary,
@@ -32,7 +38,9 @@ struct MyCollectionDiary: View {
     var body: some View {
         GeometryReader { proxy in
             let topContentInset = min(proxy.safeAreaInsets.top, AppSpacing.l) + AppSpacing.s
-            let bottomContentInset = min(proxy.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
+            let keyboardCompensation = keyboardHeight > 0 ? max(keyboardHeight - 140, 0) : 0
+            let extraBottomInset = keyboardHeight > 0 ? AppSpacing.s : AppSpacing.l
+            let bottomContentInset = proxy.safeAreaInsets.bottom + keyboardCompensation + extraBottomInset
 
             ZStack {
                 Image("my_background")
@@ -40,69 +48,90 @@ struct MyCollectionDiary: View {
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container, edges: .all)
 
                 if viewModel.isDeleted {
                     MyCollectionDiaryDeletedPlaceholder()
                 } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: AppSpacing.m) {
-                            MyCollectionDiaryVideoSection(
-                                videoURL: videoURL,
-                                startSeconds: viewModel.startSeconds,
-                                endSeconds: viewModel.endSeconds
-                            )
+                    ScrollViewReader { scrollProxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: AppSpacing.m) {
+                                MyCollectionDiaryVideoSection(
+                                    videoURL: videoURL,
+                                    startSeconds: viewModel.startSeconds,
+                                    endSeconds: viewModel.endSeconds
+                                )
 
-                            MyCollectionDiaryTrackSection(
-                                artworkURL: viewModel.diary.albumImageURL,
-                                musicTitle: viewModel.diary.musicTitle,
-                                artist: viewModel.diary.artist,
-                                startMinuteSecondText: viewModel.startMinuteSecondText,
-                                endMinuteSecondText: viewModel.endMinuteSecondText,
-                                startProgress: startProgress,
-                                endProgress: endProgress
-                            )
+                                MyCollectionDiaryTrackSection(
+                                    artworkURL: viewModel.diary.albumImageURL,
+                                    musicTitle: viewModel.diary.musicTitle,
+                                    artist: viewModel.diary.artist,
+                                    startMinuteSecondText: viewModel.startMinuteSecondText,
+                                    endMinuteSecondText: viewModel.endMinuteSecondText,
+                                    startProgress: startProgress,
+                                    endProgress: endProgress
+                                )
 
-                            MyCollectionDiaryCommentSection(
-                                isEditMode: viewModel.isEditMode,
-                                displayedContent: viewModel.displayedContent,
-                                editContentDraft: $viewModel.editContentDraft,
-                                isProcessing: viewModel.isProcessing,
-                                canSubmitEdit: viewModel.canSubmitEdit,
-                                createdDateText: createdDateText,
-                                tagText: tagText,
-                                isCommentEditorFocused: $isCommentEditorFocused,
-                                onCancelTap: {
-                                    dismissKeyboard()
-                                    viewModel.cancelEdit()
-                                },
-                                onSaveTap: {
-                                    dismissKeyboard()
-                                    Task {
-                                        let isSuccess = await viewModel.submitEdit()
-                                        guard isSuccess else { return }
-                                    }
+                                MyCollectionDiaryCommentSection(
+                                    isEditMode: viewModel.isEditMode,
+                                    displayedContent: viewModel.displayedContent,
+                                    editContentDraft: $viewModel.editContentDraft,
+                                    isProcessing: viewModel.isProcessing,
+                                    canSubmitEdit: viewModel.canSubmitEdit,
+                                    createdDateText: createdDateText,
+                                    tagText: tagText,
+                                    isCommentEditorFocused: $isCommentEditorFocused,
+                                    onCancelTap: handleCancelTap,
+                                    onSaveTap: handleSaveTap
+                                )
+
+                                if let errorMessage = viewModel.errorMessage {
+                                    Text(errorMessage)
+                                        .font(AppFont.paperlogy4Regular(size: 13))
+                                        .foregroundStyle(.red.opacity(0.95))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                            )
 
-                            if let errorMessage = viewModel.errorMessage {
-                                Text(errorMessage)
-                                    .font(AppFont.paperlogy4Regular(size: 13))
-                                    .foregroundStyle(.red.opacity(0.95))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id(commentFocusAnchorID)
+                            }
+                            .padding(.horizontal, AppSpacing.l)
+                            .padding(.top, topContentInset)
+                            .padding(.bottom, bottomContentInset)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                dismissKeyboard()
                             }
                         }
-                        .padding(.horizontal, AppSpacing.l)
-                        .padding(.top, topContentInset)
-                        .padding(.bottom, bottomContentInset)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            dismissKeyboard()
+                        .scrollIndicators(.hidden)
+                        .scrollDismissesKeyboard(.interactively)
+                        .onChange(of: isCommentEditorFocused) { isFocused in
+                            guard isFocused else { return }
+                            DispatchQueue.main.async {
+                                withAnimation(.easeOut(duration: 0.22)) {
+                                    scrollProxy.scrollTo(commentFocusAnchorID, anchor: .bottom)
+                                }
+                            }
+                        }
+                        .onChange(of: keyboardHeight) { height in
+                            guard isCommentEditorFocused else { return }
+                            guard height > 0 else { return }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                withAnimation(.easeOut(duration: 0.18)) {
+                                    scrollProxy.scrollTo(commentFocusAnchorID, anchor: .bottom)
+                                }
+                            }
                         }
                     }
-                    .scrollIndicators(.hidden)
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+            updateKeyboardHeight(from: notification)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+            updateKeyboardHeight(from: notification)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -137,7 +166,7 @@ struct MyCollectionDiary: View {
                 Task {
                     let isSuccess = await viewModel.deleteDiary()
                     if isSuccess {
-                        onDiaryChanged?(diaryId)
+                        onDiaryDeleted?(diaryId)
                         dismiss()
                     }
                 }
@@ -186,6 +215,50 @@ struct MyCollectionDiary: View {
         let raw = displayTag.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return "@killingpart_user" }
         return raw.hasPrefix("@") ? raw : "@\(raw)"
+    }
+
+    private func updateKeyboardHeight(from notification: Notification) {
+        guard
+            let userInfo = notification.userInfo,
+            let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+        else {
+            return
+        }
+
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+
+        let overlapHeight: CGFloat
+        if let keyWindow {
+            let endFrameInWindow = keyWindow.convert(endFrame, from: nil)
+            overlapHeight = max(
+                0,
+                keyWindow.bounds.maxY - endFrameInWindow.minY - keyWindow.safeAreaInsets.bottom
+            )
+        } else {
+            overlapHeight = max(0, UIScreen.main.bounds.maxY - endFrame.minY)
+        }
+
+        let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        withAnimation(.easeOut(duration: duration)) {
+            keyboardHeight = overlapHeight
+        }
+    }
+
+    private func handleCancelTap() {
+        dismissKeyboard()
+        viewModel.cancelEdit()
+    }
+
+    private func handleSaveTap() {
+        dismissKeyboard()
+        Task {
+            let isSuccess = await viewModel.submitEdit()
+            guard isSuccess else { return }
+            onDiaryUpdated?()
+        }
     }
 
     private func dismissKeyboard() {

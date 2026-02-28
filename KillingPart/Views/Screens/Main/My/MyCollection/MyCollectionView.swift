@@ -64,7 +64,12 @@ struct MyCollectionView: View {
                 diaryId: route.diaryId,
                 displayTag: viewModel.displayTag,
                 diary: diary
-            ) { changedDiaryId in
+            ) {
+                collectionListRenderID = UUID()
+                Task {
+                    await viewModel.refetchCollectionDataOnFocus()
+                }
+            } onDiaryDeleted: { changedDiaryId in
                 viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
                 collectionListRenderID = UUID()
                 Task {

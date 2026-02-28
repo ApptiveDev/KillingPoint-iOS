@@ -13,7 +13,7 @@ struct MyCollectionDiaryCommentSection: View {
     let onSaveTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+        VStack(alignment: .leading, spacing: AppSpacing.m) {
             if isEditMode {
                 editCommentContainer
                 editActionSection
