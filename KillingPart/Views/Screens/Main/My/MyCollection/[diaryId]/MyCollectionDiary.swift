@@ -13,6 +13,7 @@ struct MyCollectionDiary: View {
 
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
+    private let videoMaxWidth: CGFloat = 320
 
     init(
         diaryId: Int,
@@ -44,7 +45,6 @@ struct MyCollectionDiary: View {
                         videoSection
                         trackSection
                         commentSection
-                        bottomMetaSection
 
                         if let errorMessage = viewModel.errorMessage {
                             Text(errorMessage)
@@ -116,7 +116,7 @@ struct MyCollectionDiary: View {
             startSeconds: viewModel.startSeconds,
             endSeconds: viewModel.endSeconds
         )
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: videoMaxWidth)
         .aspectRatio(videoAspectRatio, contentMode: .fit)
         .allowsHitTesting(false)
         .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
@@ -124,6 +124,7 @@ struct MyCollectionDiary: View {
             RoundedRectangle(cornerRadius: videoCornerRadius)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var trackSection: some View {
@@ -228,7 +229,8 @@ struct MyCollectionDiary: View {
                 .foregroundStyle(.white.opacity(0.82))
 
             if viewModel.isEditMode {
-                editCommentSection
+                editCommentContainer
+                editActionSection
             } else {
                 Text(viewModel.displayedContent.isEmpty ? "작성된 코멘트가 없어요." : viewModel.displayedContent)
                     .font(AppFont.paperlogy4Regular(size: 14))
@@ -237,7 +239,8 @@ struct MyCollectionDiary: View {
                     .lineSpacing(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, AppSpacing.s)
-                    .padding(.vertical, 14)
+                    .padding(.top, 14)
+                    .padding(.bottom, 42)
                     .frame(minHeight: 190, alignment: .topLeading)
                     .background(Color.white.opacity(0.07))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -245,95 +248,94 @@ struct MyCollectionDiary: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.white.opacity(0.12), lineWidth: 1)
                     }
+                    .overlay(alignment: .bottomTrailing) {
+                        commentMetaSection
+                            .padding(.trailing, AppSpacing.s)
+                            .padding(.bottom, AppSpacing.xs)
+                    }
             }
         }
     }
 
-    private var editCommentSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.s) {
-            TextEditor(text: $viewModel.editContentDraft)
-                .font(AppFont.paperlogy4Regular(size: 14))
-                .foregroundColor(.white)
-                .scrollContentBackground(.hidden)
-                .focused($isCommentEditorFocused)
-                .padding(.horizontal, AppSpacing.xs)
-                .padding(.vertical, AppSpacing.xs)
-                .padding(.bottom, AppSpacing.s)
-                .frame(minHeight: 190)
-                .background(Color.white.opacity(0.07))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                }
+    private var editCommentContainer: some View {
+        TextEditor(text: $viewModel.editContentDraft)
+            .font(AppFont.paperlogy4Regular(size: 14))
+            .foregroundColor(.white)
+            .scrollContentBackground(.hidden)
+            .focused($isCommentEditorFocused)
+            .padding(.horizontal, AppSpacing.xs)
+            .padding(.vertical, AppSpacing.xs)
+            .padding(.bottom, 34)
+            .frame(minHeight: 190)
+            .background(Color.white.opacity(0.07))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                commentMetaSection
+                    .padding(.trailing, AppSpacing.s)
+                    .padding(.bottom, AppSpacing.xs)
+            }
+    }
 
-            HStack(spacing: AppSpacing.s) {
-                Button {
-                    dismissKeyboard()
-                    viewModel.cancelEdit()
-                } label: {
-                    Text("취소")
-                        .font(AppFont.paperlogy6SemiBold(size: 14))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isProcessing)
-                .opacity(viewModel.isProcessing ? 0.45 : 1)
-
-                Button {
-                    dismissKeyboard()
-                    Task {
-                        let isSuccess = await viewModel.submitEdit()
-                        if isSuccess {
-                            onDiaryChanged?(diaryId)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        if viewModel.isProcessing {
-                            ProgressView()
-                                .tint(.black)
-                        }
-                        Text("수정 저장")
-                            .font(AppFont.paperlogy6SemiBold(size: 14))
-                    }
-                    .foregroundStyle(.black)
+    private var editActionSection: some View {
+        HStack(spacing: AppSpacing.s) {
+            Button {
+                dismissKeyboard()
+                viewModel.cancelEdit()
+            } label: {
+                Text("취소")
+                    .font(AppFont.paperlogy6SemiBold(size: 14))
+                    .foregroundStyle(.white.opacity(0.9))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(AppColors.primary600)
+                    .background(Color.white.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.canSubmitEdit)
-                .opacity(viewModel.canSubmitEdit ? 1 : 0.45)
             }
-        }
-        .padding(AppSpacing.s)
-        .background(Color.white.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            .buttonStyle(.plain)
+            .disabled(viewModel.isProcessing)
+            .opacity(viewModel.isProcessing ? 0.45 : 1)
+
+            Button {
+                dismissKeyboard()
+                Task {
+                    let isSuccess = await viewModel.submitEdit()
+                    if isSuccess {
+                        onDiaryChanged?(diaryId)
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    if viewModel.isProcessing {
+                        ProgressView()
+                            .tint(.black)
+                    }
+                    Text("수정 저장")
+                        .font(AppFont.paperlogy6SemiBold(size: 14))
+                }
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(AppColors.primary600)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(!viewModel.canSubmitEdit)
+            .opacity(viewModel.canSubmitEdit ? 1 : 0.45)
         }
     }
 
-    private var bottomMetaSection: some View {
-        HStack(alignment: .bottom) {
-            Spacer(minLength: 0)
+    private var commentMetaSection: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            Text(createdDateText)
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(.white.opacity(0.62))
 
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(createdDateText)
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(.white.opacity(0.62))
-
-                Text(tagText)
-                    .font(AppFont.paperlogy5Medium(size: 13))
-                    .foregroundStyle(.white.opacity(0.86))
-            }
+            Text(tagText)
+                .font(AppFont.paperlogy5Medium(size: 13))
+                .foregroundStyle(.white.opacity(0.86))
         }
     }
 
