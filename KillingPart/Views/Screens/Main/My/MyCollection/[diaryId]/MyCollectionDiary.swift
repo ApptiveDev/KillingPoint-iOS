@@ -6,6 +6,7 @@ struct MyCollectionDiary: View {
     @FocusState private var isCommentEditorFocused: Bool
 
     let diaryId: Int
+    let onDiaryChanged: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
 
@@ -15,9 +16,11 @@ struct MyCollectionDiary: View {
     init(
         diaryId: Int,
         diary: DiaryFeedModel,
+        onDiaryChanged: ((Int) -> Void)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.diaryId = diaryId
+        self.onDiaryChanged = onDiaryChanged
         _viewModel = StateObject(
             wrappedValue: MyCollectionDiaryViewModel(
                 diary: diary,
@@ -91,6 +94,7 @@ struct MyCollectionDiary: View {
                 Task {
                     let isSuccess = await viewModel.deleteDiary()
                     if isSuccess {
+                        onDiaryChanged?(diaryId)
                         dismiss()
                     }
                 }
@@ -271,7 +275,10 @@ struct MyCollectionDiary: View {
                 Button {
                     dismissKeyboard()
                     Task {
-                        _ = await viewModel.submitEdit()
+                        let isSuccess = await viewModel.submitEdit()
+                        if isSuccess {
+                            onDiaryChanged?(diaryId)
+                        }
                     }
                 } label: {
                     HStack(spacing: 6) {

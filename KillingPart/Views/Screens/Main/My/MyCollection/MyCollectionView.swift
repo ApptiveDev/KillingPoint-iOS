@@ -7,6 +7,7 @@ struct MyCollectionView: View {
     @State private var screenMode: MyCollectionScreenMode = .collectionList
     @State private var navigationDirection: MyCollectionScreenTransitionDirection = .forward
     @State private var isAccountActionDialogPresented = false
+    @State private var collectionListRenderID = UUID()
 
     init(
         onSessionEnded: @escaping () -> Void,
@@ -51,13 +52,23 @@ struct MyCollectionView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
+            collectionListRenderID = UUID()
             Task {
                 await viewModel.refetchCollectionDataOnFocus()
             }
         }
         .navigationDestination(for: MyCollectionDiaryRoute.self) { route in
             if let diary = viewModel.myFeeds.first(where: { $0.diaryId == route.diaryId }) {
-                MyCollectionDiary(diaryId: route.diaryId, diary: diary)
+                MyCollectionDiary(
+                    diaryId: route.diaryId,
+                    diary: diary
+                ) { changedDiaryId in
+                    viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
+                    collectionListRenderID = UUID()
+                    Task {
+                        await viewModel.refetchCollectionDataOnFocus()
+                    }
+                }
             } else {
                 VStack(spacing: AppSpacing.s) {
                     Image(systemName: "doc.text.magnifyingglass")
@@ -143,6 +154,7 @@ struct MyCollectionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
+        .id(collectionListRenderID)
     }
 
     private var feedGridColumns: [GridItem] {
