@@ -161,9 +161,6 @@ struct MyCollectionDiary: View {
             let startX = width * startProgress
             let endX = width * endProgress
             let segmentWidth = max(endX - startX, 2)
-            let markerRadius: CGFloat = 3.5
-            let startMarkerX = min(max(startX, markerRadius), width - markerRadius)
-            let endMarkerX = min(max(endX, markerRadius), width - markerRadius)
 
             let labelY: CGFloat = 24
             let labelWidth: CGFloat = 38
