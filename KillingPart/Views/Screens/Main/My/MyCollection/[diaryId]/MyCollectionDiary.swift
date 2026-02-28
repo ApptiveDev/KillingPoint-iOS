@@ -137,11 +137,6 @@ struct MyCollectionDiary: View {
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(2)
 
-                Text("\(viewModel.startMinuteSecondText) ~ \(viewModel.endMinuteSecondText)")
-                    .font(AppFont.paperlogy5Medium(size: 13))
-                    .foregroundStyle(AppColors.primary600.opacity(0.95))
-                    .lineLimit(1)
-
                 timelineRangeSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,16 +177,6 @@ struct MyCollectionDiary: View {
                     .fill(AppColors.primary600.opacity(0.95))
                     .frame(width: segmentWidth, height: 7)
                     .offset(x: startX, y: 3)
-
-                Circle()
-                    .fill(AppColors.primary600)
-                    .frame(width: markerRadius * 2, height: markerRadius * 2)
-                    .position(x: startMarkerX, y: 6)
-
-                Circle()
-                    .fill(AppColors.primary600)
-                    .frame(width: markerRadius * 2, height: markerRadius * 2)
-                    .position(x: endMarkerX, y: 6)
 
                 Text(viewModel.startMinuteSecondText)
                     .font(AppFont.paperlogy6SemiBold(size: 10))
