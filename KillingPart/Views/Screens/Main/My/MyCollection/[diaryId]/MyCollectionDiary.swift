@@ -30,70 +30,80 @@ struct MyCollectionDiary: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        GeometryReader { proxy in
+            let topContentInset = min(proxy.safeAreaInsets.top, AppSpacing.l) + AppSpacing.s
+            let bottomContentInset = min(proxy.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
 
-            if viewModel.isDeleted {
-                MyCollectionDiaryDeletedPlaceholder()
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppSpacing.m) {
-                        MyCollectionDiaryVideoSection(
-                            videoURL: videoURL,
-                            startSeconds: viewModel.startSeconds,
-                            endSeconds: viewModel.endSeconds
-                        )
+            ZStack {
+                Image("my_background")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .ignoresSafeArea()
 
-                        MyCollectionDiaryTrackSection(
-                            artworkURL: viewModel.diary.albumImageURL,
-                            musicTitle: viewModel.diary.musicTitle,
-                            artist: viewModel.diary.artist,
-                            startMinuteSecondText: viewModel.startMinuteSecondText,
-                            endMinuteSecondText: viewModel.endMinuteSecondText,
-                            startProgress: startProgress,
-                            endProgress: endProgress
-                        )
+                if viewModel.isDeleted {
+                    MyCollectionDiaryDeletedPlaceholder()
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: AppSpacing.m) {
+                            MyCollectionDiaryVideoSection(
+                                videoURL: videoURL,
+                                startSeconds: viewModel.startSeconds,
+                                endSeconds: viewModel.endSeconds
+                            )
 
-                        MyCollectionDiaryCommentSection(
-                            isEditMode: viewModel.isEditMode,
-                            displayedContent: viewModel.displayedContent,
-                            editContentDraft: $viewModel.editContentDraft,
-                            isProcessing: viewModel.isProcessing,
-                            canSubmitEdit: viewModel.canSubmitEdit,
-                            createdDateText: createdDateText,
-                            tagText: tagText,
-                            isCommentEditorFocused: $isCommentEditorFocused,
-                            onCancelTap: {
-                                dismissKeyboard()
-                                viewModel.cancelEdit()
-                            },
-                            onSaveTap: {
-                                dismissKeyboard()
-                                Task {
-                                    let isSuccess = await viewModel.submitEdit()
-                                    if isSuccess {
-                                        onDiaryChanged?(diaryId)
+                            MyCollectionDiaryTrackSection(
+                                artworkURL: viewModel.diary.albumImageURL,
+                                musicTitle: viewModel.diary.musicTitle,
+                                artist: viewModel.diary.artist,
+                                startMinuteSecondText: viewModel.startMinuteSecondText,
+                                endMinuteSecondText: viewModel.endMinuteSecondText,
+                                startProgress: startProgress,
+                                endProgress: endProgress
+                            )
+
+                            MyCollectionDiaryCommentSection(
+                                isEditMode: viewModel.isEditMode,
+                                displayedContent: viewModel.displayedContent,
+                                editContentDraft: $viewModel.editContentDraft,
+                                isProcessing: viewModel.isProcessing,
+                                canSubmitEdit: viewModel.canSubmitEdit,
+                                createdDateText: createdDateText,
+                                tagText: tagText,
+                                isCommentEditorFocused: $isCommentEditorFocused,
+                                onCancelTap: {
+                                    dismissKeyboard()
+                                    viewModel.cancelEdit()
+                                },
+                                onSaveTap: {
+                                    dismissKeyboard()
+                                    Task {
+                                        let isSuccess = await viewModel.submitEdit()
+                                        if isSuccess {
+                                            onDiaryChanged?(diaryId)
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
 
-                        if let errorMessage = viewModel.errorMessage {
-                            Text(errorMessage)
-                                .font(AppFont.paperlogy4Regular(size: 13))
-                                .foregroundStyle(.red.opacity(0.95))
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if let errorMessage = viewModel.errorMessage {
+                                Text(errorMessage)
+                                    .font(AppFont.paperlogy4Regular(size: 13))
+                                    .foregroundStyle(.red.opacity(0.95))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(.horizontal, AppSpacing.l)
+                        .padding(.top, topContentInset)
+                        .padding(.bottom, bottomContentInset)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            dismissKeyboard()
                         }
                     }
-                    .padding(.horizontal, AppSpacing.l)
-                    .padding(.top, AppSpacing.m)
-                    .padding(.bottom, AppSpacing.l)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        dismissKeyboard()
-                    }
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             }
         }
         .navigationTitle("")
