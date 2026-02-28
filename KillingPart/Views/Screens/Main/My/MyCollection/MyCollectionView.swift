@@ -58,29 +58,18 @@ struct MyCollectionView: View {
             }
         }
         .navigationDestination(for: MyCollectionDiaryRoute.self) { route in
-            if let diary = viewModel.myFeeds.first(where: { $0.diaryId == route.diaryId }) {
-                MyCollectionDiary(
-                    diaryId: route.diaryId,
-                    displayTag: viewModel.displayTag,
-                    diary: diary
-                ) { changedDiaryId in
-                    viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
-                    collectionListRenderID = UUID()
-                    Task {
-                        await viewModel.refetchCollectionDataOnFocus()
-                    }
+            let diary = viewModel.myFeeds.first(where: { $0.diaryId == route.diaryId }) ?? route.initialDiary
+
+            MyCollectionDiary(
+                diaryId: route.diaryId,
+                displayTag: viewModel.displayTag,
+                diary: diary
+            ) { changedDiaryId in
+                viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
+                collectionListRenderID = UUID()
+                Task {
+                    await viewModel.refetchCollectionDataOnFocus()
                 }
-            } else {
-                VStack(spacing: AppSpacing.s) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.72))
-                    Text("일기를 찾을 수 없어요.")
-                        .font(AppFont.paperlogy5Medium(size: 14))
-                        .foregroundStyle(.white.opacity(0.82))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.ignoresSafeArea())
             }
         }
     }
@@ -110,7 +99,12 @@ struct MyCollectionView: View {
                 } else {
                     LazyVGrid(columns: feedGridColumns, spacing: AppSpacing.s) {
                         ForEach(viewModel.myFeeds) { feed in
-                            NavigationLink(value: MyCollectionDiaryRoute(diaryId: feed.diaryId)) {
+                            NavigationLink(
+                                value: MyCollectionDiaryRoute(
+                                    diaryId: feed.diaryId,
+                                    initialDiary: feed
+                                )
+                            ) {
                                 MyCollectionFeedCard(
                                     feed: feed,
                                     formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
@@ -228,4 +222,13 @@ private enum MyCollectionScreenTransitionDirection {
 
 private struct MyCollectionDiaryRoute: Hashable {
     let diaryId: Int
+    let initialDiary: DiaryFeedModel
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.diaryId == rhs.diaryId
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(diaryId)
+    }
 }

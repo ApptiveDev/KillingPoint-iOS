@@ -80,9 +80,7 @@ struct MyCollectionDiary: View {
                                     dismissKeyboard()
                                     Task {
                                         let isSuccess = await viewModel.submitEdit()
-                                        if isSuccess {
-                                            onDiaryChanged?(diaryId)
-                                        }
+                                        guard isSuccess else { return }
                                     }
                                 }
                             )
