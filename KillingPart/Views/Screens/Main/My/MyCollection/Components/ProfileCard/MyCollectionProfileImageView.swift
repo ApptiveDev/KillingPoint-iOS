@@ -4,6 +4,7 @@ struct MyCollectionProfileImageView: View {
     let profileImageURL: URL?
     let size: CGFloat
     let iconSize: CGFloat
+    @State private var imageReloadKey = UUID()
 
     var body: some View {
         Circle()
@@ -17,6 +18,15 @@ struct MyCollectionProfileImageView: View {
             .overlay {
                 Circle()
                     .stroke(Color.kpPrimary, lineWidth: 2)
+            }
+            .onAppear {
+                imageReloadKey = UUID()
+            }
+            .onChange(of: profileImageURL?.absoluteString) { _ in
+                imageReloadKey = UUID()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
+                imageReloadKey = UUID()
             }
     }
 
@@ -35,6 +45,7 @@ struct MyCollectionProfileImageView: View {
                     profileImagePlaceholder
                 }
             }
+            .id(imageReloadKey)
         } else {
             profileImagePlaceholder
         }
