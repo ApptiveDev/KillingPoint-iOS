@@ -38,7 +38,9 @@ struct MyCollectionDiary: View {
     var body: some View {
         GeometryReader { proxy in
             let topContentInset = min(proxy.safeAreaInsets.top, AppSpacing.l) + AppSpacing.s
-            let bottomContentInset = proxy.safeAreaInsets.bottom + keyboardHeight + AppSpacing.l
+            let keyboardCompensation = keyboardHeight > 0 ? max(keyboardHeight - 140, 0) : 0
+            let extraBottomInset = keyboardHeight > 0 ? AppSpacing.s : AppSpacing.l
+            let bottomContentInset = proxy.safeAreaInsets.bottom + keyboardCompensation + extraBottomInset
 
             ZStack {
                 Image("my_background")
@@ -115,7 +117,7 @@ struct MyCollectionDiary: View {
                         .onChange(of: keyboardHeight) { height in
                             guard isCommentEditorFocused else { return }
                             guard height > 0 else { return }
-                            DispatchQueue.main.async {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                                 withAnimation(.easeOut(duration: 0.18)) {
                                     scrollProxy.scrollTo(commentFocusAnchorID, anchor: .bottom)
                                 }
