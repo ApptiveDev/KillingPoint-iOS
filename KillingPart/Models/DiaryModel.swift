@@ -88,3 +88,43 @@ struct DiaryCreateResult {
     let diaryId: Int?
     let location: String?
 }
+
+struct DiaryUpdateRequest: Encodable {
+    var artist: String?
+    var musicTitle: String?
+    var albumImageUrl: String?
+    var videoUrl: String?
+    var scope: DiaryScope?
+    var content: String?
+    var duration: String?
+    var totalDuration: String?
+    var start: String?
+    var end: String?
+
+    enum CodingKeys: String, CodingKey {
+        case artist
+        case musicTitle
+        case albumImageUrl
+        case videoUrl
+        case scope
+        case content
+        case duration
+        case totalDuration
+        case start
+        case end
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(artist, forKey: .artist)
+        try container.encodeIfPresent(musicTitle, forKey: .musicTitle)
+        try container.encodeIfPresent(albumImageUrl, forKey: .albumImageUrl)
+        try container.encodeIfPresent(videoUrl, forKey: .videoUrl)
+        try container.encodeIfPresent(scope, forKey: .scope)
+        try container.encodeIfPresent(content, forKey: .content)
+        try container.encodeIfPresent(duration, forKey: .duration)
+        try container.encodeIfPresent(totalDuration, forKey: .totalDuration)
+        try container.encodeIfPresent(start, forKey: .start)
+        try container.encodeIfPresent(end, forKey: .end)
+    }
+}

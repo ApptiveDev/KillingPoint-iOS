@@ -7,6 +7,7 @@ struct MyCollectionView: View {
     @State private var screenMode: MyCollectionScreenMode = .collectionList
     @State private var navigationDirection: MyCollectionScreenTransitionDirection = .forward
     @State private var isAccountActionDialogPresented = false
+    @State private var collectionListRenderID = UUID()
 
     init(
         onSessionEnded: @escaping () -> Void,
@@ -51,8 +52,35 @@ struct MyCollectionView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
+            collectionListRenderID = UUID()
             Task {
                 await viewModel.refetchCollectionDataOnFocus()
+            }
+        }
+        .navigationDestination(for: MyCollectionDiaryRoute.self) { route in
+            if let diary = viewModel.myFeeds.first(where: { $0.diaryId == route.diaryId }) {
+                MyCollectionDiary(
+                    diaryId: route.diaryId,
+                    displayTag: viewModel.displayTag,
+                    diary: diary
+                ) { changedDiaryId in
+                    viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
+                    collectionListRenderID = UUID()
+                    Task {
+                        await viewModel.refetchCollectionDataOnFocus()
+                    }
+                }
+            } else {
+                VStack(spacing: AppSpacing.s) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                    Text("일기를 찾을 수 없어요.")
+                        .font(AppFont.paperlogy5Medium(size: 14))
+                        .foregroundStyle(.white.opacity(0.82))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.ignoresSafeArea())
             }
         }
     }
@@ -82,10 +110,13 @@ struct MyCollectionView: View {
                 } else {
                     LazyVGrid(columns: feedGridColumns, spacing: AppSpacing.s) {
                         ForEach(viewModel.myFeeds) { feed in
-                            MyCollectionFeedCard(
-                                feed: feed,
-                                formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
-                            )
+                            NavigationLink(value: MyCollectionDiaryRoute(diaryId: feed.diaryId)) {
+                                MyCollectionFeedCard(
+                                    feed: feed,
+                                    formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
+                                )
+                            }
+                            .buttonStyle(.plain)
                             .onAppear {
                                 guard feed.id == viewModel.myFeeds.last?.id else { return }
                                 Task {
@@ -124,6 +155,7 @@ struct MyCollectionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
+        .id(collectionListRenderID)
     }
 
     private var feedGridColumns: [GridItem] {
@@ -192,4 +224,8 @@ private enum MyCollectionScreenMode {
 private enum MyCollectionScreenTransitionDirection {
     case forward
     case backward
+}
+
+private struct MyCollectionDiaryRoute: Hashable {
+    let diaryId: Int
 }
