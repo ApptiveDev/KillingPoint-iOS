@@ -485,7 +485,8 @@ struct PlayKillingPartView: View {
                         } label: {
                             playlistRowContent(
                                 track: track,
-                                isCurrentTrack: track.id == currentTrack?.id
+                                isCurrentTrack: track.id == currentTrack?.id,
+                                isBeingDragged: playViewModel.isEditMode && draggedTrackID == track.id
                             )
                         }
                         .buttonStyle(.plain)
@@ -516,7 +517,8 @@ struct PlayKillingPartView: View {
 
     private func playlistRowContent(
         track: PlayKillingPartTrack,
-        isCurrentTrack: Bool
+        isCurrentTrack: Bool,
+        isBeingDragged: Bool
     ) -> some View {
         HStack(spacing: AppSpacing.s) {
             if playViewModel.isEditMode {
@@ -559,6 +561,7 @@ struct PlayKillingPartView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(isCurrentTrack ? AppColors.primary600.opacity(0.16) : Color.white.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .opacity(isBeingDragged ? 0.45 : 1)
     }
 
     private var playlistHandleIcon: some View {
