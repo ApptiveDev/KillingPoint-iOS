@@ -6,6 +6,19 @@ struct YoutubePlayerView: UIViewRepresentable {
     let videoURL: URL?
     let startSeconds: Double
     let endSeconds: Double
+    let isPlaying: Bool
+
+    init(
+        videoURL: URL?,
+        startSeconds: Double,
+        endSeconds: Double,
+        isPlaying: Bool = true
+    ) {
+        self.videoURL = videoURL
+        self.startSeconds = startSeconds
+        self.endSeconds = endSeconds
+        self.isPlaying = isPlaying
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -36,11 +49,13 @@ struct YoutubePlayerView: UIViewRepresentable {
             context.coordinator.loadedVideoID = videoID
             context.coordinator.lastSyncedStart = targetStart
             context.coordinator.lastSyncedEnd = targetEnd
+            context.coordinator.lastSyncedIsPlaying = isPlaying
             webView.loadHTMLString(
                 makePlayerHTML(
                     videoID: videoID,
                     startSeconds: targetStart,
-                    endSeconds: targetEnd
+                    endSeconds: targetEnd,
+                    shouldAutoplay: isPlaying
                 ),
                 baseURL: appRefererURL
             )
@@ -55,23 +70,49 @@ struct YoutubePlayerView: UIViewRepresentable {
             context.coordinator.lastSyncedEnd,
             targetEnd
         )
-        guard !(isSameStart && isSameEnd) else { return }
-        context.coordinator.lastSyncedStart = targetStart
-        context.coordinator.lastSyncedEnd = targetEnd
+        let isRangeChanged = !(isSameStart && isSameEnd)
+
+        let isSamePlayState = context.coordinator.lastSyncedIsPlaying == isPlaying
+        let isPlayStateChanged = !isSamePlayState
+        guard isRangeChanged || isPlayStateChanged else { return }
+
+        if isRangeChanged {
+            context.coordinator.lastSyncedStart = targetStart
+            context.coordinator.lastSyncedEnd = targetEnd
+        }
+        if isPlayStateChanged {
+            context.coordinator.lastSyncedIsPlaying = isPlaying
+        }
 
         let targetStartJS = jsNumber(targetStart)
         let targetEndJS = jsNumber(targetEnd)
+        let shouldAutoplayJS = isPlaying ? "true" : "false"
+        let shouldForceSeekJS = (isRangeChanged || isPlayStateChanged) ? "true" : "false"
+        let playbackControlJS = isPlaying
+            ? """
+            if (window.kpApplyDesiredRange) {
+                window.kpApplyDesiredRange(\(shouldForceSeekJS));
+            } else {
+                if (\(shouldForceSeekJS)) {
+                    window.kpPlayer.seekTo(window.kpDesiredStart, true);
+                }
+                window.kpPlayer.playVideo();
+            }
+            """
+            : """
+            if (\(shouldForceSeekJS)) {
+                window.kpPlayer.seekTo(window.kpDesiredStart, true);
+            }
+            window.kpPlayer.pauseVideo();
+            """
+
         webView.evaluateJavaScript(
             """
             window.kpDesiredStart = \(targetStartJS);
             window.kpDesiredEnd = \(targetEndJS);
+            window.kpShouldAutoplay = \(shouldAutoplayJS);
             if (window.kpPlayerReady && window.kpPlayer) {
-                if (window.kpApplyDesiredRange) {
-                    window.kpApplyDesiredRange(true);
-                } else {
-                    window.kpPlayer.seekTo(window.kpDesiredStart, true);
-                    window.kpPlayer.playVideo();
-                }
+                \(playbackControlJS)
             }
             """,
             completionHandler: nil
@@ -86,6 +127,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         var loadedVideoID: String?
         var lastSyncedStart: Double?
         var lastSyncedEnd: Double?
+        var lastSyncedIsPlaying: Bool?
     }
 
     private var appRefererURL: URL? {
@@ -95,12 +137,19 @@ struct YoutubePlayerView: UIViewRepresentable {
         return URL(string: appRefererURLString)
     }
 
-    private func makePlayerHTML(videoID: String, startSeconds: Double, endSeconds: Double) -> String {
+    private func makePlayerHTML(
+        videoID: String,
+        startSeconds: Double,
+        endSeconds: Double,
+        shouldAutoplay: Bool
+    ) -> String {
         let safeVideoID = escapeForJavaScript(videoID)
         let safeReferer = escapeForJavaScript(appRefererURLString ?? "")
         let initialStart = max(Int(startSeconds.rounded(.down)), 0)
         let initialStartJS = jsNumber(startSeconds)
         let initialEndJS = jsNumber(endSeconds)
+        let initialShouldAutoplayJS = shouldAutoplay ? "true" : "false"
+        let autoplayFlag = shouldAutoplay ? 1 : 0
 
         return """
         <!doctype html>
@@ -128,6 +177,7 @@ struct YoutubePlayerView: UIViewRepresentable {
             <script>
                 window.kpDesiredStart = \(initialStartJS);
                 window.kpDesiredEnd = \(initialEndJS);
+                window.kpShouldAutoplay = \(initialShouldAutoplayJS);
                 window.kpPlayer = null;
                 window.kpPlayerReady = false;
                 window.kpLoopTimer = null;
@@ -202,7 +252,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                         height: '100%',
                         videoId: '\(safeVideoID)',
                         playerVars: {
-                            autoplay: 1,
+                            autoplay: \(autoplayFlag),
                             controls: 0,
                             disablekb: 1,
                             fs: 0,
@@ -217,11 +267,16 @@ struct YoutubePlayerView: UIViewRepresentable {
                         events: {
                             onReady: function() {
                                 window.kpPlayerReady = true;
-                                window.kpApplyDesiredRange(true);
-                                window.kpStartRangeLoop();
+                                if (window.kpShouldAutoplay) {
+                                    window.kpApplyDesiredRange(true);
+                                    window.kpStartRangeLoop();
+                                } else {
+                                    window.kpPlayer.seekTo(window.kpDesiredStart, true);
+                                    window.kpPlayer.pauseVideo();
+                                }
                             },
                             onStateChange: function(event) {
-                                if (Number(event.data) === 0) {
+                                if (window.kpShouldAutoplay && Number(event.data) === 0) {
                                     window.kpApplyDesiredRange(true);
                                 }
                             }
