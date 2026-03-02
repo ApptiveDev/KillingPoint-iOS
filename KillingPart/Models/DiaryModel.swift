@@ -128,3 +128,7 @@ struct DiaryUpdateRequest: Encodable {
         try container.encodeIfPresent(end, forKey: .end)
     }
 }
+
+struct DiaryOrderUpdateRequest: Encodable {
+    let diaryIds: [Int]
+}

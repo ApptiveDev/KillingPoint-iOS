@@ -1,13 +1,18 @@
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct PlayKillingPartView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var viewModel: MyCollectionViewModel
+    @StateObject private var playViewModel: PlayKillingPartViewModel
     @State private var selectedTrackID: Int?
     @State private var isPlaying = true
     @State private var isPlaylistExpanded = false
     @State private var elapsedInCurrentRange: TimeInterval = 0
+    @State private var orderedDiaryIDs: [Int] = []
+    @State private var draggedTrackID: Int?
     @State private var hasTriggeredInitialLoad = false
     @State private var hasCompletedInitialLoad = false
     @State private var lastTickDate = Date()
@@ -30,6 +35,9 @@ struct PlayKillingPartView: View {
                 diaryService: diaryService
             )
         )
+        _playViewModel = StateObject(
+            wrappedValue: PlayKillingPartViewModel(diaryService: diaryService)
+        )
     }
 
     var body: some View {
@@ -38,6 +46,7 @@ struct PlayKillingPartView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .scrollDisabled(playViewModel.isEditMode && isPlaylistExpanded)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             let playlistHeight = isPlaylistExpanded ? expandedPlaylistHeight : 0
@@ -52,17 +61,22 @@ struct PlayKillingPartView: View {
             Task {
                 await loadAllDiaryFeedsForPlayback()
                 hasCompletedInitialLoad = true
+                reconcileOrderedDiaryIDsIfNeeded()
                 synchronizeSelectedTrackIfNeeded()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
             Task {
                 await loadAllDiaryFeedsForPlayback()
+                reconcileOrderedDiaryIDsIfNeeded()
                 synchronizeSelectedTrackIfNeeded()
             }
         }
         .onReceive(playbackTimer) { now in
             handlePlaybackTick(now: now)
+        }
+        .onChange(of: basePlaylistTrackIDs) { _ in
+            reconcileOrderedDiaryIDsIfNeeded()
         }
         .onChange(of: playlistTrackIDs) { _ in
             synchronizeSelectedTrackIfNeeded()
@@ -72,6 +86,11 @@ struct PlayKillingPartView: View {
                 playerReloadToken = UUID()
             }
             resetTickReference()
+        }
+        .onChange(of: playViewModel.isEditMode) { isEditing in
+            if !isEditing {
+                draggedTrackID = nil
+            }
         }
     }
 
@@ -95,6 +114,14 @@ struct PlayKillingPartView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .multilineTextAlignment(.center)
             }
+
+            if let errorMessage = playViewModel.errorMessage {
+                Text(errorMessage)
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(.red.opacity(0.95))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
+            }
         }
         .padding(AppSpacing.m)
         .background(Color.black.opacity(0.9))
@@ -105,8 +132,26 @@ struct PlayKillingPartView: View {
         }
     }
 
-    private var playlistTracks: [PlayKillingPartTrack] {
+    private var basePlaylistTracks: [PlayKillingPartTrack] {
         viewModel.myFeeds.map(makeTrack(from:))
+    }
+
+    private var basePlaylistTrackIDs: [Int] {
+        basePlaylistTracks.map(\.id)
+    }
+
+    private var playlistTracks: [PlayKillingPartTrack] {
+        guard !orderedDiaryIDs.isEmpty else { return basePlaylistTracks }
+
+        let trackByID = Dictionary(uniqueKeysWithValues: basePlaylistTracks.map { ($0.id, $0) })
+        let orderedTracks = orderedDiaryIDs.compactMap { trackByID[$0] }
+        if orderedTracks.count == basePlaylistTracks.count {
+            return orderedTracks
+        }
+
+        let orderedTrackIDs = Set(orderedTracks.map(\.id))
+        let remainingTracks = basePlaylistTracks.filter { !orderedTrackIDs.contains($0.id) }
+        return orderedTracks + remainingTracks
     }
 
     private var playlistTrackIDs: [Int] {
@@ -284,16 +329,16 @@ struct PlayKillingPartView: View {
     @ViewBuilder
     private func bottomPlayerPanel(playlistHeight: CGFloat) -> some View {
         VStack(spacing: AppSpacing.m) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isPlaylistExpanded.toggle()
-                }
-            } label: {
-                playerSummaryBar
-            }
-            .buttonStyle(.plain)
-            .disabled(currentTrack == nil)
-            .opacity(currentTrack == nil ? 0.5 : 1)
+            playerSummaryBar
+                .contentShape(Rectangle())
+                .gesture(
+                    TapGesture().onEnded {
+                        togglePlaylistExpansion()
+                    },
+                    including: .gesture
+                )
+                .allowsHitTesting(currentTrack != nil && !playViewModel.isSavingOrder)
+                .opacity((currentTrack == nil || playViewModel.isSavingOrder) ? 0.5 : 1)
 
             if isPlaylistExpanded {
                 playlistView
@@ -364,9 +409,20 @@ struct PlayKillingPartView: View {
                 Spacer(minLength: 0)
 
                 if isPlaylistExpanded {
-                    Text("편집")
-                        .font(AppFont.paperlogy5Medium(size: 13))
-                        .foregroundStyle(AppColors.primary600)
+                    Button {
+                        handlePlaylistEditButtonTap()
+                    } label: {
+                        if playViewModel.isSavingOrder {
+                            ProgressView()
+                                .tint(AppColors.primary600)
+                        } else {
+                            Text(playViewModel.isEditMode ? "완료" : "편집")
+                                .font(AppFont.paperlogy5Medium(size: 13))
+                                .foregroundStyle(AppColors.primary600)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(playlistTracks.isEmpty || playViewModel.isSavingOrder)
                 } else {
                     Image(systemName: "music.note.list")
                         .font(.system(size: 16, weight: .semibold))
@@ -417,50 +473,163 @@ struct PlayKillingPartView: View {
     }
 
     private var playlistView: some View {
-        ScrollView {
-            VStack(spacing: AppSpacing.xs) {
-                ForEach(Array(playlistTracks.enumerated()), id: \.element.id) { index, track in
-                    Button {
-                        selectTrack(at: index)
-                    } label: {
-                        HStack(spacing: AppSpacing.s) {
-                            playlistThumbnail(for: track)
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: AppSpacing.xs) {
+                    playlistEdgeDropZone(position: .top, scrollProxy: scrollProxy)
 
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(track.displayTitle)
-                                    .font(AppFont.paperlogy5Medium(size: 14))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-
-                                Text(track.displayArtist)
-                                    .font(AppFont.paperlogy4Regular(size: 12))
-                                    .foregroundStyle(.white.opacity(0.72))
-                                    .lineLimit(1)
-                            }
-
-                            Spacer(minLength: 0)
-
-                            if track.id == currentTrack?.id && isPlaying {
-                                Image("killingpart_music_icon")
-                                    .resizable()
-                                    .renderingMode(.template)
-                                    .scaledToFit()
-                                    .frame(width: 15, height: 18)
-                                    .foregroundStyle(AppColors.primary600)
-                            }
+                    ForEach(Array(playlistTracks.enumerated()), id: \.element.id) { index, track in
+                        Button {
+                            guard !playViewModel.isEditMode else { return }
+                            selectTrack(at: index)
+                        } label: {
+                            playlistRowContent(
+                                track: track,
+                                isCurrentTrack: track.id == currentTrack?.id,
+                                isBeingDragged: playViewModel.isEditMode && draggedTrackID == track.id
+                            )
                         }
-                        .padding(.horizontal, AppSpacing.s)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(track.id == currentTrack?.id ? AppColors.primary600.opacity(0.16) : Color.white.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .buttonStyle(.plain)
+                        .id(track.id)
+                        .onDrop(
+                            of: [UTType.text.identifier],
+                            delegate: PlayKillingPartReorderDropDelegate(
+                                targetTrackID: track.id,
+                                orderedDiaryIDs: $orderedDiaryIDs,
+                                draggedTrackID: $draggedTrackID,
+                                isEditing: playViewModel.isEditMode,
+                                onTrackHovered: { hoveredTrackID in
+                                    withAnimation(.easeInOut(duration: 0.12)) {
+                                        scrollProxy.scrollTo(hoveredTrackID, anchor: .center)
+                                    }
+                                }
+                            )
+                        )
                     }
-                    .buttonStyle(.plain)
+
+                    playlistEdgeDropZone(position: .bottom, scrollProxy: scrollProxy)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
+    }
+
+    private func playlistRowContent(
+        track: PlayKillingPartTrack,
+        isCurrentTrack: Bool,
+        isBeingDragged: Bool
+    ) -> some View {
+        HStack(spacing: AppSpacing.s) {
+            if playViewModel.isEditMode {
+                playlistHandleIcon
+                    .contentShape(Rectangle())
+                    .onDrag {
+                        beginTrackDrag(trackID: track.id)
+                        return NSItemProvider(object: NSString(string: "\(track.id)"))
+                    } preview: {
+                        playlistDragPreview(for: track)
+                    }
+            }
+
+            playlistThumbnail(for: track)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(track.displayTitle)
+                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text(track.displayArtist)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            if !playViewModel.isEditMode && isCurrentTrack && isPlaying {
+                Image("killingpart_music_icon")
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
+                    .frame(width: 15, height: 18)
+                    .foregroundStyle(AppColors.primary600)
+            }
+        }
+        .padding(.horizontal, AppSpacing.s)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isCurrentTrack ? AppColors.primary600.opacity(0.16) : Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .opacity(isBeingDragged ? 0.45 : 1)
+    }
+
+    private var playlistHandleIcon: some View {
+        Image(systemName: "line.3.horizontal")
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.72))
+            .frame(width: 22, height: 22)
+    }
+
+    private func playlistDragPreview(for track: PlayKillingPartTrack) -> some View {
+        HStack(spacing: AppSpacing.s) {
+            playlistHandleIcon
+
+            playlistThumbnail(for: track)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(track.displayTitle)
+                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text(track.displayArtist)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, AppSpacing.s)
+        .padding(.vertical, 12)
+        .frame(width: 320, alignment: .leading)
+        .background(Color.black.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        }
+    }
+
+    private func playlistEdgeDropZone(
+        position: PlayKillingPartDropEdge,
+        scrollProxy: ScrollViewProxy
+    ) -> some View {
+        Color.clear
+            .frame(height: 20)
+            .contentShape(Rectangle())
+            .onDrop(
+                of: [UTType.text.identifier],
+                delegate: PlayKillingPartEdgeDropDelegate(
+                    edge: position,
+                    orderedDiaryIDs: $orderedDiaryIDs,
+                    draggedTrackID: $draggedTrackID,
+                    isEditing: playViewModel.isEditMode,
+                    onEdgeReached: { edge in
+                        guard !orderedDiaryIDs.isEmpty else { return }
+                        let targetID = edge == .top ? orderedDiaryIDs.first : orderedDiaryIDs.last
+                        guard let targetID else { return }
+                        withAnimation(.easeInOut(duration: 0.12)) {
+                            scrollProxy.scrollTo(
+                                targetID,
+                                anchor: edge == .top ? .top : .bottom
+                            )
+                        }
+                    }
+                )
+            )
     }
 
     private func playlistThumbnail(for track: PlayKillingPartTrack) -> some View {
@@ -519,8 +688,8 @@ struct PlayKillingPartView: View {
                     }
             }
             .buttonStyle(.plain)
-            .disabled(currentTrack == nil)
-            .opacity(currentTrack == nil ? 0.5 : 1)
+            .disabled(currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder)
+            .opacity((currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder) ? 0.5 : 1)
 
             controlButton(symbol: "forward.end", action: moveToNextTrack)
         }
@@ -539,12 +708,65 @@ struct PlayKillingPartView: View {
                 }
         }
         .buttonStyle(.plain)
-        .disabled(currentTrack == nil)
-        .opacity(currentTrack == nil ? 0.5 : 1)
+        .disabled(currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder)
+        .opacity((currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder) ? 0.5 : 1)
+    }
+
+    private func beginTrackDrag(trackID: Int) {
+        draggedTrackID = trackID
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+
+    private func togglePlaylistExpansion() {
+        guard !(playViewModel.isEditMode && isPlaylistExpanded) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isPlaylistExpanded.toggle()
+        }
+    }
+
+    private func handlePlaylistEditButtonTap() {
+        if playViewModel.isEditMode {
+            Task {
+                let isSuccess = await playViewModel.completeEditing(with: orderedDiaryIDs)
+                guard isSuccess else { return }
+                draggedTrackID = nil
+            }
+            return
+        }
+
+        playViewModel.beginEditing()
+    }
+
+    private func reconcileOrderedDiaryIDsIfNeeded() {
+        let sourceIDs = basePlaylistTrackIDs
+        guard !sourceIDs.isEmpty else {
+            orderedDiaryIDs = []
+            return
+        }
+
+        guard playViewModel.isEditMode else {
+            if orderedDiaryIDs != sourceIDs {
+                orderedDiaryIDs = sourceIDs
+            }
+            return
+        }
+
+        let sourceSet = Set(sourceIDs)
+        var reconciledIDs = orderedDiaryIDs.filter { sourceSet.contains($0) }
+        for sourceID in sourceIDs where !reconciledIDs.contains(sourceID) {
+            reconciledIDs.append(sourceID)
+        }
+
+        if reconciledIDs != orderedDiaryIDs {
+            orderedDiaryIDs = reconciledIDs
+        }
     }
 
     private func togglePlayState() {
         guard currentTrack != nil else { return }
+        guard !playViewModel.isEditMode else { return }
         isPlaying.toggle()
         resetTickReference()
     }
@@ -775,5 +997,86 @@ private struct PlayKillingPartTrack: Identifiable {
     func playheadProgress(elapsedInCurrentRange: TimeInterval) -> CGFloat {
         let absoluteSeconds = min(startSeconds + elapsedInCurrentRange, endSeconds)
         return CGFloat(min(max(absoluteSeconds / totalSeconds, 0), 1))
+    }
+}
+
+private struct PlayKillingPartReorderDropDelegate: DropDelegate {
+    let targetTrackID: Int
+    @Binding var orderedDiaryIDs: [Int]
+    @Binding var draggedTrackID: Int?
+    let isEditing: Bool
+    let onTrackHovered: (Int) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard isEditing else { return }
+        guard let draggedTrackID else { return }
+        guard draggedTrackID != targetTrackID else { return }
+        guard
+            let sourceIndex = orderedDiaryIDs.firstIndex(of: draggedTrackID),
+            let destinationIndex = orderedDiaryIDs.firstIndex(of: targetTrackID)
+        else {
+            return
+        }
+
+        if orderedDiaryIDs[destinationIndex] != draggedTrackID {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                orderedDiaryIDs.move(
+                    fromOffsets: IndexSet(integer: sourceIndex),
+                    toOffset: destinationIndex > sourceIndex ? destinationIndex + 1 : destinationIndex
+                )
+            }
+        }
+        onTrackHovered(targetTrackID)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        isEditing ? DropProposal(operation: .move) : DropProposal(operation: .cancel)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedTrackID = nil
+        return isEditing
+    }
+}
+
+private enum PlayKillingPartDropEdge {
+    case top
+    case bottom
+}
+
+private struct PlayKillingPartEdgeDropDelegate: DropDelegate {
+    let edge: PlayKillingPartDropEdge
+    @Binding var orderedDiaryIDs: [Int]
+    @Binding var draggedTrackID: Int?
+    let isEditing: Bool
+    let onEdgeReached: (PlayKillingPartDropEdge) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard isEditing else { return }
+        guard let draggedTrackID else { return }
+        guard let sourceIndex = orderedDiaryIDs.firstIndex(of: draggedTrackID) else { return }
+
+        let destinationOffset: Int = edge == .top ? 0 : orderedDiaryIDs.count
+        let destinationIndex: Int = edge == .top ? 0 : max(orderedDiaryIDs.count - 1, 0)
+
+        if sourceIndex != destinationIndex {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                orderedDiaryIDs.move(
+                    fromOffsets: IndexSet(integer: sourceIndex),
+                    toOffset: destinationOffset
+                )
+            }
+        }
+
+        onEdgeReached(edge)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        isEditing ? DropProposal(operation: .move) : DropProposal(operation: .cancel)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedTrackID = nil
+        return isEditing
     }
 }
