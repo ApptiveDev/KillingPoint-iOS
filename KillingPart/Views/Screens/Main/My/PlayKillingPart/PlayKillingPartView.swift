@@ -34,23 +34,7 @@ struct PlayKillingPartView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.m) {
-                profileSummaryCard
-
-                if let currentTrack {
-                    currentTrackContent(track: currentTrack)
-                } else if hasCompletedInitialLoad {
-                    emptyStateCard
-                } else {
-                    loadingStateCard
-                }
-
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(.red.opacity(0.95))
-                }
-            }
+            playbackContentContainer
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
@@ -88,6 +72,36 @@ struct PlayKillingPartView: View {
                 playerReloadToken = UUID()
             }
             resetTickReference()
+        }
+    }
+
+    @ViewBuilder
+    private var playbackContentContainer: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.m) {
+            profileSummaryCard
+
+            if let currentTrack {
+                currentTrackContent(track: currentTrack)
+            } else if hasCompletedInitialLoad {
+                emptyStateCard
+            } else {
+                loadingStateCard
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(.red.opacity(0.95))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(AppSpacing.m)
+        .background(Color.black.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
         }
     }
 
@@ -155,21 +169,7 @@ struct PlayKillingPartView: View {
         }
         .padding(AppSpacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.16),
-                    Color.white.opacity(0.04)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.16), lineWidth: 1)
-        }
+        
     }
 
     @ViewBuilder
@@ -205,38 +205,36 @@ struct PlayKillingPartView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .center, spacing: 6) {
                 Text(track.displayTitle)
                     .font(AppFont.paperlogy6SemiBold(size: 20))
                     .foregroundStyle(.white)
                     .lineLimit(2)
+                    .multilineTextAlignment(.center)
 
                 Text(track.displayArtist)
                     .font(AppFont.paperlogy4Regular(size: 14))
                     .foregroundStyle(.white.opacity(0.78))
                     .lineLimit(2)
+                    .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, AppSpacing.xs)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, AppSpacing.m)
 
-            VStack(alignment: .leading, spacing: AppSpacing.s) {
+            VStack(alignment: .center, spacing: AppSpacing.s) {
                 Text("킬링파트 일기")
                     .font(AppFont.paperlogy6SemiBold(size: 13))
-                    .foregroundStyle(AppColors.primary600.opacity(0.92))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
 
                 Text(track.displayContent)
                     .font(AppFont.paperlogy4Regular(size: 14))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .foregroundStyle(.white)
                     .lineSpacing(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
             }
             .padding(AppSpacing.m)
-            .background(Color.white.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
         }
         .padding(.bottom, AppSpacing.m)
     }
