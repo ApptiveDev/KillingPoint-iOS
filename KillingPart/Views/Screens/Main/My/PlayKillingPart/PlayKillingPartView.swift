@@ -13,6 +13,7 @@ struct PlayKillingPartView: View {
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var orderedDiaryIDs: [Int] = []
     @State private var draggedTrackID: Int?
+    @State private var lastReorderDate = Date.distantPast
     @State private var hasTriggeredInitialLoad = false
     @State private var hasCompletedInitialLoad = false
     @State private var lastTickDate = Date()
@@ -22,6 +23,8 @@ struct PlayKillingPartView: View {
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
     private let controlsHeight: CGFloat = 98
+    private let reorderThrottleInterval: TimeInterval = 0.18
+    private let reorderAnimationDuration: Double = 0.24
 
     init(
         authenticationService: AuthenticationServicing = AuthenticationService(),
@@ -90,6 +93,7 @@ struct PlayKillingPartView: View {
         .onChange(of: playViewModel.isEditMode) { isEditing in
             if !isEditing {
                 draggedTrackID = nil
+                lastReorderDate = .distantPast
             }
         }
     }
@@ -497,6 +501,9 @@ struct PlayKillingPartView: View {
                                 targetTrackID: track.id,
                                 orderedDiaryIDs: $orderedDiaryIDs,
                                 draggedTrackID: $draggedTrackID,
+                                lastReorderDate: $lastReorderDate,
+                                minimumReorderInterval: reorderThrottleInterval,
+                                reorderAnimationDuration: reorderAnimationDuration,
                                 isEditing: playViewModel.isEditMode,
                                 onTrackHovered: { hoveredTrackID in
                                     withAnimation(.easeInOut(duration: 0.12)) {
@@ -584,6 +591,9 @@ struct PlayKillingPartView: View {
                     edge: position,
                     orderedDiaryIDs: $orderedDiaryIDs,
                     draggedTrackID: $draggedTrackID,
+                    lastReorderDate: $lastReorderDate,
+                    minimumReorderInterval: reorderThrottleInterval,
+                    reorderAnimationDuration: reorderAnimationDuration,
                     isEditing: playViewModel.isEditMode,
                     onEdgeReached: { edge in
                         guard !orderedDiaryIDs.isEmpty else { return }
@@ -682,6 +692,7 @@ struct PlayKillingPartView: View {
 
     private func beginTrackDrag(trackID: Int) {
         draggedTrackID = trackID
+        lastReorderDate = .distantPast
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()
         generator.impactOccurred()
@@ -993,6 +1004,9 @@ private struct PlayKillingPartReorderDropDelegate: DropDelegate {
     let targetTrackID: Int
     @Binding var orderedDiaryIDs: [Int]
     @Binding var draggedTrackID: Int?
+    @Binding var lastReorderDate: Date
+    let minimumReorderInterval: TimeInterval
+    let reorderAnimationDuration: Double
     let isEditing: Bool
     let onTrackHovered: (Int) -> Void
 
@@ -1000,6 +1014,8 @@ private struct PlayKillingPartReorderDropDelegate: DropDelegate {
         guard isEditing else { return }
         guard let draggedTrackID else { return }
         guard draggedTrackID != targetTrackID else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastReorderDate) >= minimumReorderInterval else { return }
         guard
             let sourceIndex = orderedDiaryIDs.firstIndex(of: draggedTrackID),
             let destinationIndex = orderedDiaryIDs.firstIndex(of: targetTrackID)
@@ -1008,12 +1024,13 @@ private struct PlayKillingPartReorderDropDelegate: DropDelegate {
         }
 
         if orderedDiaryIDs[destinationIndex] != draggedTrackID {
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(.easeInOut(duration: reorderAnimationDuration)) {
                 orderedDiaryIDs.move(
                     fromOffsets: IndexSet(integer: sourceIndex),
                     toOffset: destinationIndex > sourceIndex ? destinationIndex + 1 : destinationIndex
                 )
             }
+            lastReorderDate = now
         }
         onTrackHovered(targetTrackID)
     }
@@ -1024,6 +1041,7 @@ private struct PlayKillingPartReorderDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggedTrackID = nil
+        lastReorderDate = .distantPast
         return isEditing
     }
 }
@@ -1037,24 +1055,30 @@ private struct PlayKillingPartEdgeDropDelegate: DropDelegate {
     let edge: PlayKillingPartDropEdge
     @Binding var orderedDiaryIDs: [Int]
     @Binding var draggedTrackID: Int?
+    @Binding var lastReorderDate: Date
+    let minimumReorderInterval: TimeInterval
+    let reorderAnimationDuration: Double
     let isEditing: Bool
     let onEdgeReached: (PlayKillingPartDropEdge) -> Void
 
     func dropEntered(info: DropInfo) {
         guard isEditing else { return }
         guard let draggedTrackID else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastReorderDate) >= minimumReorderInterval else { return }
         guard let sourceIndex = orderedDiaryIDs.firstIndex(of: draggedTrackID) else { return }
 
         let destinationOffset: Int = edge == .top ? 0 : orderedDiaryIDs.count
         let destinationIndex: Int = edge == .top ? 0 : max(orderedDiaryIDs.count - 1, 0)
 
         if sourceIndex != destinationIndex {
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(.easeInOut(duration: reorderAnimationDuration)) {
                 orderedDiaryIDs.move(
                     fromOffsets: IndexSet(integer: sourceIndex),
                     toOffset: destinationOffset
                 )
             }
+            lastReorderDate = now
         }
 
         onEdgeReached(edge)
@@ -1066,6 +1090,7 @@ private struct PlayKillingPartEdgeDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         draggedTrackID = nil
+        lastReorderDate = .distantPast
         return isEditing
     }
 }
