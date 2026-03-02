@@ -4,6 +4,7 @@ struct MyCollectionDiaryVideoSection: View {
     let videoURL: URL?
     let startSeconds: Double
     let endSeconds: Double
+    let playerReloadToken: UUID
 
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
@@ -14,6 +15,7 @@ struct MyCollectionDiaryVideoSection: View {
             startSeconds: startSeconds,
             endSeconds: endSeconds
         )
+        .id(playerReloadToken)
         .frame(maxWidth: .infinity)
         .aspectRatio(videoAspectRatio, contentMode: .fill)
         .allowsHitTesting(false)

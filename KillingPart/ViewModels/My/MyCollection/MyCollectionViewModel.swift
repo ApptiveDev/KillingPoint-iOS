@@ -238,11 +238,12 @@ final class MyCollectionViewModel: ObservableObject {
 
         do {
             let response = try await diaryService.fetchMyFeeds(page: page, size: size)
+            let normalizedFeeds = normalizeFeedVideoURLs(in: response.content)
             if mode == .initial {
-                myFeeds = response.content
+                myFeeds = normalizedFeeds
             } else {
                 let existingFeedIDs = Set(myFeeds.map(\.id))
-                let newFeeds = response.content.filter { !existingFeedIDs.contains($0.id) }
+                let newFeeds = normalizedFeeds.filter { !existingFeedIDs.contains($0.id) }
                 myFeeds.append(contentsOf: newFeeds)
                 if newFeeds.isEmpty {
                     hasLoadedMyFeeds = true
@@ -262,6 +263,38 @@ final class MyCollectionViewModel: ObservableObject {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
         }
+    }
+
+    private func normalizeFeedVideoURLs(in feeds: [DiaryFeedModel]) -> [DiaryFeedModel] {
+        feeds.map { feed in
+            let normalizedVideoURL = resolvedVideoURLForPlayback(from: feed.videoUrl)
+            guard normalizedVideoURL != feed.videoUrl else { return feed }
+            return feed.replacingVideoURL(normalizedVideoURL)
+        }
+    }
+
+    private func resolvedVideoURLForPlayback(from rawVideoURL: String) -> String {
+        let trimmedVideoURL = rawVideoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedVideoURL.isEmpty else { return rawVideoURL }
+        guard isLikelyYouTubeVideoID(trimmedVideoURL) else { return trimmedVideoURL }
+        return "https://www.youtube.com/embed/\(trimmedVideoURL)?playsinline=1"
+    }
+
+    private func isLikelyYouTubeVideoID(_ value: String) -> Bool {
+        if value.hasPrefix("//") {
+            return false
+        }
+
+        if let components = URLComponents(string: value),
+           components.scheme != nil || components.host != nil {
+            return false
+        }
+
+        return !value.contains("/")
+            && !value.contains("?")
+            && !value.contains("&")
+            && !value.contains("=")
+            && !value.contains(".")
     }
 
     private enum FeedLoadMode {
@@ -325,5 +358,32 @@ final class MyCollectionViewModel: ObservableObject {
         Task {
             await refetchCollectionDataOnFocus()
         }
+    }
+}
+
+private extension DiaryFeedModel {
+    func replacingVideoURL(_ newVideoURL: String) -> DiaryFeedModel {
+        DiaryFeedModel(
+            diaryId: diaryId,
+            artist: artist,
+            musicTitle: musicTitle,
+            albumImageUrl: albumImageUrl,
+            content: content,
+            videoUrl: newVideoURL,
+            scope: scope,
+            duration: duration,
+            totalDuration: totalDuration,
+            start: start,
+            end: end,
+            createDate: createDate,
+            updateDate: updateDate,
+            isLiked: isLiked,
+            isStored: isStored,
+            likeCount: likeCount,
+            userId: userId,
+            username: username,
+            tag: tag,
+            profileImageUrl: profileImageUrl
+        )
     }
 }
