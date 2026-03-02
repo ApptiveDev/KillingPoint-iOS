@@ -485,8 +485,7 @@ struct PlayKillingPartView: View {
                         } label: {
                             playlistRowContent(
                                 track: track,
-                                isCurrentTrack: track.id == currentTrack?.id,
-                                isBeingDragged: playViewModel.isEditMode && draggedTrackID == track.id
+                                isCurrentTrack: track.id == currentTrack?.id
                             )
                         }
                         .buttonStyle(.plain)
@@ -517,18 +516,16 @@ struct PlayKillingPartView: View {
 
     private func playlistRowContent(
         track: PlayKillingPartTrack,
-        isCurrentTrack: Bool,
-        isBeingDragged: Bool
+        isCurrentTrack: Bool
     ) -> some View {
         HStack(spacing: AppSpacing.s) {
             if playViewModel.isEditMode {
                 playlistHandleIcon
                     .contentShape(Rectangle())
                     .onDrag {
-                        beginTrackDrag(trackID: track.id)
-                        return NSItemProvider(object: NSString(string: "\(track.id)"))
+                        makeTrackDragItemProvider(trackID: track.id)
                     } preview: {
-                        playlistDragPreview(for: track)
+                        EmptyView()
                     }
             }
 
@@ -562,7 +559,6 @@ struct PlayKillingPartView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(isCurrentTrack ? AppColors.primary600.opacity(0.16) : Color.white.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .opacity(isBeingDragged ? 0.45 : 1)
     }
 
     private var playlistHandleIcon: some View {
@@ -570,37 +566,6 @@ struct PlayKillingPartView: View {
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(.white.opacity(0.72))
             .frame(width: 22, height: 22)
-    }
-
-    private func playlistDragPreview(for track: PlayKillingPartTrack) -> some View {
-        HStack(spacing: AppSpacing.s) {
-            playlistHandleIcon
-
-            playlistThumbnail(for: track)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(track.displayTitle)
-                    .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Text(track.displayArtist)
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, AppSpacing.s)
-        .padding(.vertical, 12)
-        .frame(width: 320, alignment: .leading)
-        .background(Color.black.opacity(0.9))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        }
     }
 
     private func playlistEdgeDropZone(
@@ -717,6 +682,19 @@ struct PlayKillingPartView: View {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()
         generator.impactOccurred()
+    }
+
+    private func makeTrackDragItemProvider(trackID: Int) -> NSItemProvider {
+        beginTrackDrag(trackID: trackID)
+        let itemProvider = PlayKillingPartDragItemProvider(object: NSString(string: "\(trackID)"))
+        itemProvider.onDragEnded = { [trackID] in
+            DispatchQueue.main.async {
+                if draggedTrackID == trackID {
+                    draggedTrackID = nil
+                }
+            }
+        }
+        return itemProvider
     }
 
     private func togglePlaylistExpansion() {
@@ -947,6 +925,14 @@ struct PlayKillingPartView: View {
             && !value.contains("&")
             && !value.contains("=")
             && !value.contains(".")
+    }
+}
+
+private final class PlayKillingPartDragItemProvider: NSItemProvider {
+    var onDragEnded: (() -> Void)?
+
+    deinit {
+        onDragEnded?()
     }
 }
 
