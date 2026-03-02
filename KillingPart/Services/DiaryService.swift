@@ -5,6 +5,7 @@ protocol DiaryServicing {
     func createDiary(request: DiaryCreateRequest) async throws -> DiaryCreateResult
     func updateDiary(diaryId: Int, request: DiaryUpdateRequest) async throws
     func deleteDiary(diaryId: Int) async throws
+    func updateMyDiaryOrder(request: DiaryOrderUpdateRequest) async throws
 }
 
 enum DiaryServiceError: LocalizedError {
@@ -130,6 +131,30 @@ struct DiaryService: DiaryServicing {
                 requiresAuthorization: true
             )
             try await apiClient.request(request)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func updateMyDiaryOrder(request: DiaryOrderUpdateRequest) async throws {
+        let requestBody: Data
+        do {
+            requestBody = try JSONEncoder().encode(request)
+        } catch {
+            throw DiaryServiceError.requestEncodingFailed
+        }
+
+        do {
+            var apiRequest = APIRequest(
+                path: "/diaries/order",
+                method: .patch,
+                requiresAuthorization: true,
+                body: requestBody
+            )
+            apiRequest.headers["Accept"] = "application/json"
+            apiRequest.headers["Content-Type"] = "application/json"
+            try await apiClient.request(apiRequest)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)
