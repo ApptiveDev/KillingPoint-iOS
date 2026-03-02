@@ -16,8 +16,8 @@ struct PlayKillingPartView: View {
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
-    private let collapsedPlayerBarHeight: CGFloat = 102
-    private let controlsHeight: CGFloat = 86
+    private let collapsedPlayerBarHeight: CGFloat = 118
+    private let controlsHeight: CGFloat = 98
 
     init(
         authenticationService: AuthenticationServicing = AuthenticationService(),
@@ -298,7 +298,7 @@ struct PlayKillingPartView: View {
 
     @ViewBuilder
     private func bottomPlayerPanel(bottomSafeInset: CGFloat, playlistHeight: CGFloat) -> some View {
-        VStack(spacing: AppSpacing.s) {
+        VStack(spacing: AppSpacing.m) {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isPlaylistExpanded.toggle()
@@ -319,9 +319,10 @@ struct PlayKillingPartView: View {
             playbackControls
                 .frame(height: controlsHeight)
         }
-        .padding(.horizontal, AppSpacing.m)
-        .padding(.top, AppSpacing.s)
-        .padding(.bottom, bottomSafeInset + AppSpacing.s)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, AppSpacing.l)
+        .padding(.top, AppSpacing.m)
+        .padding(.bottom, bottomSafeInset + AppSpacing.m)
         .background(
             LinearGradient(
                 colors: [
@@ -332,12 +333,11 @@ struct PlayKillingPartView: View {
                 endPoint: .bottom
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay {
-            RoundedRectangle(cornerRadius: 22)
+            RoundedRectangle(cornerRadius: 24)
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
         }
-        .padding(.horizontal, AppSpacing.xs)
         .padding(.bottom, AppSpacing.xs)
     }
 
@@ -345,52 +345,57 @@ struct PlayKillingPartView: View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
             HStack(spacing: AppSpacing.s) {
                 Text(currentTrack?.displayTitle ?? "재생할 곡 없음")
-                    .font(AppFont.paperlogy6SemiBold(size: 14))
+                    .font(AppFont.paperlogy6SemiBold(size: 15))
                     .foregroundStyle(.white)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
 
                 Image(systemName: isPlaylistExpanded ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
             }
 
             if let currentTrack {
                 playbackRangeBar(track: currentTrack)
-                    .frame(height: 20)
+                    .frame(height: 24)
             } else {
                 Capsule()
                     .fill(Color.white.opacity(0.2))
-                    .frame(height: 3)
+                    .frame(height: 4)
             }
 
             HStack(spacing: AppSpacing.s) {
-                Text("다음 곡: \(nextTrack?.displayTitle ?? "마지막 곡")")
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(AppColors.primary600)
+                (
+                    Text("다음 곡: ")
+                        .foregroundColor(AppColors.primary600)
+                    +
+                    Text(nextTrack?.displayTitle ?? "마지막 곡")
+                        .foregroundColor(.white)
+                )
+                    .font(AppFont.paperlogy4Regular(size: 13))
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
 
                 if isPlaylistExpanded {
                     Text("편집")
-                        .font(AppFont.paperlogy5Medium(size: 12))
+                        .font(AppFont.paperlogy5Medium(size: 13))
                         .foregroundStyle(AppColors.primary600)
                 } else {
                     Image(systemName: "music.note.list")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(AppColors.primary600)
                 }
             }
         }
-        .padding(.horizontal, AppSpacing.s)
-        .padding(.vertical, AppSpacing.s)
+        .padding(.horizontal, AppSpacing.m)
+        .padding(.vertical, AppSpacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
         }
     }
@@ -406,21 +411,21 @@ struct PlayKillingPartView: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.26))
-                    .frame(height: 3)
+                    .frame(height: 4)
 
                 Capsule()
                     .fill(AppColors.primary600)
-                    .frame(width: segmentWidth, height: 8)
+                    .frame(width: segmentWidth, height: 10)
                     .offset(x: startX)
 
                 Circle()
                     .fill(Color.white)
-                    .frame(width: 9, height: 9)
+                    .frame(width: 11, height: 11)
                     .overlay {
                         Circle()
                             .stroke(AppColors.primary600, lineWidth: 1)
                     }
-                    .offset(x: min(max(playheadX - 4.5, 0), width - 9))
+                    .offset(x: min(max(playheadX - 5.5, 0), width - 11))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
@@ -438,12 +443,12 @@ struct PlayKillingPartView: View {
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(track.displayTitle)
-                                    .font(AppFont.paperlogy5Medium(size: 13))
+                                    .font(AppFont.paperlogy5Medium(size: 14))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
 
                                 Text(track.displayArtist)
-                                    .font(AppFont.paperlogy4Regular(size: 11))
+                                    .font(AppFont.paperlogy4Regular(size: 12))
                                     .foregroundStyle(.white.opacity(0.72))
                                     .lineLimit(1)
                             }
@@ -455,12 +460,12 @@ struct PlayKillingPartView: View {
                                     .resizable()
                                     .renderingMode(.template)
                                     .scaledToFit()
-                                    .frame(width: 13, height: 16)
+                                    .frame(width: 15, height: 18)
                                     .foregroundStyle(AppColors.primary600)
                             }
                         }
                         .padding(.horizontal, AppSpacing.s)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(track.id == currentTrack?.id ? AppColors.primary600.opacity(0.16) : Color.white.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -492,10 +497,10 @@ struct PlayKillingPartView: View {
                 playlistThumbnailPlaceholder
             }
         }
-        .frame(width: 34, height: 34)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .frame(width: 40, height: 40)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.white.opacity(0.14), lineWidth: 1)
         }
     }
@@ -519,10 +524,10 @@ struct PlayKillingPartView: View {
             } label: {
                 Circle()
                     .fill(AppColors.primary600)
-                    .frame(width: 58, height: 58)
+                    .frame(width: 64, height: 64)
                     .overlay {
                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 21, weight: .bold))
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(.black)
                             .offset(x: isPlaying ? 0 : 2)
                             .animation(nil, value: isPlaying)
@@ -541,10 +546,10 @@ struct PlayKillingPartView: View {
         Button(action: action) {
             Circle()
                 .fill(Color.white.opacity(0.16))
-                .frame(width: 44, height: 44)
+                .frame(width: 50, height: 50)
                 .overlay {
                     Image(systemName: symbol)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
                 }
         }
