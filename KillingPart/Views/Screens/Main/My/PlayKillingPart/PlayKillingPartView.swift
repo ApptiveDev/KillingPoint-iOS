@@ -80,14 +80,14 @@ struct PlayKillingPartView: View {
             hasTriggeredInitialLoad = true
             resetTickReference()
             Task {
-                await viewModel.refetchCollectionDataOnFocus()
+                await loadAllDiaryFeedsForPlayback()
                 hasCompletedInitialLoad = true
                 synchronizeSelectedTrackIfNeeded()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
             Task {
-                await viewModel.refetchCollectionDataOnFocus()
+                await loadAllDiaryFeedsForPlayback()
                 synchronizeSelectedTrackIfNeeded()
             }
         }
@@ -339,7 +339,6 @@ struct PlayKillingPartView: View {
         }
         .padding(.horizontal, AppSpacing.xs)
         .padding(.bottom, AppSpacing.xs)
-        .animation(.easeInOut(duration: 0.2), value: isPlaylistExpanded)
     }
 
     private var playerSummaryBar: some View {
@@ -366,10 +365,24 @@ struct PlayKillingPartView: View {
                     .frame(height: 3)
             }
 
-            Text("다음 곡: \(nextTrack?.displayTitle ?? "마지막 곡")")
-                .font(AppFont.paperlogy4Regular(size: 12))
-                .foregroundStyle(.white.opacity(0.76))
-                .lineLimit(1)
+            HStack(spacing: AppSpacing.s) {
+                Text("다음 곡: \(nextTrack?.displayTitle ?? "마지막 곡")")
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(AppColors.primary600)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                if isPlaylistExpanded {
+                    Text("편집")
+                        .font(AppFont.paperlogy5Medium(size: 12))
+                        .foregroundStyle(AppColors.primary600)
+                } else {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppColors.primary600)
+                }
+            }
         }
         .padding(.horizontal, AppSpacing.s)
         .padding(.vertical, AppSpacing.s)
@@ -460,7 +473,7 @@ struct PlayKillingPartView: View {
 
     private var playbackControls: some View {
         HStack(spacing: AppSpacing.xl) {
-            controlButton(symbol: "backward.fill", action: moveToPreviousTrack)
+            controlButton(symbol: "backward.end", action: moveToPreviousTrack)
 
             Button {
                 togglePlayState()
@@ -473,13 +486,14 @@ struct PlayKillingPartView: View {
                             .font(.system(size: 21, weight: .bold))
                             .foregroundStyle(.black)
                             .offset(x: isPlaying ? 0 : 2)
+                            .animation(nil, value: isPlaying)
                     }
             }
             .buttonStyle(.plain)
             .disabled(currentTrack == nil)
             .opacity(currentTrack == nil ? 0.5 : 1)
 
-            controlButton(symbol: "forward.fill", action: moveToNextTrack)
+            controlButton(symbol: "forward.end", action: moveToNextTrack)
         }
         .frame(maxWidth: .infinity)
     }
@@ -589,6 +603,18 @@ struct PlayKillingPartView: View {
 
     private func resetTickReference() {
         lastTickDate = Date()
+    }
+
+    private func loadAllDiaryFeedsForPlayback() async {
+        await viewModel.refetchCollectionDataOnFocus()
+
+        var previousFeedCount = -1
+        var iteration = 0
+        while previousFeedCount != viewModel.myFeeds.count, iteration < 200 {
+            previousFeedCount = viewModel.myFeeds.count
+            await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
+            iteration += 1
+        }
     }
 
     private func makeTrack(from feed: DiaryFeedModel) -> PlayKillingPartTrack {
