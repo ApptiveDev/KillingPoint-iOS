@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AddSearchDetailVideoSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
+    let playerReloadToken: UUID
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
 
@@ -18,6 +19,7 @@ struct AddSearchDetailVideoSection: View {
                             startSeconds: viewModel.startSeconds,
                             endSeconds: viewModel.endSeconds
                         )
+                            .id(playerReloadToken)
                             .frame(maxWidth: .infinity)
                             .aspectRatio(videoAspectRatio, contentMode: .fit)
                             .allowsHitTesting(false)

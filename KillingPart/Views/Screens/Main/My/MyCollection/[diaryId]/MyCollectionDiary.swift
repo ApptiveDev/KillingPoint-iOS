@@ -3,6 +3,7 @@ import UIKit
 
 struct MyCollectionDiary: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @FocusState private var isCommentEditorFocused: Bool
 
     let diaryId: Int
@@ -12,6 +13,7 @@ struct MyCollectionDiary: View {
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
     @State private var keyboardHeight: CGFloat = 0
+    @State private var playerReloadToken = UUID()
 
     private let commentFocusAnchorID = "my-collection-diary-comment-focus-anchor"
 
@@ -59,7 +61,8 @@ struct MyCollectionDiary: View {
                                 MyCollectionDiaryVideoSection(
                                     videoURL: videoURL,
                                     startSeconds: viewModel.startSeconds,
-                                    endSeconds: viewModel.endSeconds
+                                    endSeconds: viewModel.endSeconds,
+                                    playerReloadToken: playerReloadToken
                                 )
 
                                 MyCollectionDiaryTrackSection(
@@ -132,6 +135,10 @@ struct MyCollectionDiary: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
             updateKeyboardHeight(from: notification)
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            playerReloadToken = UUID()
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)

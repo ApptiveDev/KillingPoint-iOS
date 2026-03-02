@@ -2,8 +2,10 @@ import SwiftUI
 
 struct AddSearchDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: AddSearchDetailViewModel
     @State private var isForwardStepTransition = true
+    @State private var playerReloadToken = UUID()
     private let onSaved: (() -> Void)?
 
     init(
@@ -20,7 +22,10 @@ struct AddSearchDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: AppSpacing.m) {
-                    AddSearchDetailVideoSection(viewModel: viewModel)
+                    AddSearchDetailVideoSection(
+                        viewModel: viewModel,
+                        playerReloadToken: playerReloadToken
+                    )
                     AddSearchDetailTrackInfoSection(track: viewModel.track)
                     detailInputSection
                         .clipped()
@@ -40,6 +45,10 @@ struct AddSearchDetailView: View {
         }
         .task {
             await viewModel.loadIfNeeded()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            playerReloadToken = UUID()
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
