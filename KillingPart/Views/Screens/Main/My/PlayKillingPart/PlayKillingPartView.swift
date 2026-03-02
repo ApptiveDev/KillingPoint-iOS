@@ -434,10 +434,7 @@ struct PlayKillingPartView: View {
                         selectTrack(at: index)
                     } label: {
                         HStack(spacing: AppSpacing.s) {
-                            Text("\(index + 1)")
-                                .font(AppFont.paperlogy5Medium(size: 12))
-                                .foregroundStyle(AppColors.primary600)
-                                .frame(width: 18, alignment: .leading)
+                            playlistThumbnail(for: track)
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(track.displayTitle)
@@ -453,9 +450,14 @@ struct PlayKillingPartView: View {
 
                             Spacer(minLength: 0)
 
-                            Text("\(track.startLabel) - \(track.endLabel)")
-                                .font(AppFont.paperlogy4Regular(size: 10))
-                                .foregroundStyle(AppColors.primary600.opacity(0.9))
+                            if track.id == currentTrack?.id && isPlaying {
+                                Image("killingpart_music_icon")
+                                    .resizable()
+                                    .renderingMode(.template)
+                                    .scaledToFit()
+                                    .frame(width: 13, height: 16)
+                                    .foregroundStyle(AppColors.primary600)
+                            }
                         }
                         .padding(.horizontal, AppSpacing.s)
                         .padding(.vertical, 10)
@@ -469,6 +471,43 @@ struct PlayKillingPartView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func playlistThumbnail(for track: PlayKillingPartTrack) -> some View {
+        Group {
+            if let albumURL = track.feed.albumImageURL {
+                AsyncImage(url: albumURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .empty, .failure:
+                        playlistThumbnailPlaceholder
+                    @unknown default:
+                        playlistThumbnailPlaceholder
+                    }
+                }
+            } else {
+                playlistThumbnailPlaceholder
+            }
+        }
+        .frame(width: 34, height: 34)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        }
+    }
+
+    private var playlistThumbnailPlaceholder: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.12))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.86))
+            }
     }
 
     private var playbackControls: some View {
