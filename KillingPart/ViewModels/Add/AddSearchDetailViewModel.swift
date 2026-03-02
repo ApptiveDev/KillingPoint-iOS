@@ -287,13 +287,87 @@ final class AddSearchDetailViewModel: ObservableObject {
     }
 
     private var videoURLForSave: String? {
-        if let embedURL = selectedVideo?.embedURL?.absoluteString {
-            return embedURL
+        guard let selectedVideo else { return nil }
+
+        if let normalizedVideoID = normalizedYouTubeVideoID(from: selectedVideo.id) {
+            return normalizedVideoID
         }
 
-        guard let selectedVideo else { return nil }
-        let videoID = selectedVideo.id.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !videoID.isEmpty else { return nil }
-        return "https://www.youtube.com/watch?v=\(videoID)"
+        if
+            let embedURLString = selectedVideo.embedURL?.absoluteString,
+            let normalizedVideoID = normalizedYouTubeVideoID(from: embedURLString)
+        {
+            return normalizedVideoID
+        }
+
+        return nil
+    }
+
+    private func normalizedYouTubeVideoID(from value: String) -> String? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return nil }
+
+        if let extractedVideoID = extractYouTubeVideoID(from: trimmedValue) {
+            return extractedVideoID
+        }
+
+        if
+            !trimmedValue.contains("/"),
+            !trimmedValue.contains("?"),
+            !trimmedValue.contains("&"),
+            !trimmedValue.contains("="),
+            !trimmedValue.contains(".")
+        {
+            return trimmedValue
+        }
+
+        return nil
+    }
+
+    private func extractYouTubeVideoID(from value: String) -> String? {
+        guard let components = URLComponents(string: value) else {
+            return nil
+        }
+
+        let pathComponents = components.path.split(separator: "/").map(String.init)
+        if let embedIndex = pathComponents.firstIndex(of: "embed"),
+           pathComponents.indices.contains(embedIndex + 1) {
+            let candidate = pathComponents[embedIndex + 1]
+            if !candidate.isEmpty {
+                return candidate
+            }
+        }
+
+        if let shortsIndex = pathComponents.firstIndex(of: "shorts"),
+           pathComponents.indices.contains(shortsIndex + 1) {
+            let candidate = pathComponents[shortsIndex + 1]
+            if !candidate.isEmpty {
+                return candidate
+            }
+        }
+
+        if let liveIndex = pathComponents.firstIndex(of: "live"),
+           pathComponents.indices.contains(liveIndex + 1) {
+            let candidate = pathComponents[liveIndex + 1]
+            if !candidate.isEmpty {
+                return candidate
+            }
+        }
+
+        if
+            let host = components.host?.lowercased(),
+            host.contains("youtu.be"),
+            let firstPath = pathComponents.first,
+            !firstPath.isEmpty
+        {
+            return firstPath
+        }
+
+        if let watchVideoID = components.queryItems?.first(where: { $0.name == "v" })?.value,
+           !watchVideoID.isEmpty {
+            return watchVideoID
+        }
+
+        return nil
     }
 }
