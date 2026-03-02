@@ -16,7 +16,6 @@ struct PlayKillingPartView: View {
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
-    private let collapsedPlayerBarHeight: CGFloat = 118
     private let controlsHeight: CGFloat = 98
 
     init(
@@ -34,45 +33,32 @@ struct PlayKillingPartView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let bottomSafeInset = proxy.safeAreaInsets.bottom
-            let playlistHeight = isPlaylistExpanded ? expandedPlaylistHeight : 0
-            let bottomPlayerTotalHeight = collapsedPlayerBarHeight
-                + controlsHeight
-                + playlistHeight
-                + bottomSafeInset
-                + AppSpacing.s
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.m) {
+                profileSummaryCard
 
-            ZStack(alignment: .bottom) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppSpacing.m) {
-                        profileSummaryCard
-
-                        if let currentTrack {
-                            currentTrackContent(track: currentTrack)
-                        } else if hasCompletedInitialLoad {
-                            emptyStateCard
-                        } else {
-                            loadingStateCard
-                        }
-
-                        if let errorMessage = viewModel.errorMessage {
-                            Text(errorMessage)
-                                .font(AppFont.paperlogy4Regular(size: 13))
-                                .foregroundStyle(.red.opacity(0.95))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, bottomPlayerTotalHeight + AppSpacing.m)
+                if let currentTrack {
+                    currentTrackContent(track: currentTrack)
+                } else if hasCompletedInitialLoad {
+                    emptyStateCard
+                } else {
+                    loadingStateCard
                 }
-                .scrollIndicators(.hidden)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                bottomPlayerPanel(
-                    bottomSafeInset: bottomSafeInset,
-                    playlistHeight: playlistHeight
-                )
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.red.opacity(0.95))
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            let playlistHeight = isPlaylistExpanded ? expandedPlaylistHeight : 0
+            bottomPlayerPanel(playlistHeight: playlistHeight)
+                .padding(.bottom, AppSpacing.l)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -252,6 +238,7 @@ struct PlayKillingPartView: View {
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             }
         }
+        .padding(.bottom, AppSpacing.m)
     }
 
     private var loadingStateCard: some View {
@@ -297,7 +284,7 @@ struct PlayKillingPartView: View {
     }
 
     @ViewBuilder
-    private func bottomPlayerPanel(bottomSafeInset: CGFloat, playlistHeight: CGFloat) -> some View {
+    private func bottomPlayerPanel(playlistHeight: CGFloat) -> some View {
         VStack(spacing: AppSpacing.m) {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -322,7 +309,7 @@ struct PlayKillingPartView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, AppSpacing.l)
         .padding(.top, AppSpacing.m)
-        .padding(.bottom, bottomSafeInset + AppSpacing.m)
+        .padding(.bottom, AppSpacing.m)
         .background(
             LinearGradient(
                 colors: [
