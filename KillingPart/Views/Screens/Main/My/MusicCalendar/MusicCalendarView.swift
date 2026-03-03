@@ -3,7 +3,8 @@ import SwiftUI
 struct MusicCalendarView: View {
     @StateObject private var viewModel: MusicCalendarViewModel
     @State private var isDatePickerPresented = false
-    @State private var pickerDate = Date()
+    @State private var pickerYear = Calendar.current.component(.year, from: Date())
+    @State private var pickerMonth = Calendar.current.component(.month, from: Date())
 
     init(calendarService: CalendarServicing = CalendarService()) {
         _viewModel = StateObject(
@@ -45,17 +46,19 @@ struct MusicCalendarView: View {
     }
 
     private var headerSection: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .top) {
             Button {
-                pickerDate = viewModel.selectedDate
+                let displayedMonth = viewModel.displayedMonth
+                pickerYear = Calendar.current.component(.year, from: displayedMonth)
+                pickerMonth = Calendar.current.component(.month, from: displayedMonth)
                 isDatePickerPresented = true
             } label: {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(viewModel.yearText)
                         .font(AppFont.paperlogy5Medium(size: 14))
                         .foregroundStyle(.white.opacity(0.8))
 
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text(viewModel.monthText)
                             .font(AppFont.paperlogy7Bold(size: 26))
                             .foregroundStyle(.white)
@@ -69,9 +72,9 @@ struct MusicCalendarView: View {
             }
             .buttonStyle(.plain)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: AppSpacing.xl)
 
-            HStack(spacing: AppSpacing.xs) {
+            HStack(spacing: AppSpacing.s) {
                 Button {
                     viewModel.moveMonth(by: -1)
                 } label: {
@@ -97,6 +100,7 @@ struct MusicCalendarView: View {
                 .buttonStyle(.plain)
             }
         }
+        .padding(.bottom, AppSpacing.m)
     }
 
     private var calendarSection: some View {
@@ -114,9 +118,7 @@ struct MusicCalendarView: View {
                 }
                 .padding(AppSpacing.m)
             }
-            .transaction { transaction in
-                transaction.animation = nil
-            }
+            .animation(nil, value: viewModel.displayedMonth)
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
@@ -325,6 +327,11 @@ struct MusicCalendarView: View {
         Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7)
     }
 
+    private var yearOptions: [Int] {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return Array((currentYear - 30)...(currentYear + 10))
+    }
+
     private var datePickerSheet: some View {
         VStack(spacing: 0) {
             HStack {
@@ -337,7 +344,7 @@ struct MusicCalendarView: View {
                 Spacer(minLength: 0)
 
                 Button("완료") {
-                    viewModel.applyPickerDate(pickerDate)
+                    viewModel.applyPickerYearMonth(year: pickerYear, month: pickerMonth)
                     isDatePickerPresented = false
                 }
                 .font(AppFont.paperlogy6SemiBold(size: 14))
@@ -346,14 +353,26 @@ struct MusicCalendarView: View {
             .padding(.horizontal, AppSpacing.l)
             .padding(.top, AppSpacing.m)
 
-            DatePicker(
-                "",
-                selection: $pickerDate,
-                displayedComponents: [.date]
-            )
-            .datePickerStyle(.wheel)
-            .labelsHidden()
-            .environment(\.locale, Locale(identifier: "ko_KR"))
+            HStack(spacing: 0) {
+                Picker("년도", selection: $pickerYear) {
+                    ForEach(yearOptions, id: \.self) { year in
+                        Text(verbatim: "\(year)년")
+                            .tag(year)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .labelsHidden()
+
+                Picker("월", selection: $pickerMonth) {
+                    ForEach(1...12, id: \.self) { month in
+                        Text(verbatim: "\(month)월")
+                            .tag(month)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .labelsHidden()
+            }
+            .frame(height: 220)
             .padding(.horizontal, AppSpacing.m)
             .padding(.bottom, AppSpacing.m)
         }

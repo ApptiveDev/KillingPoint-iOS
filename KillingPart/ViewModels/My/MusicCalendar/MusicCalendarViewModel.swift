@@ -149,6 +149,19 @@ final class MusicCalendarViewModel: ObservableObject {
         selectDate(date)
     }
 
+    func applyPickerYearMonth(year: Int, month: Int) {
+        var components = calendar.dateComponents([.year, .month], from: displayedMonth)
+        components.year = year
+        components.month = min(max(month, 1), 12)
+        components.day = 1
+
+        guard let selectedMonthDate = calendar.date(from: components) else {
+            return
+        }
+
+        selectDate(selectedMonthDate)
+    }
+
     private func loadDisplayedMonthDiaries() async {
         let monthStart = startOfMonth(for: displayedMonth)
         guard
