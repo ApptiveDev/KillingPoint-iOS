@@ -1,50 +1,377 @@
 import SwiftUI
 
 struct MusicCalendarView: View {
+    @StateObject private var viewModel: MusicCalendarViewModel
+    @State private var isDatePickerPresented = false
+    @State private var pickerDate = Date()
+
+    init(calendarService: CalendarServicing = CalendarService()) {
+        _viewModel = StateObject(
+            wrappedValue: MusicCalendarViewModel(calendarService: calendarService)
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.m) {
-            Text("뮤직캘린더")
-                .font(AppFont.paperlogy7Bold(size: 24))
-                .foregroundStyle(.white)
+            headerSection
 
-            Text("날짜별로 기록한 킬링파트를 캘린더로 확인하세요.")
-                .font(AppFont.paperlogy4Regular(size: 15))
-                .foregroundStyle(.white.opacity(0.75))
+            calendarSection
 
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.08))
-                .frame(height: 320)
-                .overlay {
-                    VStack(spacing: AppSpacing.s) {
-                        Text("February")
-                            .font(AppFont.paperlogy6SemiBold(size: 18))
+            selectedDateDiarySection
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(.red.opacity(0.95))
+            }
+        }
+        .padding(.top, AppSpacing.xs)
+        .padding(.bottom, AppSpacing.l)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear {
+            viewModel.onAppear()
+        }
+        .navigationDestination(for: MusicCalendarDiaryRoute.self) { route in
+            MyCollectionDiary(
+                diaryId: route.diaryId,
+                displayTag: route.displayTag,
+                diary: route.initialDiary
+            )
+        }
+        .sheet(isPresented: $isDatePickerPresented) {
+            datePickerSheet
+        }
+    }
+
+    private var headerSection: some View {
+        HStack(alignment: .center) {
+            Button {
+                pickerDate = viewModel.selectedDate
+                isDatePickerPresented = true
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.yearText)
+                        .font(AppFont.paperlogy5Medium(size: 14))
+                        .foregroundStyle(.white.opacity(0.8))
+
+                    HStack(spacing: 6) {
+                        Text(viewModel.monthText)
+                            .font(AppFont.paperlogy7Bold(size: 26))
                             .foregroundStyle(.white)
 
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7), spacing: AppSpacing.xs) {
-                            ForEach(1...35, id: \.self) { day in
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(day % 5 == 0 ? AppColors.primary600.opacity(0.28) : Color.white.opacity(0.08))
-                                    .frame(height: 28)
-                                    .overlay {
-                                        if day <= 29 {
-                                            Text("\(day)")
-                                                .font(AppFont.paperlogy4Regular(size: 11))
-                                                .foregroundStyle(.white)
-                                        }
-                                    }
-                            }
-                        }
-                        .padding(.horizontal, AppSpacing.s)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.top, 2)
                     }
-                    .padding(AppSpacing.m)
                 }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                }
+            }
+            .buttonStyle(.plain)
 
-            Spacer()
+            Spacer(minLength: 0)
+
+            HStack(spacing: AppSpacing.xs) {
+                Button {
+                    viewModel.moveMonth(by: -1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    viewModel.moveMonth(by: 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var calendarSection: some View {
+        RoundedRectangle(cornerRadius: 18)
+            .fill(Color.black.opacity(0.28))
+            .overlay {
+                VStack(spacing: AppSpacing.s) {
+                    weekdayHeaderRow
+
+                    LazyVGrid(columns: calendarGridColumns, spacing: AppSpacing.xs) {
+                        ForEach(viewModel.dayCells) { cell in
+                            dayCell(cell)
+                        }
+                    }
+                }
+                .padding(AppSpacing.m)
+            }
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
+    }
+
+    private var selectedDateDiarySection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.s) {
+            Text(viewModel.selectedDateTitle)
+                .font(AppFont.paperlogy6SemiBold(size: 16))
+                .foregroundStyle(.white)
+
+            if viewModel.isLoading {
+                HStack {
+                    Spacer(minLength: 0)
+                    ProgressView()
+                        .tint(AppColors.primary600)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, AppSpacing.s)
+            } else if viewModel.selectedDateDiaries.isEmpty {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.06))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 74)
+                    .overlay {
+                        Text("선택한 날짜의 킬링파트가 없어요.")
+                            .font(AppFont.paperlogy4Regular(size: 13))
+                            .foregroundStyle(.white.opacity(0.72))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    }
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: AppSpacing.xs) {
+                        ForEach(viewModel.selectedDateDiaries) { diary in
+                            NavigationLink(
+                                value: MusicCalendarDiaryRoute(
+                                    diaryId: diary.diaryId,
+                                    initialDiary: diary,
+                                    displayTag: diary.tag ?? ""
+                                )
+                            ) {
+                                diaryRow(diary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.bottom, AppSpacing.s)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .scrollIndicators(.hidden)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var weekdayHeaderRow: some View {
+        HStack(spacing: AppSpacing.xs) {
+            ForEach(Array(viewModel.weekdayTitles.enumerated()), id: \.offset) { index, title in
+                Text(title)
+                    .font(AppFont.paperlogy5Medium(size: 12))
+                    .foregroundStyle(weekdayColor(for: index + 1))
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func dayCell(_ cell: MusicCalendarDayCell) -> some View {
+        Group {
+            if cell.isPlaceholder {
+                Color.clear
+                    .frame(height: 44)
+            } else if let date = cell.date, let dayNumber = cell.dayNumber {
+                Button {
+                    viewModel.selectDate(date)
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(cell.isSelected ? AppColors.primary600 : Color.white.opacity(0.04))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(
+                                        cell.isToday ? AppColors.primary600 : Color.clear,
+                                        lineWidth: 1.4
+                                    )
+                            }
+
+                        VStack(spacing: 2) {
+                            Text("\(dayNumber)")
+                                .font(AppFont.paperlogy5Medium(size: 13))
+                                .foregroundStyle(cell.isSelected ? .black : weekdayColor(for: cell.weekday))
+
+                            if cell.hasDiary {
+                                if cell.isSelected {
+                                    Image("killingpart_music_icon_black")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 10, height: 12)
+                                } else {
+                                    Image("killingpart_music_icon")
+                                        .resizable()
+                                        .renderingMode(.template)
+                                        .scaledToFit()
+                                        .frame(width: 10, height: 12)
+                                        .foregroundStyle(AppColors.primary600)
+                                }
+                            } else {
+                                Spacer()
+                                    .frame(height: 12)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(height: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func diaryRow(_ diary: DiaryFeedModel) -> some View {
+        HStack(spacing: AppSpacing.s) {
+            albumArtwork(for: diary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(diary.musicTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "제목 없음" : diary.musicTitle)
+                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text(diary.artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "아티스트 정보 없음" : diary.artist)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.62))
+        }
+        .padding(.horizontal, AppSpacing.s)
+        .padding(.vertical, AppSpacing.s)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+
+    private func albumArtwork(for diary: DiaryFeedModel) -> some View {
+        Group {
+            if let albumURL = diary.albumImageURL {
+                AsyncImage(url: albumURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .empty, .failure:
+                        placeholderArtwork
+                    @unknown default:
+                        placeholderArtwork
+                    }
+                }
+            } else {
+                placeholderArtwork
+            }
+        }
+        .frame(width: 42, height: 42)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        }
+    }
+
+    private var placeholderArtwork: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.12))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+    }
+
+    private func weekdayColor(for weekday: Int?) -> Color {
+        switch weekday {
+        case 1:
+            return Color.red.opacity(0.95)
+        case 7:
+            return Color.blue.opacity(0.95)
+        default:
+            return .white
+        }
+    }
+
+    private var calendarGridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7)
+    }
+
+    private var datePickerSheet: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("취소") {
+                    isDatePickerPresented = false
+                }
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer(minLength: 0)
+
+                Button("완료") {
+                    viewModel.applyPickerDate(pickerDate)
+                    isDatePickerPresented = false
+                }
+                .font(AppFont.paperlogy6SemiBold(size: 14))
+                .foregroundStyle(AppColors.primary600)
+            }
+            .padding(.horizontal, AppSpacing.l)
+            .padding(.top, AppSpacing.m)
+
+            DatePicker(
+                "",
+                selection: $pickerDate,
+                displayedComponents: [.date]
+            )
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .environment(\.locale, Locale(identifier: "ko_KR"))
+            .padding(.horizontal, AppSpacing.m)
+            .padding(.bottom, AppSpacing.m)
+        }
+        .presentationDetents([.height(320)])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+private struct MusicCalendarDiaryRoute: Hashable {
+    let diaryId: Int
+    let initialDiary: DiaryFeedModel
+    let displayTag: String
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.diaryId == rhs.diaryId
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(diaryId)
     }
 }
