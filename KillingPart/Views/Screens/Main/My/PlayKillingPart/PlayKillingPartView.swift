@@ -84,6 +84,7 @@ struct PlayKillingPartView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
+                elapsedInCurrentRange = 0
                 playerReloadToken = UUID()
             }
             resetTickReference()
