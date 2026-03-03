@@ -43,7 +43,7 @@ final class MusicCalendarViewModel: ObservableObject {
     }
 
     var weekdayTitles: [String] {
-        ["일", "월", "화", "수", "목", "금", "토"]
+        ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
     }
 
     var selectedDateDiaries: [DiaryFeedModel] {

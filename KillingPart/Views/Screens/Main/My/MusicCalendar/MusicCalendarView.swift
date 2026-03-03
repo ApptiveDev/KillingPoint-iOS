@@ -104,13 +104,13 @@ struct MusicCalendarView: View {
     }
 
     private var calendarSection: some View {
-        RoundedRectangle(cornerRadius: 18)
+        Rectangle()
             .fill(Color.black.opacity(0.28))
             .overlay {
                 VStack(spacing: AppSpacing.s) {
                     weekdayHeaderRow
 
-                    LazyVGrid(columns: calendarGridColumns, spacing: AppSpacing.xs) {
+                    LazyVGrid(columns: calendarGridColumns, spacing: 0) {
                         ForEach(viewModel.dayCells) { cell in
                             dayCell(cell)
                         }
@@ -119,10 +119,6 @@ struct MusicCalendarView: View {
                 .padding(AppSpacing.m)
             }
             .animation(nil, value: viewModel.displayedMonth)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
     }
 
     private var selectedDateDiarySection: some View {
@@ -184,7 +180,8 @@ struct MusicCalendarView: View {
                 Text(title)
                     .font(AppFont.paperlogy5Medium(size: 12))
                     .foregroundStyle(weekdayColor(for: index + 1))
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 6)
             }
         }
     }
@@ -199,41 +196,43 @@ struct MusicCalendarView: View {
                     viewModel.selectDate(date)
                 } label: {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10)
+                        Rectangle()
                             .fill(cell.isSelected ? AppColors.primary600 : Color.white.opacity(0.04))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 10)
+                                Rectangle()
                                     .stroke(
                                         cell.isToday ? AppColors.primary600 : Color.clear,
                                         lineWidth: 1.4
                                     )
                             }
 
-                        VStack(spacing: 2) {
-                            Text("\(dayNumber)")
-                                .font(AppFont.paperlogy5Medium(size: 13))
-                                .foregroundStyle(cell.isSelected ? .black : weekdayColor(for: cell.weekday))
+                        Text("\(dayNumber)")
+                            .font(AppFont.paperlogy5Medium(size: 13))
+                            .foregroundStyle(cell.isSelected ? .black : weekdayColor(for: cell.weekday))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .padding(.leading, 6)
+                            .padding(.top, 4)
+                            .zIndex(1)
 
-                            if cell.hasDiary {
+                        if cell.hasDiary {
+                            Group {
                                 if cell.isSelected {
                                     Image("killingpart_music_icon_black")
                                         .resizable()
                                         .scaledToFit()
-                                        .frame(width: 10, height: 12)
                                 } else {
                                     Image("killingpart_music_icon")
                                         .resizable()
                                         .renderingMode(.template)
                                         .scaledToFit()
-                                        .frame(width: 10, height: 12)
                                         .foregroundStyle(AppColors.primary600)
                                 }
-                            } else {
-                                Spacer()
-                                    .frame(height: 12)
                             }
+                            .frame(width: 14, height: 16)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                            .padding(.bottom, 4)
+                            .zIndex(5)
                         }
-                        .padding(.vertical, 4)
                     }
                     .frame(height: 44)
                 }
@@ -324,7 +323,7 @@ struct MusicCalendarView: View {
     }
 
     private var calendarGridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7)
+        Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
     }
 
     private var yearOptions: [Int] {
