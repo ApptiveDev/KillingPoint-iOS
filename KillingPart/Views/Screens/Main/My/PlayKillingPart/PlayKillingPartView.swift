@@ -20,8 +20,6 @@ struct PlayKillingPartView: View {
     @State private var playerReloadToken = UUID()
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
-    private let videoAspectRatio: CGFloat = 16 / 9
-    private let videoCornerRadius: CGFloat = 16
     private let controlsHeight: CGFloat = 98
     private let reorderThrottleInterval: TimeInterval = 0.18
     private let reorderAnimationDuration: Double = 0.24
@@ -86,6 +84,7 @@ struct PlayKillingPartView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
+                elapsedInCurrentRange = 0
                 playerReloadToken = UUID()
             }
             resetTickReference()
@@ -101,14 +100,22 @@ struct PlayKillingPartView: View {
     @ViewBuilder
     private var playbackContentContainer: some View {
         VStack(alignment: .leading, spacing: AppSpacing.m) {
-            profileSummaryCard
+            PlayKillingPartProfileSummaryCard(
+                profileImageURL: viewModel.profileImageURL,
+                displayName: viewModel.displayName,
+                displayTag: viewModel.displayTag
+            )
 
             if let currentTrack {
-                currentTrackContent(track: currentTrack)
+                PlayKillingPartCurrentTrackContent(
+                    track: currentTrack,
+                    isPlaying: isPlaying,
+                    playerReloadToken: playerReloadToken
+                )
             } else if hasCompletedInitialLoad {
-                emptyStateCard
+                PlayKillingPartEmptyStateCard()
             } else {
-                loadingStateCard
+                PlayKillingPartLoadingStateCard()
             }
 
             if let errorMessage = viewModel.errorMessage {
@@ -193,147 +200,19 @@ struct PlayKillingPartView: View {
         return min(max(estimated, 120), 284)
     }
 
-    private var profileSummaryCard: some View {
-        HStack(spacing: AppSpacing.s) {
-            MyCollectionProfileImageView(
-                profileImageURL: viewModel.profileImageURL,
-                size: 56,
-                iconSize: 22
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(viewModel.displayName)
-                    .font(AppFont.paperlogy6SemiBold(size: 16))
-                    .foregroundStyle(Color.kpPrimary)
-                    .lineLimit(1)
-
-                Text(viewModel.displayTag)
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(Color.kpPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(AppSpacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        
-    }
-
-    @ViewBuilder
-    private func currentTrackContent(track: PlayKillingPartTrack) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.m) {
-            Group {
-                if let videoURL = track.videoURL {
-                    YoutubePlayerView(
-                        videoURL: videoURL,
-                        startSeconds: track.startSeconds,
-                        endSeconds: track.endSeconds,
-                        isPlaying: isPlaying
-                    )
-                    .id("\(track.id)-\(playerReloadToken)")
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(videoAspectRatio, contentMode: .fit)
-                    .allowsHitTesting(false)
-                    .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: videoCornerRadius)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                    }
-                } else {
-                    RoundedRectangle(cornerRadius: videoCornerRadius)
-                        .fill(Color.white.opacity(0.08))
-                        .frame(maxWidth: .infinity)
-                        .aspectRatio(videoAspectRatio, contentMode: .fit)
-                        .overlay {
-                            Image(systemName: "play.rectangle")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(AppColors.primary600)
-                        }
-                }
-            }
-
-            VStack(alignment: .center, spacing: 6) {
-                Text(track.displayTitle)
-                    .font(AppFont.paperlogy6SemiBold(size: 20))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-
-                Text(track.displayArtist)
-                    .font(AppFont.paperlogy4Regular(size: 14))
-                    .foregroundStyle(.white.opacity(0.78))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, AppSpacing.m)
-
-            VStack(alignment: .center, spacing: AppSpacing.s) {
-                Text("킬링파트 일기")
-                    .font(AppFont.paperlogy6SemiBold(size: 13))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-
-                Text(track.displayContent)
-                    .font(AppFont.paperlogy4Regular(size: 14))
-                    .foregroundStyle(.white)
-                    .lineSpacing(4)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(AppSpacing.m)
-        }
-        .padding(.bottom, AppSpacing.m)
-    }
-
-    private var loadingStateCard: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(Color.white.opacity(0.08))
-            .frame(maxWidth: .infinity)
-            .frame(height: 180)
-            .overlay {
-                VStack(spacing: AppSpacing.s) {
-                    ProgressView()
-                        .tint(AppColors.primary600)
-                    Text("재생 목록을 불러오는 중...")
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(.white.opacity(0.74))
-                }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
-    }
-
-    private var emptyStateCard: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(Color.white.opacity(0.08))
-            .frame(maxWidth: .infinity)
-            .frame(height: 180)
-            .overlay {
-                VStack(spacing: AppSpacing.s) {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(AppColors.primary600)
-
-                    Text("재생할 음악 다이어리가 없어요.")
-                        .font(AppFont.paperlogy5Medium(size: 14))
-                        .foregroundStyle(.white.opacity(0.76))
-                }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
-    }
-
     @ViewBuilder
     private func bottomPlayerPanel(playlistHeight: CGFloat) -> some View {
         VStack(spacing: AppSpacing.m) {
-            playerSummaryBar
+            PlayKillingPartPlayerSummaryBar(
+                currentTrack: currentTrack,
+                nextTrack: nextTrack,
+                isPlaylistExpanded: isPlaylistExpanded,
+                isSavingOrder: playViewModel.isSavingOrder,
+                isEditMode: playViewModel.isEditMode,
+                isPlaylistEmpty: playlistTracks.isEmpty,
+                elapsedInCurrentRange: elapsedInCurrentRange,
+                onEditButtonTap: handlePlaylistEditButtonTap
+            )
                 .contentShape(Rectangle())
                 .gesture(
                     TapGesture().onEnded {
@@ -350,7 +229,13 @@ struct PlayKillingPartView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            playbackControls
+            PlayKillingPartPlaybackControls(
+                isPlaying: isPlaying,
+                isDisabled: currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder,
+                onPrevious: moveToPreviousTrack,
+                onTogglePlay: togglePlayState,
+                onNext: moveToNextTrack
+            )
                 .frame(height: controlsHeight)
         }
         .frame(maxWidth: .infinity)
@@ -375,107 +260,6 @@ struct PlayKillingPartView: View {
         .padding(.bottom, AppSpacing.xs)
     }
 
-    private var playerSummaryBar: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.s) {
-            HStack(spacing: AppSpacing.s) {
-                Text(currentTrack?.displayTitle ?? "재생할 곡 없음")
-                    .font(AppFont.paperlogy6SemiBold(size: 15))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: isPlaylistExpanded ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-
-            if let currentTrack {
-                playbackRangeBar(track: currentTrack)
-                    .frame(height: 24)
-            } else {
-                Capsule()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(height: 4)
-            }
-
-            HStack(spacing: AppSpacing.s) {
-                (
-                    Text("다음 곡: ")
-                        .foregroundColor(AppColors.primary600)
-                    +
-                    Text(nextTrack?.displayTitle ?? "마지막 곡")
-                        .foregroundColor(.white)
-                )
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-
-                if isPlaylistExpanded {
-                    Button {
-                        handlePlaylistEditButtonTap()
-                    } label: {
-                        if playViewModel.isSavingOrder {
-                            ProgressView()
-                                .tint(AppColors.primary600)
-                        } else {
-                            Text(playViewModel.isEditMode ? "완료" : "편집")
-                                .font(AppFont.paperlogy5Medium(size: 13))
-                                .foregroundStyle(AppColors.primary600)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(playlistTracks.isEmpty || playViewModel.isSavingOrder)
-                } else {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(AppColors.primary600)
-                }
-            }
-        }
-        .padding(.horizontal, AppSpacing.m)
-        .padding(.vertical, AppSpacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        }
-    }
-
-    private func playbackRangeBar(track: PlayKillingPartTrack) -> some View {
-        GeometryReader { proxy in
-            let width = max(proxy.size.width, 1)
-            let startX = width * track.startProgress
-            let endX = width * track.endProgress
-            let segmentWidth = max(endX - startX, 2)
-            let playheadX = width * track.playheadProgress(elapsedInCurrentRange: elapsedInCurrentRange)
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.26))
-                    .frame(height: 4)
-
-                Capsule()
-                    .fill(AppColors.primary600)
-                    .frame(width: segmentWidth, height: 10)
-                    .offset(x: startX)
-
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 11, height: 11)
-                    .overlay {
-                        Circle()
-                            .stroke(AppColors.primary600, lineWidth: 1)
-                    }
-                    .offset(x: min(max(playheadX - 5.5, 0), width - 11))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        }
-    }
-
     private var playlistView: some View {
         ScrollViewReader { scrollProxy in
             ScrollView {
@@ -487,11 +271,15 @@ struct PlayKillingPartView: View {
                             guard !playViewModel.isEditMode else { return }
                             selectTrack(at: index)
                         } label: {
-                            playlistRowContent(
+                            PlayKillingPartPlaylistRow(
                                 track: track,
                                 isCurrentTrack: track.id == currentTrack?.id,
+                                isPlaying: isPlaying,
+                                isEditMode: playViewModel.isEditMode,
                                 isBeingDragged: playViewModel.isEditMode && draggedTrackID == track.id
-                            )
+                            ) { trackID in
+                                makeTrackDragItemProvider(trackID: trackID)
+                            }
                         }
                         .buttonStyle(.plain)
                         .id(track.id)
@@ -520,62 +308,6 @@ struct PlayKillingPartView: View {
             }
             .scrollIndicators(.hidden)
         }
-    }
-
-    private func playlistRowContent(
-        track: PlayKillingPartTrack,
-        isCurrentTrack: Bool,
-        isBeingDragged: Bool
-    ) -> some View {
-        HStack(spacing: AppSpacing.s) {
-            if playViewModel.isEditMode {
-                playlistHandleIcon
-                    .contentShape(Rectangle())
-                    .onDrag {
-                        makeTrackDragItemProvider(trackID: track.id)
-                    } preview: {
-                        EmptyView()
-                    }
-            }
-
-            playlistThumbnail(for: track)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(track.displayTitle)
-                    .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Text(track.displayArtist)
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
-
-            if !playViewModel.isEditMode && isCurrentTrack && isPlaying {
-                Image("killingpart_music_icon")
-                    .resizable()
-                    .renderingMode(.template)
-                    .scaledToFit()
-                    .frame(width: 15, height: 18)
-                    .foregroundStyle(AppColors.primary600)
-            }
-        }
-        .padding(.horizontal, AppSpacing.s)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isCurrentTrack ? AppColors.primary600.opacity(0.16) : Color.white.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .opacity(isBeingDragged ? 0.45 : 1)
-    }
-
-    private var playlistHandleIcon: some View {
-        Image(systemName: "line.3.horizontal")
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.72))
-            .frame(width: 22, height: 22)
     }
 
     private func playlistEdgeDropZone(
@@ -608,86 +340,6 @@ struct PlayKillingPartView: View {
                     }
                 )
             )
-    }
-
-    private func playlistThumbnail(for track: PlayKillingPartTrack) -> some View {
-        Group {
-            if let albumURL = track.feed.albumImageURL {
-                AsyncImage(url: albumURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .empty, .failure:
-                        playlistThumbnailPlaceholder
-                    @unknown default:
-                        playlistThumbnailPlaceholder
-                    }
-                }
-            } else {
-                playlistThumbnailPlaceholder
-            }
-        }
-        .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        }
-    }
-
-    private var playlistThumbnailPlaceholder: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.12))
-            .overlay {
-                Image(systemName: "music.note")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.86))
-            }
-    }
-
-    private var playbackControls: some View {
-        HStack(spacing: AppSpacing.xl) {
-            controlButton(symbol: "backward.end", action: moveToPreviousTrack)
-
-            Button {
-                togglePlayState()
-            } label: {
-                Circle()
-                    .fill(AppColors.primary600)
-                    .frame(width: 64, height: 64)
-                    .overlay {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(.black)
-                            .offset(x: isPlaying ? 0 : 2)
-                            .animation(nil, value: isPlaying)
-                    }
-            }
-            .buttonStyle(.plain)
-            .disabled(currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder)
-            .opacity((currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder) ? 0.5 : 1)
-
-            controlButton(symbol: "forward.end", action: moveToNextTrack)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func controlButton(symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Circle()
-                .fill(Color.white.opacity(0.16))
-                .frame(width: 50, height: 50)
-                .overlay {
-                    Image(systemName: symbol)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-        }
-        .buttonStyle(.plain)
-        .disabled(currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder)
-        .opacity((currentTrack == nil || playViewModel.isEditMode || playViewModel.isSavingOrder) ? 0.5 : 1)
     }
 
     private func beginTrackDrag(trackID: Int) {
@@ -950,7 +602,7 @@ private final class PlayKillingPartDragItemProvider: NSItemProvider {
     }
 }
 
-private struct PlayKillingPartTrack: Identifiable {
+struct PlayKillingPartTrack: Identifiable {
     let feed: DiaryFeedModel
     let startSeconds: Double
     let endSeconds: Double
