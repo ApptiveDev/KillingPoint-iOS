@@ -51,6 +51,9 @@ struct MyTabView: View {
                 .padding(.bottom, bottomContentInset)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPlayKillingPart)) { _ in
+            selectTab(.playKillingPart)
+        }
     }
 
     private var topToggleTabs: some View {
@@ -71,18 +74,22 @@ struct MyTabView: View {
         Binding(
             get: { selectedTab },
             set: { newTab in
-                let previousIndex = selectedTab.order
-                let nextIndex = newTab.order
-
-                guard previousIndex != nextIndex else { return }
-
-                tabTransitionDirection = nextIndex > previousIndex ? .trailing : .leading
-
-                withAnimation(tabAnimation) {
-                    selectedTab = newTab
-                }
+                selectTab(newTab)
             }
         )
+    }
+
+    private func selectTab(_ newTab: MyTopTab) {
+        let previousIndex = selectedTab.order
+        let nextIndex = newTab.order
+
+        guard previousIndex != nextIndex else { return }
+
+        tabTransitionDirection = nextIndex > previousIndex ? .trailing : .leading
+
+        withAnimation(tabAnimation) {
+            selectedTab = newTab
+        }
     }
 
     private var tabContentTransition: AnyTransition {

@@ -167,6 +167,7 @@ struct AddSearchDetailView: View {
             let isSuccess = await viewModel.submitDiary()
             if isSuccess {
                 onSaved?()
+                NotificationCenter.default.post(name: .navigateToPlayKillingPart, object: nil)
                 dismiss()
             }
         }

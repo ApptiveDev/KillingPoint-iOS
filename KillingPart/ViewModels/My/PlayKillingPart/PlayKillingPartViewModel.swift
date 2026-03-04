@@ -7,6 +7,7 @@ final class PlayKillingPartViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let diaryService: DiaryServicing
+    private var isRefetchingPlaybackFeeds = false
 
     init(diaryService: DiaryServicing = DiaryService()) {
         self.diaryService = diaryService
@@ -51,6 +52,35 @@ final class PlayKillingPartViewModel: ObservableObject {
         isEditMode = false
     }
 
+    func refetchPlaybackFeeds(
+        refetchInitialPage: @escaping () async -> Void,
+        loadNextPageIfNeeded: @escaping () async -> Void,
+        currentFeedCount: @escaping () -> Int,
+        currentFeedIDs: @escaping () -> [Int]
+    ) async -> PlaybackFeedRefetchResult {
+        guard !isRefetchingPlaybackFeeds else { return .unchanged }
+
+        isRefetchingPlaybackFeeds = true
+        defer { isRefetchingPlaybackFeeds = false }
+
+        let previousFeedIDs = currentFeedIDs()
+        await refetchInitialPage()
+
+        var previousFeedCount = -1
+        var iteration = 0
+        while previousFeedCount != currentFeedCount(), iteration < 200 {
+            if Task.isCancelled { return .unchanged }
+            previousFeedCount = currentFeedCount()
+            await loadNextPageIfNeeded()
+            iteration += 1
+        }
+
+        let refreshedFeedIDs = currentFeedIDs()
+        return PlaybackFeedRefetchResult(
+            hasFeedOrderingChanged: previousFeedIDs != refreshedFeedIDs
+        )
+    }
+
     private func resolveErrorMessage(from error: Error) -> String {
         if let diaryError = error as? DiaryServiceError {
             return diaryError.errorDescription ?? "요청 처리에 실패했어요."
@@ -74,5 +104,13 @@ final class PlayKillingPartViewModel: ObservableObject {
 
         let nsError = error as NSError
         return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+}
+
+struct PlaybackFeedRefetchResult {
+    let hasFeedOrderingChanged: Bool
+
+    static var unchanged: Self {
+        PlaybackFeedRefetchResult(hasFeedOrderingChanged: false)
     }
 }
