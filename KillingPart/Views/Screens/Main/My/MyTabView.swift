@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MyTabView: View {
     let onLogout: () -> Void
-    @State private var selectedTab: MyTopTab = .myCollection
+    @State private var selectedTab: MyTopTab = .playKillingPart
     @State private var tabTransitionDirection: Edge = .trailing
     private let tabAnimation = Animation.interactiveSpring(
         response: 0.32,
