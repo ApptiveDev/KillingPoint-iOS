@@ -14,7 +14,6 @@ struct PlayKillingPartView: View {
     @State private var orderedDiaryIDs: [Int] = []
     @State private var draggedTrackID: Int?
     @State private var lastReorderDate = Date.distantPast
-    @State private var hasTriggeredInitialLoad = false
     @State private var hasCompletedInitialLoad = false
     @State private var lastTickDate = Date()
     @State private var playerReloadToken = UUID()
@@ -56,20 +55,24 @@ struct PlayKillingPartView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
-            guard !hasTriggeredInitialLoad else { return }
-            hasTriggeredInitialLoad = true
             resetTickReference()
             Task {
-                await loadAllDiaryFeedsForPlayback()
+                let refetchResult = await refreshPlaybackFeeds()
                 hasCompletedInitialLoad = true
                 reconcileOrderedDiaryIDsIfNeeded()
+                if refetchResult.hasFeedOrderingChanged {
+                    restartPlaybackFromFirstTrack()
+                }
                 synchronizeSelectedTrackIfNeeded()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
             Task {
-                await loadAllDiaryFeedsForPlayback()
+                let refetchResult = await refreshPlaybackFeeds()
                 reconcileOrderedDiaryIDsIfNeeded()
+                if refetchResult.hasFeedOrderingChanged {
+                    restartPlaybackFromFirstTrack()
+                }
                 synchronizeSelectedTrackIfNeeded()
             }
         }
@@ -500,16 +503,29 @@ struct PlayKillingPartView: View {
         lastTickDate = Date()
     }
 
-    private func loadAllDiaryFeedsForPlayback() async {
-        await viewModel.refetchCollectionDataOnFocus()
+    private func refreshPlaybackFeeds() async -> PlaybackFeedRefetchResult {
+        await playViewModel.refetchPlaybackFeeds(
+            refetchInitialPage: {
+                await viewModel.refetchCollectionDataOnFocus()
+            },
+            loadNextPageIfNeeded: {
+                await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
+            },
+            currentFeedCount: {
+                viewModel.myFeeds.count
+            },
+            currentFeedIDs: {
+                viewModel.myFeeds.map(\.id)
+            }
+        )
+    }
 
-        var previousFeedCount = -1
-        var iteration = 0
-        while previousFeedCount != viewModel.myFeeds.count, iteration < 200 {
-            previousFeedCount = viewModel.myFeeds.count
-            await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
-            iteration += 1
-        }
+    private func restartPlaybackFromFirstTrack() {
+        selectedTrackID = nil
+        elapsedInCurrentRange = 0
+        isPlaying = true
+        playerReloadToken = UUID()
+        resetTickReference()
     }
 
     private func makeTrack(from feed: DiaryFeedModel) -> PlayKillingPartTrack {
