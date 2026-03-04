@@ -189,13 +189,41 @@ struct MyCollectionDiary: View {
     private var videoURL: URL? {
         let trimmed = viewModel.diary.videoUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        if let parsed = URL(string: trimmed), parsed.scheme != nil {
+
+        let normalizedURLText: String
+        if isLikelyYouTubeVideoID(trimmed) {
+            normalizedURLText = "https://www.youtube.com/embed/\(trimmed)?playsinline=1"
+        } else {
+            normalizedURLText = trimmed
+        }
+
+        if let parsed = URL(string: normalizedURLText), parsed.scheme != nil {
             return parsed
         }
-        if trimmed.hasPrefix("//"), let parsed = URL(string: "https:\(trimmed)") {
+
+        if normalizedURLText.hasPrefix("//"),
+           let parsed = URL(string: "https:\(normalizedURLText)") {
             return parsed
         }
-        return URL(string: "https://\(trimmed)")
+
+        return URL(string: "https://\(normalizedURLText)")
+    }
+
+    private func isLikelyYouTubeVideoID(_ value: String) -> Bool {
+        if value.hasPrefix("//") {
+            return false
+        }
+
+        if let components = URLComponents(string: value),
+           components.scheme != nil || components.host != nil {
+            return false
+        }
+
+        return !value.contains("/")
+            && !value.contains("?")
+            && !value.contains("&")
+            && !value.contains("=")
+            && !value.contains(".")
     }
 
     private var startProgress: CGFloat {
