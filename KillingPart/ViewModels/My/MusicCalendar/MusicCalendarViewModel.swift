@@ -12,7 +12,6 @@ final class MusicCalendarViewModel: ObservableObject {
     private let calendarService: CalendarServicing
     private let userService: UserServicing
     private let calendar: Calendar
-    private var hasLoadedInitially = false
     private var hasLoadedDisplayTag = false
 
     init(
@@ -112,8 +111,6 @@ final class MusicCalendarViewModel: ObservableObject {
     }
 
     func onAppear() {
-        guard !hasLoadedInitially else { return }
-        hasLoadedInitially = true
         Task {
             async let loadDiariesTask: Void = loadDisplayedMonthDiaries()
             async let loadDisplayTagTask: Void = loadDisplayTagIfNeeded()
