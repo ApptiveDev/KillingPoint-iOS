@@ -5,19 +5,24 @@ final class MusicCalendarViewModel: ObservableObject {
     @Published var selectedDate: Date
     @Published private(set) var displayedMonth: Date
     @Published private(set) var diariesByDate: [String: [DiaryFeedModel]] = [:]
+    @Published private(set) var displayTag = "@killingpart_user"
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
     private let calendarService: CalendarServicing
+    private let userService: UserServicing
     private let calendar: Calendar
     private var hasLoadedInitially = false
+    private var hasLoadedDisplayTag = false
 
     init(
         calendarService: CalendarServicing = CalendarService(),
+        userService: UserServicing = UserService(),
         calendar: Calendar = .current,
         now: Date = Date()
     ) {
         self.calendarService = calendarService
+        self.userService = userService
         self.calendar = calendar
 
         let startOfCurrentMonth = calendar.date(
@@ -110,7 +115,9 @@ final class MusicCalendarViewModel: ObservableObject {
         guard !hasLoadedInitially else { return }
         hasLoadedInitially = true
         Task {
-            await loadDisplayedMonthDiaries()
+            async let loadDiariesTask: Void = loadDisplayedMonthDiaries()
+            async let loadDisplayTagTask: Void = loadDisplayTagIfNeeded()
+            _ = await (loadDiariesTask, loadDisplayTagTask)
         }
     }
 
@@ -197,6 +204,26 @@ final class MusicCalendarViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    private func loadDisplayTagIfNeeded() async {
+        guard !hasLoadedDisplayTag else { return }
+
+        do {
+            let user = try await userService.fetchMyUser()
+            let trimmedTag = user.tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedTag.isEmpty else {
+                displayTag = "@killingpart_user"
+                hasLoadedDisplayTag = true
+                return
+            }
+
+            displayTag = trimmedTag.hasPrefix("@") ? trimmedTag : "@\(trimmedTag)"
+            hasLoadedDisplayTag = true
+        } catch {
+            if isRequestCancelled(error) { return }
+            displayTag = "@killingpart_user"
+        }
     }
 
     private func startOfMonth(for date: Date) -> Date {

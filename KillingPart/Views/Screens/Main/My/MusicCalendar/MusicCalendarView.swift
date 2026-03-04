@@ -157,7 +157,7 @@ struct MusicCalendarView: View {
                                 value: MusicCalendarDiaryRoute(
                                     diaryId: diary.diaryId,
                                     initialDiary: diary,
-                                    displayTag: diary.tag ?? ""
+                                    displayTag: viewModel.displayTag
                                 )
                             ) {
                                 diaryRow(diary)
