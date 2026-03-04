@@ -92,6 +92,9 @@ struct YoutubePlayerView: UIViewRepresentable {
             ? """
             if (window.kpApplyDesiredRange) {
                 window.kpApplyDesiredRange(\(shouldForceSeekJS));
+                if (window.kpScheduleAutoplayRetry) {
+                    window.kpScheduleAutoplayRetry(\(shouldForceSeekJS));
+                }
             } else {
                 if (\(shouldForceSeekJS)) {
                     window.kpPlayer.seekTo(window.kpDesiredStart, true);
@@ -100,6 +103,9 @@ struct YoutubePlayerView: UIViewRepresentable {
             }
             """
             : """
+            if (window.kpStopAutoplayRetry) {
+                window.kpStopAutoplayRetry();
+            }
             if (\(shouldForceSeekJS)) {
                 window.kpPlayer.seekTo(window.kpDesiredStart, true);
             }
@@ -181,6 +187,18 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpPlayer = null;
                 window.kpPlayerReady = false;
                 window.kpLoopTimer = null;
+                window.kpAutoplayRetryTimer = null;
+                window.kpAutoplayRetryCount = 0;
+                window.kpAutoplayMaxRetryCount = 14;
+                window.kpAutoplayRetryDelayMs = 220;
+
+                window.kpStopAutoplayRetry = function() {
+                    if (window.kpAutoplayRetryTimer) {
+                        clearTimeout(window.kpAutoplayRetryTimer);
+                        window.kpAutoplayRetryTimer = null;
+                    }
+                    window.kpAutoplayRetryCount = 0;
+                };
 
                 function kpNormalizedStart() {
                     var targetStart = Number(window.kpDesiredStart || 0);
@@ -217,6 +235,36 @@ struct YoutubePlayerView: UIViewRepresentable {
                     window.kpPlayer.playVideo();
                 };
 
+                window.kpScheduleAutoplayRetry = function(forceSeek) {
+                    if (!window.kpShouldAutoplay || !window.kpPlayerReady || !window.kpPlayer) {
+                        return;
+                    }
+                    if (window.kpAutoplayRetryTimer) {
+                        return;
+                    }
+                    if (window.kpAutoplayRetryCount >= window.kpAutoplayMaxRetryCount) {
+                        return;
+                    }
+
+                    window.kpAutoplayRetryTimer = setTimeout(function() {
+                        window.kpAutoplayRetryTimer = null;
+                        if (!window.kpShouldAutoplay || !window.kpPlayerReady || !window.kpPlayer) {
+                            return;
+                        }
+
+                        window.kpApplyDesiredRange(forceSeek);
+
+                        var state = Number(window.kpPlayer.getPlayerState ? window.kpPlayer.getPlayerState() : -1);
+                        if (state === 1 || state === 3) {
+                            window.kpAutoplayRetryCount = 0;
+                            return;
+                        }
+
+                        window.kpAutoplayRetryCount += 1;
+                        window.kpScheduleAutoplayRetry(false);
+                    }, window.kpAutoplayRetryDelayMs);
+                };
+
                 window.kpStartRangeLoop = function() {
                     if (window.kpLoopTimer) {
                         clearInterval(window.kpLoopTimer);
@@ -227,17 +275,24 @@ struct YoutubePlayerView: UIViewRepresentable {
                             return;
                         }
 
-                        var state = Number(window.kpPlayer.getPlayerState ? window.kpPlayer.getPlayerState() : -1);
-                        if (state !== 1 && state !== 3) {
+                        if (!window.kpShouldAutoplay) {
                             return;
                         }
 
-                        var targetStart = kpNormalizedStart();
-                        var targetEnd = kpNormalizedEnd(targetStart);
-                        var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
-                        if (isNaN(current) || current < targetStart || current >= targetEnd) {
-                            window.kpPlayer.seekTo(targetStart, true);
-                            window.kpPlayer.playVideo();
+                        var state = Number(window.kpPlayer.getPlayerState ? window.kpPlayer.getPlayerState() : -1);
+                        if (state === 1 || state === 3) {
+                            var targetStart = kpNormalizedStart();
+                            var targetEnd = kpNormalizedEnd(targetStart);
+                            var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
+                            if (isNaN(current) || current < targetStart || current >= targetEnd) {
+                                window.kpPlayer.seekTo(targetStart, true);
+                                window.kpPlayer.playVideo();
+                            }
+                            return;
+                        }
+
+                        if (state === 0 || state === 2 || state === 5 || state === -1) {
+                            window.kpScheduleAutoplayRetry(false);
                         }
                     }, 200);
                 };
@@ -270,14 +325,31 @@ struct YoutubePlayerView: UIViewRepresentable {
                                 if (window.kpShouldAutoplay) {
                                     window.kpApplyDesiredRange(true);
                                     window.kpStartRangeLoop();
+                                    window.kpScheduleAutoplayRetry(true);
                                 } else {
                                     window.kpPlayer.seekTo(window.kpDesiredStart, true);
                                     window.kpPlayer.pauseVideo();
                                 }
                             },
                             onStateChange: function(event) {
-                                if (window.kpShouldAutoplay && Number(event.data) === 0) {
+                                var state = Number(event.data);
+                                if (!window.kpShouldAutoplay) {
+                                    return;
+                                }
+
+                                if (state === 1 || state === 3) {
+                                    window.kpStopAutoplayRetry();
+                                    return;
+                                }
+
+                                if (state === 0) {
                                     window.kpApplyDesiredRange(true);
+                                    window.kpScheduleAutoplayRetry(true);
+                                    return;
+                                }
+
+                                if (state === 2 || state === 5 || state === -1) {
+                                    window.kpScheduleAutoplayRetry(false);
                                 }
                             }
                         }
@@ -288,6 +360,10 @@ struct YoutubePlayerView: UIViewRepresentable {
                     if (window.kpLoopTimer) {
                         clearInterval(window.kpLoopTimer);
                         window.kpLoopTimer = null;
+                    }
+                    if (window.kpAutoplayRetryTimer) {
+                        clearTimeout(window.kpAutoplayRetryTimer);
+                        window.kpAutoplayRetryTimer = null;
                     }
                 });
             </script>
