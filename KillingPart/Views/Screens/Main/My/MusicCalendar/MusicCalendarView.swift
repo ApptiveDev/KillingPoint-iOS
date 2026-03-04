@@ -242,36 +242,37 @@ struct MusicCalendarView: View {
     }
 
     private func diaryRow(_ diary: DiaryFeedModel) -> some View {
-        HStack(spacing: AppSpacing.s) {
+        HStack(spacing: AppSpacing.m) {
             albumArtwork(for: diary)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(diary.musicTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "제목 없음" : diary.musicTitle)
-                    .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(.white)
+                    .font(AppFont.paperlogy6SemiBold(size: 14))
+                    .foregroundStyle(Color.white)
                     .lineLimit(1)
 
                 Text(diary.artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "아티스트 정보 없음" : diary.artist)
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(AppFont.paperlogy5Medium(size: 12))
+                    .foregroundStyle(Color.white)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 0)
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.62))
+            VStack(spacing: 4) {
+                      Text("코멘트읽기")
+                          .font(AppFont.paperlogy5Medium(size: 14))
+                          .foregroundStyle(Color.kpPrimary)
+
+                      Image(systemName: "arrow.right")
+                          .font(.system(size: 12, weight: .semibold))
+                          .foregroundStyle(Color.kpPrimary)
+                  }
         }
-        .padding(.horizontal, AppSpacing.s)
-        .padding(.vertical, AppSpacing.s)
+        .padding(.horizontal, AppSpacing.m)
+        .padding(.vertical, AppSpacing.m)
+        .frame(minHeight: 82)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        }
     }
 
     private func albumArtwork(for diary: DiaryFeedModel) -> some View {
@@ -293,12 +294,7 @@ struct MusicCalendarView: View {
                 placeholderArtwork
             }
         }
-        .frame(width: 42, height: 42)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        }
+        .frame(width: 58, height: 58)
     }
 
     private var placeholderArtwork: some View {
