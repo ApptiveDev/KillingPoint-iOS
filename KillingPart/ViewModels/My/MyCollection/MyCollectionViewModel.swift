@@ -139,6 +139,11 @@ final class MyCollectionViewModel: ObservableObject {
         myFeeds.removeAll { $0.diaryId == diaryId }
     }
 
+    func applyUpdatedUser(_ updatedUser: UserModel) {
+        user = updatedUser
+        hasLoadedProfile = true
+    }
+
     func logout(onSuccess: @escaping () -> Void) {
         guard !isProcessing else { return }
 
