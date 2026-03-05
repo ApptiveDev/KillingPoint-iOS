@@ -48,7 +48,7 @@ struct MyCollectionProfileSettingsSection: View {
                         )
                     }
                 }
-                .padding(.horizontal, AppSpacing.l)
+                
                 .padding(.bottom, max(AppSpacing.l, bottomSafeAreaPadding))
             }
             .scrollIndicators(.hidden)
@@ -203,7 +203,7 @@ struct MyCollectionProfileSettingsSection: View {
         let normalizedTag = normalizedTag(from: viewModel.tagDraft)
         guard isTagFormatValid(normalizedTag) else {
             return TagHelperMessage(
-                text: "30자 이내의 영문과 숫자, 특수문자([.],[_])로 조합해주세요.",
+                text: "4자 이상 30자 이내의 영문과 숫자, 특수문자([.],[_])로 조합해주세요.",
                 color: .red.opacity(0.95)
             )
         }
