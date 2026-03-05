@@ -4,6 +4,7 @@ struct MyCollectionView: View {
     let onSessionEnded: () -> Void
 
     @StateObject private var viewModel: MyCollectionViewModel
+    @StateObject private var profileSettingViewModel: ProfileSettingViewModel
     @State private var screenMode: MyCollectionScreenMode = .collectionList
     @State private var navigationDirection: MyCollectionScreenTransitionDirection = .forward
     @State private var isAccountActionDialogPresented = false
@@ -22,6 +23,9 @@ struct MyCollectionView: View {
                 userService: userService,
                 diaryService: diaryService
             )
+        )
+        _profileSettingViewModel = StateObject(
+            wrappedValue: ProfileSettingViewModel(userService: userService)
         )
     }
 
@@ -49,6 +53,11 @@ struct MyCollectionView: View {
         .onAppear {
             Task {
                 await viewModel.refetchCollectionDataOnFocus()
+            }
+        }
+        .onChange(of: viewModel.user?.identifier) { _ in
+            if screenMode == .profileSettings || profileSettingViewModel.user == nil {
+                profileSettingViewModel.syncUser(viewModel.user)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
@@ -189,6 +198,7 @@ struct MyCollectionView: View {
             fanStatText: viewModel.fanStatText,
             pickStatText: viewModel.pickStatText
         ) {
+            profileSettingViewModel.syncUser(viewModel.user)
             navigationDirection = .forward
             withAnimation(.easeInOut(duration: 0.2)) {
                 screenMode = .profileSettings
@@ -198,19 +208,18 @@ struct MyCollectionView: View {
 
     private var profileSettingsSection: some View {
         MyCollectionProfileSettingsSection(
-            displayName: viewModel.displayName,
-            displayTag: viewModel.displayTag,
-            profileImageURL: viewModel.profileImageURL,
-            errorMessage: viewModel.errorMessage,
-            isProcessing: viewModel.isProcessing
+            viewModel: profileSettingViewModel
         ) {
             navigationDirection = .backward
             withAnimation(.easeInOut(duration: 0.2)) {
                 screenMode = .collectionList
             }
         } onAccountActionTap: {
-            guard !viewModel.isProcessing else { return }
+            guard !viewModel.isProcessing, !profileSettingViewModel.isProcessing else { return }
             isAccountActionDialogPresented = true
+        } onUserUpdated: { updatedUser in
+            viewModel.applyUpdatedUser(updatedUser)
+            profileSettingViewModel.syncUser(updatedUser)
         }
     }
 }

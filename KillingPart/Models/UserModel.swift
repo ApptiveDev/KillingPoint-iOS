@@ -30,3 +30,17 @@ struct UserStaticsModel: Decodable {
     let pickCount: Int
     let killingPartCount: Int
 }
+
+struct PresignedURLResponse: Decodable {
+    let id: Int
+    let presignedUrl: String
+}
+
+struct UpdateMyProfileImageRequest: Encodable {
+    let id: Int
+    let presignedUrl: String
+}
+
+struct UpdateMyTagRequest: Encodable {
+    let tag: String
+}
