@@ -16,225 +16,127 @@ struct MyCollectionProfileSettingsSection: View {
     @FocusState private var isTagFieldFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.m) {
-                MyCollectionProfileSettingsHeaderView(onBackTap: onBackTap)
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    MyCollectionProfileSettingPageContainerView(
+                        minHeight: max(
+                            geometry.size.height - (AppSpacing.l + bottomSafeAreaPadding),
+                            0
+                        )
+                    ) {
+                        MyCollectionProfileSettingsHeaderView(onBackTap: onBackTap)
+                        profileEditorCard
 
-                profileEditorCard
+                        if let successMessage = viewModel.successMessage {
+                            Text(successMessage)
+                                .font(AppFont.paperlogy4Regular(size: 13))
+                                .foregroundStyle(AppColors.primary600.opacity(0.95))
+                        }
 
-                if let successMessage = viewModel.successMessage {
-                    Text(successMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(AppColors.primary600.opacity(0.95))
+                        if let errorMessage = viewModel.errorMessage, !isEditingTag {
+                            Text(errorMessage)
+                                .font(AppFont.paperlogy4Regular(size: 13))
+                                .foregroundStyle(.red.opacity(0.95))
+                        }
+
+                        Spacer(minLength: AppSpacing.m)
+
+                        MyCollectionAccountActionButton(
+                            isProcessing: viewModel.isProcessing,
+                            action: onAccountActionTap
+                        )
+                    }
                 }
-
-                if let errorMessage = viewModel.errorMessage, !isEditingTag {
-                    Text(errorMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(.red.opacity(0.95))
+                .padding(.horizontal, AppSpacing.l)
+                .padding(.bottom, max(AppSpacing.l, bottomSafeAreaPadding))
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: selectedPhotoItem) { newItem in
+                Task {
+                    await handlePickedImage(newItem)
+                    selectedPhotoItem = nil
                 }
-
-                MyCollectionAccountActionButton(
-                    isProcessing: viewModel.isProcessing,
-                    action: onAccountActionTap
-                )
-                .padding(.top, AppSpacing.s)
             }
-        }
-        .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.interactively)
-        .onChange(of: selectedPhotoItem) { newItem in
-            Task {
-                await handlePickedImage(newItem)
-                selectedPhotoItem = nil
+            .onChange(of: viewModel.tagDraft) { _ in
+                guard isEditingTag else { return }
+                tagValidationFeedback = nil
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) {
+                notification in
+                keyboardBottomInset = resolvedKeyboardInset(from: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardBottomInset = 0
+            }
+            .safeAreaInset(edge: .bottom) {
+                Color.clear
+                    .frame(height: keyboardBottomInset)
+            }
+            .animation(.easeOut(duration: 0.2), value: keyboardBottomInset)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .onChange(of: viewModel.tagDraft) { _ in
-            guard isEditingTag else { return }
-            tagValidationFeedback = nil
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) {
-            notification in
-            keyboardBottomInset = resolvedKeyboardInset(from: notification)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            keyboardBottomInset = 0
-        }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear
-                .frame(height: keyboardBottomInset)
-        }
-        .animation(.easeOut(duration: 0.2), value: keyboardBottomInset)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(.bottom, AppSpacing.l)
     }
 
     private var profileEditorCard: some View {
-        let currentProfileImageURL = viewModel.profileImageURL
+        let helper = tagHelperMessage
 
         return HStack(alignment: .top, spacing: AppSpacing.m) {
-            VStack(spacing: AppSpacing.xs) {
-                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                    MyCollectionProfileImageView(
-                        profileImageURL: currentProfileImageURL,
-                        size: 92,
-                        iconSize: 34
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isProcessing)
-
-                Text("프로필 사진")
-                    .font(AppFont.paperlogy5Medium(size: 13))
-                    .foregroundStyle(Color.kpPrimary)
-
-                Button {
-                    Task {
-                        if let updatedUser = await viewModel.deleteProfileImage() {
-                            onUserUpdated(updatedUser)
-                        }
+            MyCollectionProfileImageColumnView(
+                selectedPhotoItem: $selectedPhotoItem,
+                profileImageURL: viewModel.profileImageURL,
+                isProcessing: viewModel.isProcessing
+            ) {
+                Task {
+                    if let updatedUser = await viewModel.deleteProfileImage() {
+                        onUserUpdated(updatedUser)
                     }
-                } label: {
-                    Text("기본 이미지 변경")
-                        .font(AppFont.paperlogy5Medium(size: 12))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(.horizontal, AppSpacing.s)
-                        .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.1))
-                        .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isProcessing)
             }
 
             VStack(alignment: .leading, spacing: AppSpacing.s) {
                 Text(viewModel.displayName)
                     .font(AppFont.paperlogy5Medium(size: 20))
                     .foregroundStyle(Color.kpPrimary)
-                tagSection
+
+                MyCollectionProfileTagSectionView(
+                    displayTag: viewModel.displayTag,
+                    isEditingTag: isEditingTag,
+                    tagDraft: $viewModel.tagDraft,
+                    isProcessing: viewModel.isProcessing,
+                    isTagFieldFocused: $isTagFieldFocused,
+                    helperMessage: helper?.text,
+                    helperColor: helper?.color
+                ) {
+                    beginTagEditing()
+                }
 
                 if isEditingTag {
-                    HStack(spacing: AppSpacing.s) {
-                        Spacer()
-
-                        Button {
-                            cancelTagEditing()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.72))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.isProcessing)
-
-                        Button {
-                            Task {
-                                if let updatedUser = await viewModel.updateTag() {
-                                    onUserUpdated(updatedUser)
-                                    isEditingTag = false
-                                    isTagFieldFocused = false
-                                    tagValidationFeedback = nil
-                                } else {
-                                    updateTagValidationFeedback(from: viewModel.errorMessage)
-                                }
-                            }
-                        } label: {
-                            if viewModel.isProcessing {
-                                ProgressView()
-                                    .tint(AppColors.primary600)
-                            } else {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundStyle(AppColors.primary600)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!viewModel.canSubmitTagUpdate)
-                        .opacity(viewModel.canSubmitTagUpdate ? 1 : 0.45)
+                    MyCollectionProfileTagEditActionRowView(
+                        isProcessing: viewModel.isProcessing,
+                        canSubmit: viewModel.canSubmitTagUpdate,
+                        onCancel: cancelTagEditing
+                    ) {
+                        submitTagUpdate()
                     }
-                    .padding(.top, 2)
                 }
             }
 
             Spacer()
         }
-        .padding(AppSpacing.m)
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private var tagSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if isEditingTag {
-                HStack(spacing: 8) {
-                    Text("@")
-                        .font(AppFont.paperlogy3Light(size: 14))
-                        .foregroundStyle(Color.kpPrimary)
-
-                    TextField("태그를 입력해 주세요", text: $viewModel.tagDraft)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(AppFont.paperlogy4Regular(size: 14))
-                        .foregroundStyle(Color.kpPrimary)
-                        .focused($isTagFieldFocused)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            isTagFieldFocused = false
-                        }
-
-                    Spacer(minLength: 0)
-
-                    Image(systemName: "pencil.line")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.kpPrimary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, AppSpacing.s)
-                .padding(.vertical, AppSpacing.xs)
-                .background(Color.white.opacity(0.07))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(AppColors.primary600.opacity(0.9), lineWidth: 1.2)
-                }
+    private func submitTagUpdate() {
+        Task {
+            if let updatedUser = await viewModel.updateTag() {
+                onUserUpdated(updatedUser)
+                isEditingTag = false
+                isTagFieldFocused = false
+                tagValidationFeedback = nil
             } else {
-                Button {
-                    beginTagEditing()
-                } label: {
-                    HStack(spacing: 8) {
-                        Text(viewModel.displayTag)
-                            .font(AppFont.paperlogy3Light(size: 15))
-                            .foregroundStyle(Color.kpPrimary)
-
-                        Spacer(minLength: 0)
-
-                        Image(systemName: "pencil.line")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.kpPrimary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, AppSpacing.s)
-                    .padding(.vertical, AppSpacing.xs)
-                    .background(Color.white.opacity(0.07))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isProcessing)
-            }
-
-            if isEditingTag, let tagHelperMessage {
-                Text(tagHelperMessage.text)
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(tagHelperMessage.color)
+                updateTagValidationFeedback(from: viewModel.errorMessage)
             }
         }
     }
@@ -301,7 +203,7 @@ struct MyCollectionProfileSettingsSection: View {
         let normalizedTag = normalizedTag(from: viewModel.tagDraft)
         guard isTagFormatValid(normalizedTag) else {
             return TagHelperMessage(
-                text: "4자 이상 30자 이내의 영문과 숫자, 특수문자([.],[_])로 조합해주세요.",
+                text: "30자 이내의 영문과 숫자, 특수문자([.],[_])로 조합해주세요.",
                 color: .red.opacity(0.95)
             )
         }
@@ -353,6 +255,10 @@ struct MyCollectionProfileSettingsSection: View {
         }
 
         tagValidationFeedback = .unavailable
+    }
+
+    private var bottomSafeAreaPadding: CGFloat {
+        currentSafeAreaBottomInset() + AppSpacing.s
     }
 
     private func resolvedKeyboardInset(from notification: Notification) -> CGFloat {
