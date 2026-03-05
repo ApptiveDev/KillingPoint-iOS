@@ -12,6 +12,7 @@ struct MyCollectionProfileSettingsSection: View {
     @State private var isEditingTag = false
     @State private var originalTagDraft = ""
     @State private var keyboardBottomInset: CGFloat = 0
+    @State private var tagValidationFeedback: TagValidationFeedback?
     @FocusState private var isTagFieldFocused: Bool
 
     var body: some View {
@@ -27,7 +28,7 @@ struct MyCollectionProfileSettingsSection: View {
                         .foregroundStyle(AppColors.primary600.opacity(0.95))
                 }
 
-                if let errorMessage = viewModel.errorMessage {
+                if let errorMessage = viewModel.errorMessage, !isEditingTag {
                     Text(errorMessage)
                         .font(AppFont.paperlogy4Regular(size: 13))
                         .foregroundStyle(.red.opacity(0.95))
@@ -47,6 +48,10 @@ struct MyCollectionProfileSettingsSection: View {
                 await handlePickedImage(newItem)
                 selectedPhotoItem = nil
             }
+        }
+        .onChange(of: viewModel.tagDraft) { _ in
+            guard isEditingTag else { return }
+            tagValidationFeedback = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) {
             notification in
@@ -104,7 +109,7 @@ struct MyCollectionProfileSettingsSection: View {
 
             VStack(alignment: .leading, spacing: AppSpacing.s) {
                 Text(viewModel.displayName)
-                    .font(AppFont.paperlogy3Light(size: 20))
+                    .font(AppFont.paperlogy5Medium(size: 20))
                     .foregroundStyle(Color.kpPrimary)
                 tagSection
 
@@ -128,6 +133,9 @@ struct MyCollectionProfileSettingsSection: View {
                                     onUserUpdated(updatedUser)
                                     isEditingTag = false
                                     isTagFieldFocused = false
+                                    tagValidationFeedback = nil
+                                } else {
+                                    updateTagValidationFeedback(from: viewModel.errorMessage)
                                 }
                             }
                         } label: {
@@ -163,7 +171,7 @@ struct MyCollectionProfileSettingsSection: View {
     private var tagSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             if isEditingTag {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("@")
                         .font(AppFont.paperlogy3Light(size: 14))
                         .foregroundStyle(Color.kpPrimary)
@@ -171,45 +179,62 @@ struct MyCollectionProfileSettingsSection: View {
                     TextField("태그를 입력해 주세요", text: $viewModel.tagDraft)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .font(AppFont.paperlogy3Light(size: 14))
+                        .font(AppFont.paperlogy4Regular(size: 14))
                         .foregroundStyle(Color.kpPrimary)
                         .focused($isTagFieldFocused)
                         .submitLabel(.done)
                         .onSubmit {
                             isTagFieldFocused = false
                         }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "pencil.line")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.kpPrimary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, AppSpacing.s)
                 .padding(.vertical, AppSpacing.xs)
                 .background(Color.white.opacity(0.07))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay {
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(AppColors.primary600.opacity(0.62), lineWidth: 1)
+                        .stroke(AppColors.primary600.opacity(0.9), lineWidth: 1.2)
                 }
             } else {
-                HStack(spacing: 8) {
-                    Text(viewModel.displayTag)
-                        .font(AppFont.paperlogy6SemiBold(size: 15))
-                        .foregroundStyle(Color.kpPrimary)
+                Button {
+                    beginTagEditing()
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(viewModel.displayTag)
+                            .font(AppFont.paperlogy3Light(size: 15))
+                            .foregroundStyle(Color.kpPrimary)
 
-                    Button {
-                        originalTagDraft = viewModel.tagDraft
-                        isEditingTag = true
-                        isTagFieldFocused = true
-                        viewModel.successMessage = nil
-                        viewModel.errorMessage = nil
-                    } label: {
-                        Image(systemName: "pencil")
+                        Spacer(minLength: 0)
+
+                        Image(systemName: "pencil.line")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .padding(6)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
+                            .foregroundStyle(Color.kpPrimary)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.isProcessing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AppSpacing.s)
+                    .padding(.vertical, AppSpacing.xs)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    }
                 }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isProcessing)
+            }
+
+            if isEditingTag, let tagHelperMessage {
+                Text(tagHelperMessage.text)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(tagHelperMessage.color)
             }
         }
     }
@@ -236,8 +261,98 @@ struct MyCollectionProfileSettingsSection: View {
         viewModel.tagDraft = originalTagDraft
         viewModel.errorMessage = nil
         viewModel.successMessage = nil
+        tagValidationFeedback = nil
         isEditingTag = false
         isTagFieldFocused = false
+    }
+
+    private func beginTagEditing() {
+        originalTagDraft = viewModel.tagDraft
+        isEditingTag = true
+        isTagFieldFocused = true
+        tagValidationFeedback = nil
+        viewModel.successMessage = nil
+        viewModel.errorMessage = nil
+    }
+
+    private var tagHelperMessage: TagHelperMessage? {
+        guard isEditingTag else { return nil }
+
+        if let tagValidationFeedback {
+            switch tagValidationFeedback {
+            case .invalidFormat:
+                return TagHelperMessage(
+                    text: "30자 이내의 영문과 숫자, 특수문자([.],[_])로 조합해주세요.",
+                    color: .red.opacity(0.95)
+                )
+            case .duplicate:
+                return TagHelperMessage(
+                    text: "이미 사용된 태그입니다.",
+                    color: .red.opacity(0.95)
+                )
+            case .unavailable:
+                return TagHelperMessage(
+                    text: "사용할 수 없는 태그입니다.",
+                    color: .red.opacity(0.95)
+                )
+            }
+        }
+
+        let normalizedTag = normalizedTag(from: viewModel.tagDraft)
+        guard isTagFormatValid(normalizedTag) else {
+            return TagHelperMessage(
+                text: "4자 이상 30자 이내의 영문과 숫자, 특수문자([.],[_])로 조합해주세요.",
+                color: .red.opacity(0.95)
+            )
+        }
+
+        return TagHelperMessage(
+            text: "사용 가능한 회원태그입니다!",
+            color: .green.opacity(0.9)
+        )
+    }
+
+    private func normalizedTag(from rawTag: String) -> String {
+        let trimmed = rawTag.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("@") {
+            return String(trimmed.dropFirst())
+        }
+        return trimmed
+    }
+
+    private func isTagFormatValid(_ tag: String) -> Bool {
+        guard (4...30).contains(tag.count) else { return false }
+        let allowedCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789_.")
+        guard tag.rangeOfCharacter(from: allowedCharacters.inverted) == nil else { return false }
+        guard !tag.hasPrefix("."), !tag.hasSuffix("."), !tag.contains("..") else { return false }
+        return true
+    }
+
+    private func updateTagValidationFeedback(from message: String?) {
+        let normalizedMessage = message?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
+
+        if normalizedMessage.contains("이미 존재")
+            || normalizedMessage.contains("이미 사용")
+            || normalizedMessage.contains("already")
+        {
+            tagValidationFeedback = .duplicate
+            return
+        }
+
+        if normalizedMessage.contains("tag는")
+            || normalizedMessage.contains("30")
+            || normalizedMessage.contains("영문")
+            || normalizedMessage.contains("소문자")
+            || normalizedMessage.contains("연속")
+            || normalizedMessage.contains("형식")
+        {
+            tagValidationFeedback = .invalidFormat
+            return
+        }
+
+        tagValidationFeedback = .unavailable
     }
 
     private func resolvedKeyboardInset(from notification: Notification) -> CGFloat {
@@ -261,4 +376,15 @@ struct MyCollectionProfileSettingsSection: View {
         }
         return keyWindow.safeAreaInsets.bottom
     }
+}
+
+private struct TagHelperMessage {
+    let text: String
+    let color: Color
+}
+
+private enum TagValidationFeedback {
+    case invalidFormat
+    case duplicate
+    case unavailable
 }
