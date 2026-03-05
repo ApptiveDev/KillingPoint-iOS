@@ -104,7 +104,7 @@ struct MyCollectionProfileSettingsSection: View {
 
             VStack(alignment: .leading, spacing: AppSpacing.s) {
                 Text(viewModel.displayName)
-                    .font(AppFont.paperlogy6SemiBold(size: 17))
+                    .font(AppFont.paperlogy3Light(size: 20))
                     .foregroundStyle(Color.kpPrimary)
                 tagSection
 
@@ -165,13 +165,13 @@ struct MyCollectionProfileSettingsSection: View {
             if isEditingTag {
                 HStack(spacing: 6) {
                     Text("@")
-                        .font(AppFont.paperlogy5Medium(size: 14))
+                        .font(AppFont.paperlogy3Light(size: 14))
                         .foregroundStyle(Color.kpPrimary)
 
                     TextField("태그를 입력해 주세요", text: $viewModel.tagDraft)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .font(AppFont.paperlogy5Medium(size: 14))
+                        .font(AppFont.paperlogy3Light(size: 14))
                         .foregroundStyle(Color.kpPrimary)
                         .focused($isTagFieldFocused)
                         .submitLabel(.done)
