@@ -35,8 +35,8 @@ struct MyCollectionProfileCard: View {
 
                         HStack(alignment: .center, spacing: AppSpacing.m) {
                             MyCollectionProfileStatItemView(value: killingPartStatText, title: "킬링파트")
-                            MyCollectionProfileStatItemView(value: fanStatText, title: "팬덤")
-                            MyCollectionProfileStatItemView(value: pickStatText, title: "PICKS")
+//                            MyCollectionProfileStatItemView(value: fanStatText, title: "팬덤")
+//                            MyCollectionProfileStatItemView(value: pickStatText, title: "PICKS")
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
