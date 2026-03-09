@@ -30,7 +30,7 @@ struct PlayKillingPartPlayerSummaryBar: View {
                     track: currentTrack,
                     elapsedInCurrentRange: elapsedInCurrentRange
                 )
-                .frame(height: 24)
+                .frame(height: 34)
             } else {
                 Capsule()
                     .fill(Color.white.opacity(0.2))
@@ -96,26 +96,49 @@ private struct PlayKillingPartPlaybackRangeBar: View {
             let segmentWidth = max(endX - startX, 2)
             let playheadX = width * track.playheadProgress(elapsedInCurrentRange: elapsedInCurrentRange)
 
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.26))
-                    .frame(height: 4)
+            let labelWidth: CGFloat = 42
+            let labelHalfWidth = labelWidth / 2
+            let clampedStartLabelX = min(max(startX, labelHalfWidth), width - labelHalfWidth)
+            let clampedEndLabelX = min(max(endX, labelHalfWidth), width - labelHalfWidth)
 
-                Capsule()
-                    .fill(AppColors.primary600)
-                    .frame(width: segmentWidth, height: 10)
-                    .offset(x: startX)
+            ZStack(alignment: .topLeading) {
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.26))
+                        .frame(height: 4)
 
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 11, height: 11)
-                    .overlay {
-                        Circle()
-                            .stroke(AppColors.primary600, lineWidth: 1)
-                    }
-                    .offset(x: min(max(playheadX - 5.5, 0), width - 11))
+                    Capsule()
+                        .fill(AppColors.primary600)
+                        .frame(width: segmentWidth, height: 10)
+                        .offset(x: startX)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 11, height: 11)
+                        .overlay {
+                            Circle()
+                                .stroke(AppColors.primary600, lineWidth: 1)
+                        }
+                        .offset(x: min(max(playheadX - 5.5, 0), width - 11))
+                }
+                .frame(width: width, height: 12, alignment: .center)
+
+                Text(track.startLabel)
+                    .font(AppFont.paperlogy4Regular(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(1)
+                    .frame(width: labelWidth, alignment: .center)
+                    .position(x: clampedStartLabelX, y: 24)
+
+                Text(track.endLabel)
+                    .font(AppFont.paperlogy4Regular(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(1)
+                    .frame(width: labelWidth, alignment: .center)
+                    .position(x: clampedEndLabelX, y: 24)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
     }
 }
