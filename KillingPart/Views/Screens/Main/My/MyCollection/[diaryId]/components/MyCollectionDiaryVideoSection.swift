@@ -18,7 +18,6 @@ struct MyCollectionDiaryVideoSection: View {
         .id(playerReloadToken)
         .frame(maxWidth: .infinity)
         .aspectRatio(videoAspectRatio, contentMode: .fill)
-        .allowsHitTesting(false)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
         .overlay {
