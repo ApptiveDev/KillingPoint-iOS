@@ -21,7 +21,6 @@ struct PlayKillingPartCurrentTrackContent: View {
                     .id("\(track.id)-\(playerReloadToken)")
                     .frame(maxWidth: .infinity)
                     .aspectRatio(videoAspectRatio, contentMode: .fit)
-                    .allowsHitTesting(false)
                     .clipShape(RoundedRectangle(cornerRadius: videoCornerRadius))
                     .overlay {
                         RoundedRectangle(cornerRadius: videoCornerRadius)
