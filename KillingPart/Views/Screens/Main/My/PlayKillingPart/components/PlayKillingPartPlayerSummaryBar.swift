@@ -95,11 +95,11 @@ private struct PlayKillingPartPlaybackRangeBar: View {
             let endX = width * track.endProgress
             let segmentWidth = max(endX - startX, 2)
             let playheadX = width * track.playheadProgress(elapsedInCurrentRange: elapsedInCurrentRange)
-
-            let labelWidth: CGFloat = 42
-            let labelHalfWidth = labelWidth / 2
-            let clampedStartLabelX = min(max(startX, labelHalfWidth), width - labelHalfWidth)
-            let clampedEndLabelX = min(max(endX, labelHalfWidth), width - labelHalfWidth)
+            let labelLayout = resolvedLabelLayout(
+                rangeWidth: width,
+                startX: startX,
+                endX: endX
+            )
 
             ZStack(alignment: .topLeading) {
                 ZStack(alignment: .leading) {
@@ -128,17 +128,53 @@ private struct PlayKillingPartPlaybackRangeBar: View {
                     .monospacedDigit()
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
-                    .frame(width: labelWidth, alignment: .center)
-                    .position(x: clampedStartLabelX, y: 24)
+                    .frame(width: labelLayout.width, alignment: .center)
+                    .position(x: labelLayout.startX, y: 24)
 
                 Text(track.endLabel)
                     .font(AppFont.paperlogy4Regular(size: 11))
                     .monospacedDigit()
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
-                    .frame(width: labelWidth, alignment: .center)
-                    .position(x: clampedEndLabelX, y: 24)
+                    .frame(width: labelLayout.width, alignment: .center)
+                    .position(x: labelLayout.endX, y: 24)
             }
         }
+    }
+
+    private func resolvedLabelLayout(
+        rangeWidth: CGFloat,
+        startX: CGFloat,
+        endX: CGFloat
+    ) -> (width: CGFloat, startX: CGFloat, endX: CGFloat) {
+        let minimumLabelSpacing: CGFloat = 6
+        let idealLabelWidth: CGFloat = 42
+        let labelWidth = min(idealLabelWidth, max((rangeWidth - minimumLabelSpacing) / 2, 1))
+        let labelHalfWidth = labelWidth / 2
+        let minLabelCenterX = labelHalfWidth
+        let maxLabelCenterX = rangeWidth - labelHalfWidth
+        let minimumCenterDistance = labelWidth + minimumLabelSpacing
+
+        var resolvedStartX = min(max(startX, minLabelCenterX), maxLabelCenterX)
+        var resolvedEndX = min(max(endX, minLabelCenterX), maxLabelCenterX)
+        if resolvedEndX - resolvedStartX < minimumCenterDistance {
+            let midpoint = (resolvedStartX + resolvedEndX) / 2
+            resolvedStartX = midpoint - (minimumCenterDistance / 2)
+            resolvedEndX = midpoint + (minimumCenterDistance / 2)
+
+            if resolvedStartX < minLabelCenterX {
+                let shift = minLabelCenterX - resolvedStartX
+                resolvedStartX += shift
+                resolvedEndX += shift
+            }
+
+            if resolvedEndX > maxLabelCenterX {
+                let shift = resolvedEndX - maxLabelCenterX
+                resolvedStartX -= shift
+                resolvedEndX -= shift
+            }
+        }
+
+        return (labelWidth, resolvedStartX, resolvedEndX)
     }
 }
