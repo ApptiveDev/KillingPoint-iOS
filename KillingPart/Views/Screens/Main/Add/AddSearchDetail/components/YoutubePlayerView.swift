@@ -87,7 +87,9 @@ struct YoutubePlayerView: UIViewRepresentable {
         let targetStartJS = jsNumber(targetStart)
         let targetEndJS = jsNumber(targetEnd)
         let shouldAutoplayJS = isPlaying ? "true" : "false"
-        let shouldForceSeekJS = (isRangeChanged || isPlayStateChanged) ? "true" : "false"
+        // Keep playback position when only play/pause state changes.
+        // Force seek is only needed when the target range itself changed.
+        let shouldForceSeekJS = isRangeChanged ? "true" : "false"
         let playbackControlJS = isPlaying
             ? """
             if (window.kpApplyDesiredRange) {
