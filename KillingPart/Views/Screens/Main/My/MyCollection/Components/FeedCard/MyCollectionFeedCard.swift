@@ -7,7 +7,7 @@ struct MyCollectionFeedCard: View {
     var body: some View {
         VStack(alignment: .center, spacing: AppSpacing.xs) {
             HStack {
-                MyCollectionFeedLikeBadgeView(isLiked: feed.isLiked, likeCount: feed.likeCount)
+//                MyCollectionFeedLikeBadgeView(isLiked: feed.isLiked, likeCount: feed.likeCount)
                 Spacer()
                 MyCollectionFeedScopeBadgeView(scope: feed.scope)
             }
