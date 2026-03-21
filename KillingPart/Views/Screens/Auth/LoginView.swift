@@ -41,12 +41,24 @@ struct LoginView: View {
                             Text(message)
                                 .font(.footnote)
                                 .foregroundStyle(Color.red.opacity(0.95))
+                                .multilineTextAlignment(.center)
                         }
 
-                        KakaoLoginButton(
-                            isLoading: viewModel.isLoading,
-                            action: viewModel.loginWithKakao
-                        )
+                        HStack(spacing: AppSpacing.m) {
+                            KakaoLoginButton(
+                                isLoading: viewModel.isLoading
+                                    && viewModel.activeSocialLoginProvider == .kakao,
+                                isDisabled: viewModel.isLoading,
+                                action: viewModel.loginWithKakao
+                            )
+
+                            AppleLoginButton(
+                                isLoading: viewModel.isLoading
+                                    && viewModel.activeSocialLoginProvider == .apple,
+                                isDisabled: viewModel.isLoading,
+                                action: viewModel.loginWithApple
+                            )
+                        }
                     }
                     .padding(.horizontal, horizontalPadding)
                     .padding(.bottom, bottomPadding)
