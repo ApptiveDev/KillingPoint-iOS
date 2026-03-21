@@ -30,7 +30,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         webView.scrollView.isScrollEnabled = false
         webView.isOpaque = false
         webView.backgroundColor = .clear
-        webView.isUserInteractionEnabled = false
+        webView.isUserInteractionEnabled = true
         webView.allowsLinkPreview = false
         return webView
     }
@@ -87,7 +87,9 @@ struct YoutubePlayerView: UIViewRepresentable {
         let targetStartJS = jsNumber(targetStart)
         let targetEndJS = jsNumber(targetEnd)
         let shouldAutoplayJS = isPlaying ? "true" : "false"
-        let shouldForceSeekJS = (isRangeChanged || isPlayStateChanged) ? "true" : "false"
+        // Keep playback position when only play/pause state changes.
+        // Force seek is only needed when the target range itself changed.
+        let shouldForceSeekJS = isRangeChanged ? "true" : "false"
         let playbackControlJS = isPlaying
             ? """
             if (window.kpApplyDesiredRange) {
@@ -174,7 +176,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                 #player {
                     position: absolute;
                     inset: 0;
-                    pointer-events: none;
+                    pointer-events: auto;
                 }
             </style>
         </head>
@@ -308,9 +310,9 @@ struct YoutubePlayerView: UIViewRepresentable {
                         videoId: '\(safeVideoID)',
                         playerVars: {
                             autoplay: \(autoplayFlag),
-                            controls: 0,
-                            disablekb: 1,
-                            fs: 0,
+                            controls: 1,
+                            disablekb: 0,
+                            fs: 1,
                             rel: 0,
                             modestbranding: 1,
                             iv_load_policy: 3,
