@@ -12,7 +12,7 @@ final class AppViewModel: ObservableObject {
 
     init(
         authenticationService: AuthenticationServicing = AuthenticationService(),
-        kakaoLoginService: KakaoLoginServicing = KakaoLoginService(),
+        authService: AuthServicing = AuthService(),
         tokenStore: TokenStoring = TokenStore.shared,
         notificationCenter: NotificationCenter = .default
     ) {
@@ -21,7 +21,7 @@ final class AppViewModel: ObservableObject {
 
         let loginViewModel = LoginViewModel(
             authenticationService: authenticationService,
-            kakaoLoginService: kakaoLoginService
+            authService: authService
         )
 
         self.loginViewModel = loginViewModel

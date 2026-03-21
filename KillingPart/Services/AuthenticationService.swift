@@ -2,13 +2,16 @@ import Foundation
 
 protocol AuthenticationServicing {
     func login(email: String, password: String) async -> Bool
-    func loginWithKakao(accessToken: String) async throws -> KakaoSocialLoginResponse
+    func loginWithKakao(accessToken: String) async throws -> AuthLoginResponse
+    func loginWithApple(identityToken: String, authorizationCode: String, email: String?, name: String?) async throws -> AuthLoginResponse
     func logout() async throws
     func deleteMyAccount() async throws
 }
 
 enum AuthenticationServiceError: LocalizedError {
     case invalidKakaoAccessToken
+    case invalidAppleIdentityToken
+    case invalidAppleAuthorizationCode
     case invalidResponse
     case serverError(statusCode: Int, message: String?)
     case decodingFailed
@@ -20,6 +23,10 @@ enum AuthenticationServiceError: LocalizedError {
         switch self {
         case .invalidKakaoAccessToken:
             return "카카오 액세스 토큰이 유효하지 않아요."
+        case .invalidAppleIdentityToken:
+            return "애플 identity token이 유효하지 않아요."
+        case .invalidAppleAuthorizationCode:
+            return "애플 authorization code가 유효하지 않아요."
         case .invalidResponse:
             return "서버 응답을 확인할 수 없어요."
         case .serverError(let statusCode, let message):
@@ -59,7 +66,7 @@ struct AuthenticationService: AuthenticationServicing {
             && !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    func loginWithKakao(accessToken: String) async throws -> KakaoSocialLoginResponse {
+    func loginWithKakao(accessToken: String) async throws -> AuthLoginResponse {
         let trimmedToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedToken.isEmpty else {
             throw AuthenticationServiceError.invalidKakaoAccessToken
@@ -68,15 +75,62 @@ struct AuthenticationService: AuthenticationServicing {
         let requestBody: Data
         do {
             requestBody = try JSONEncoder().encode(
-                KakaoSocialLoginRequest(accessToken: trimmedToken)
+                KakaoLoginRequest(accessToken: trimmedToken)
             )
         } catch {
             throw AuthenticationServiceError.requestEncodingFailed
         }
 
+        return try await performSocialLogin(path: "/oauth2/kakao", requestBody: requestBody)
+    }
+
+    func loginWithApple(identityToken: String, authorizationCode: String, email: String?, name: String?) async throws -> AuthLoginResponse {
+        let trimmedIdentityToken = identityToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedIdentityToken.isEmpty else {
+            throw AuthenticationServiceError.invalidAppleIdentityToken
+        }
+
+        let trimmedAuthorizationCode = authorizationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAuthorizationCode.isEmpty else {
+            throw AuthenticationServiceError.invalidAppleAuthorizationCode
+        }
+
+        let trimmedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = (trimmedEmail?.isEmpty == false) ? trimmedEmail : nil
+        let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedName = (trimmedName?.isEmpty == false) ? trimmedName : nil
+
+        if normalizedEmail == nil {
+            print("[Auth][Apple] email field is nil. Sending null.")
+        }
+        if normalizedName == nil {
+            print("[Auth][Apple] name field is nil. Sending null.")
+        }
+
+        let requestBody: Data
+        do {
+            requestBody = try JSONEncoder().encode(
+                AppleLoginRequest(
+                    identityToken: trimmedIdentityToken,
+                    authorizationCode: trimmedAuthorizationCode,
+                    email: normalizedEmail,
+                    name: normalizedName
+                )
+            )
+            if let bodyString = String(data: requestBody, encoding: .utf8) {
+                print("[Auth][Apple][RequestBody] \(bodyString)")
+            }
+        } catch {
+            throw AuthenticationServiceError.requestEncodingFailed
+        }
+
+        return try await performSocialLogin(path: "/oauth2/apple", requestBody: requestBody)
+    }
+
+    private func performSocialLogin(path: String, requestBody: Data) async throws -> AuthLoginResponse {
         do {
             var request = APIRequest(
-                path: "/oauth2/kakao",
+                path: path,
                 method: .post,
                 requiresAuthorization: false,
                 body: requestBody
@@ -86,7 +140,7 @@ struct AuthenticationService: AuthenticationServicing {
 
             let response = try await apiClient.request(
                 request,
-                responseType: KakaoSocialLoginResponse.self
+                responseType: AuthLoginResponse.self
             )
 
             tokenStore.save(

@@ -1,9 +1,11 @@
 import SwiftUI
+import UIKit
 
 struct MyTabView: View {
     let onLogout: () -> Void
     @State private var selectedTab: MyTopTab = .playKillingPart
     @State private var tabTransitionDirection: Edge = .trailing
+    private static var hasConfiguredSegmentedControlAppearance = false
     private let tabAnimation = Animation.interactiveSpring(
         response: 0.32,
         dampingFraction: 0.85,
@@ -68,6 +70,9 @@ struct MyTabView: View {
         .controlSize(.large)
         .scaleEffect(x: 1, y: 1.08, anchor: .center)
         .padding(.vertical, AppSpacing.xs)
+        .onAppear {
+            configureSegmentedControlFontIfNeeded()
+        }
     }
 
     private var segmentedSelectionBinding: Binding<MyTopTab> {
@@ -96,6 +101,23 @@ struct MyTabView: View {
         .asymmetric(
             insertion: .move(edge: tabTransitionDirection).combined(with: .opacity),
             removal: .move(edge: tabTransitionDirection == .trailing ? .leading : .trailing).combined(with: .opacity)
+        )
+    }
+
+    private func configureSegmentedControlFontIfNeeded() {
+        guard !Self.hasConfiguredSegmentedControlAppearance else { return }
+        Self.hasConfiguredSegmentedControlAppearance = true
+
+        let fallbackFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        let segmentFont = UIFont(name: "Paperlogy-6SemiBold", size: 15) ?? fallbackFont
+
+        UISegmentedControl.appearance().setTitleTextAttributes(
+            [.font: segmentFont],
+            for: .normal
+        )
+        UISegmentedControl.appearance().setTitleTextAttributes(
+            [.font: segmentFont],
+            for: .selected
         )
     }
 }
