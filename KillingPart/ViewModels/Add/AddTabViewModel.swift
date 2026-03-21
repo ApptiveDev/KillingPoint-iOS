@@ -8,7 +8,7 @@ final class AddTabViewModel: ObservableObject {
     @Published private(set) var isLoadingMore = false
     @Published var errorMessage: String?
 
-    private let spotifyService: SpotifyServicing
+    private let itunesService: ITunesServicing
     private var searchTask: Task<Void, Never>?
     private var loadMoreTask: Task<Void, Never>?
     private var lastSearchedQuery = ""
@@ -16,8 +16,8 @@ final class AddTabViewModel: ObservableObject {
     private var nextOffset = 0
     private var hasMoreResults = true
 
-    init(spotifyService: SpotifyServicing = SpotifyService()) {
-        self.spotifyService = spotifyService
+    init(itunesService: ITunesServicing = ITunesService()) {
+        self.itunesService = itunesService
     }
 
     deinit {
@@ -143,7 +143,7 @@ final class AddTabViewModel: ObservableObject {
         }
 
         do {
-            let fetchedTracks = try await spotifyService.searchTracks(
+            let fetchedTracks = try await itunesService.searchTracks(
                 query: query,
                 limit: pageSize,
                 offset: offset
@@ -188,14 +188,14 @@ final class AddTabViewModel: ObservableObject {
     }
 
     private func resolveErrorMessage(from error: Error) -> String {
-        if let spotifyError = error as? SpotifyServiceError {
-            return spotifyError.errorDescription ?? "Spotify 검색에 실패했어요."
+        if let itunesError = error as? ITunesServiceError {
+            return itunesError.errorDescription ?? "음악 검색에 실패했어요."
         }
 
         if let localizedError = error as? LocalizedError {
-            return localizedError.errorDescription ?? "Spotify 검색에 실패했어요."
+            return localizedError.errorDescription ?? "음악 검색에 실패했어요."
         }
 
-        return "Spotify 검색에 실패했어요."
+        return "음악 검색에 실패했어요."
     }
 }
