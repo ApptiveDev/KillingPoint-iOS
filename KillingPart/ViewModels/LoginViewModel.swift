@@ -78,7 +78,9 @@ final class LoginViewModel: ObservableObject {
                 let applePayload = try await authService.loginWithApple()
                 let response = try await authenticationService.loginWithApple(
                     identityToken: applePayload.identityToken,
-                    authorizationCode: applePayload.authorizationCode
+                    authorizationCode: applePayload.authorizationCode,
+                    email: applePayload.email,
+                    name: applePayload.name
                 )
                 isNewUser = response.isNew
                 onLoginSuccess?(response.isNew)

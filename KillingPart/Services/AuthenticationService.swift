@@ -3,7 +3,7 @@ import Foundation
 protocol AuthenticationServicing {
     func login(email: String, password: String) async -> Bool
     func loginWithKakao(accessToken: String) async throws -> AuthLoginResponse
-    func loginWithApple(identityToken: String, authorizationCode: String) async throws -> AuthLoginResponse
+    func loginWithApple(identityToken: String, authorizationCode: String, email: String?, name: String?) async throws -> AuthLoginResponse
     func logout() async throws
     func deleteMyAccount() async throws
 }
@@ -84,7 +84,7 @@ struct AuthenticationService: AuthenticationServicing {
         return try await performSocialLogin(path: "/oauth2/kakao", requestBody: requestBody)
     }
 
-    func loginWithApple(identityToken: String, authorizationCode: String) async throws -> AuthLoginResponse {
+    func loginWithApple(identityToken: String, authorizationCode: String, email: String?, name: String?) async throws -> AuthLoginResponse {
         let trimmedIdentityToken = identityToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedIdentityToken.isEmpty else {
             throw AuthenticationServiceError.invalidAppleIdentityToken
@@ -95,14 +95,31 @@ struct AuthenticationService: AuthenticationServicing {
             throw AuthenticationServiceError.invalidAppleAuthorizationCode
         }
 
+        let trimmedEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = (trimmedEmail?.isEmpty == false) ? trimmedEmail : nil
+        let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedName = (trimmedName?.isEmpty == false) ? trimmedName : nil
+
+        if normalizedEmail == nil {
+            print("[Auth][Apple] email field is nil. Sending null.")
+        }
+        if normalizedName == nil {
+            print("[Auth][Apple] name field is nil. Sending null.")
+        }
+
         let requestBody: Data
         do {
             requestBody = try JSONEncoder().encode(
                 AppleLoginRequest(
                     identityToken: trimmedIdentityToken,
-                    authorizationCode: trimmedAuthorizationCode
+                    authorizationCode: trimmedAuthorizationCode,
+                    email: normalizedEmail,
+                    name: normalizedName
                 )
             )
+            if let bodyString = String(data: requestBody, encoding: .utf8) {
+                print("[Auth][Apple][RequestBody] \(bodyString)")
+            }
         } catch {
             throw AuthenticationServiceError.requestEncodingFailed
         }

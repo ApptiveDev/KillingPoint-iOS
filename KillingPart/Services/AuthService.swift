@@ -14,6 +14,8 @@ protocol AuthServicing {
 struct AppleAuthPayload {
     let identityToken: String
     let authorizationCode: String
+    let email: String?
+    let name: String?
 }
 
 enum AuthServiceError: LocalizedError {
@@ -77,7 +79,7 @@ final class AuthService: NSObject, AuthServicing {
         }
 
         let request = ASAuthorizationAppleIDProvider().createRequest()
-        request.requestedScopes = []
+        request.requestedScopes = [.email, .fullName]
 
         return try await withCheckedThrowingContinuation { continuation in
             appleLoginContinuation = continuation
@@ -192,11 +194,25 @@ extension AuthService: ASAuthorizationControllerDelegate, ASAuthorizationControl
             return
         }
 
+        let email = credential.email?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = email?.isEmpty == true ? nil : email
+        let name = normalizedAppleUserName(from: credential.fullName)
+
+        if normalizedEmail == nil {
+            print("[Auth][Apple] email is missing from credential. This can happen after first authorization.")
+        }
+        if name == nil {
+            print("[Auth][Apple] name is missing from credential. This can happen after first authorization.")
+        }
+
         completeAppleLogin(
             .success(
                 AppleAuthPayload(
                     identityToken: identityToken,
-                    authorizationCode: authorizationCode
+                    authorizationCode: authorizationCode,
+                    email: normalizedEmail,
+                    name: name
                 )
             )
         )
@@ -204,5 +220,23 @@ extension AuthService: ASAuthorizationControllerDelegate, ASAuthorizationControl
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         completeAppleLogin(.failure(AuthServiceError.appleAuthorizationFailed(underlying: error)))
+    }
+
+    private func normalizedAppleUserName(from fullName: PersonNameComponents?) -> String? {
+        guard let fullName else { return nil }
+
+        let formatter = PersonNameComponentsFormatter()
+        let formattedName = formatter.string(from: fullName)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !formattedName.isEmpty {
+            return formattedName
+        }
+
+        let manualName = [fullName.familyName, fullName.givenName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        return manualName.isEmpty ? nil : manualName
     }
 }
