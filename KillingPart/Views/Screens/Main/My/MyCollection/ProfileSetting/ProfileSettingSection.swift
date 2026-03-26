@@ -17,13 +17,18 @@ struct MyCollectionProfileSettingsSection: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let bottomContentPadding = resolvedBottomContentPadding(
+                safeAreaBottomInset: geometry.safeAreaInsets.bottom
+            )
+            let containerMinHeight = resolvedContainerMinHeight(
+                availableHeight: geometry.size.height,
+                bottomContentPadding: bottomContentPadding
+            )
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     MyCollectionProfileSettingPageContainerView(
-                        minHeight: max(
-                            geometry.size.height - (AppSpacing.l + bottomSafeAreaPadding),
-                            0
-                        )
+                        minHeight: containerMinHeight
                     ) {
                         MyCollectionProfileSettingsHeaderView(onBackTap: onBackTap)
                         profileEditorCard
@@ -46,10 +51,10 @@ struct MyCollectionProfileSettingsSection: View {
                             isProcessing: viewModel.isProcessing,
                             action: onAccountActionTap
                         )
+                        .padding(.bottom, AppSpacing.xs)
                     }
                 }
-                
-                .padding(.bottom, max(AppSpacing.l, bottomSafeAreaPadding))
+                .padding(.bottom, bottomContentPadding + keyboardBottomInset)
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
@@ -65,16 +70,12 @@ struct MyCollectionProfileSettingsSection: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) {
                 notification in
-                keyboardBottomInset = resolvedKeyboardInset(from: notification)
+                applyKeyboardInset(from: notification)
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                keyboardBottomInset = 0
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) {
+                notification in
+                applyKeyboardInset(from: notification)
             }
-            .safeAreaInset(edge: .bottom) {
-                Color.clear
-                    .frame(height: keyboardBottomInset)
-            }
-            .animation(.easeOut(duration: 0.2), value: keyboardBottomInset)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
@@ -257,30 +258,58 @@ struct MyCollectionProfileSettingsSection: View {
         tagValidationFeedback = .unavailable
     }
 
-    private var bottomSafeAreaPadding: CGFloat {
-        currentSafeAreaBottomInset() + AppSpacing.s
+    private func resolvedBottomContentPadding(safeAreaBottomInset: CGFloat) -> CGFloat {
+        let adaptiveInset = safeAreaBottomInset + AppSpacing.s
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return max(adaptiveInset, AppSpacing.l + AppSpacing.xl)
+        }
+        return max(AppSpacing.l, adaptiveInset)
+    }
+
+    private func resolvedContainerMinHeight(
+        availableHeight: CGFloat,
+        bottomContentPadding: CGFloat
+    ) -> CGFloat {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return 0
+        }
+
+        let reservedBottomSpace = AppSpacing.l + bottomContentPadding + keyboardBottomInset
+        return max(availableHeight - reservedBottomSpace, 0)
+    }
+
+    private func applyKeyboardInset(from notification: Notification) {
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double)
+            ?? 0.25
+        let inset = resolvedKeyboardInset(from: notification)
+
+        withAnimation(.easeOut(duration: duration)) {
+            keyboardBottomInset = inset
+        }
     }
 
     private func resolvedKeyboardInset(from notification: Notification) -> CGFloat {
         guard
-            let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+            let userInfo = notification.userInfo,
+            let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         else {
             return 0
         }
 
-        let screenHeight = UIScreen.main.bounds.height
-        let rawOverlap = max(0, screenHeight - frame.minY)
-        return max(rawOverlap - currentSafeAreaBottomInset(), 0)
-    }
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
 
-    private func currentSafeAreaBottomInset() -> CGFloat {
-        guard
-            let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-            let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow })
-        else {
-            return 0
+        if let keyWindow {
+            let endFrameInWindow = keyWindow.convert(endFrame, from: nil)
+            return max(
+                0,
+                keyWindow.bounds.maxY - endFrameInWindow.minY - keyWindow.safeAreaInsets.bottom
+            )
         }
-        return keyWindow.safeAreaInsets.bottom
+
+        return max(0, UIScreen.main.bounds.maxY - endFrame.minY)
     }
 }
 
