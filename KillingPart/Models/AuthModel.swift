@@ -41,3 +41,13 @@ struct AuthLoginResponse: Decodable {
     let refreshToken: String
     let isNew: Bool
 }
+
+extension AuthLoginResponse {
+    func withIsNew(_ isNew: Bool) -> AuthLoginResponse {
+        AuthLoginResponse(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            isNew: isNew
+        )
+    }
+}
