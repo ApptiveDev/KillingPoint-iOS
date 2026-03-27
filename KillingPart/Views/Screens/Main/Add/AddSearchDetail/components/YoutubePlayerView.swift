@@ -3,6 +3,8 @@ import UIKit
 import WebKit
 
 struct YoutubePlayerView: UIViewRepresentable {
+    @Environment(\.openURL) private var openURL
+
     let videoURL: URL?
     let startSeconds: Double
     let endSeconds: Double
@@ -32,16 +34,46 @@ struct YoutubePlayerView: UIViewRepresentable {
         webView.backgroundColor = .clear
         webView.isUserInteractionEnabled = true
         webView.allowsLinkPreview = false
+        webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
+
+        let redirectOverlayButton = UIButton(type: .custom)
+        redirectOverlayButton.translatesAutoresizingMaskIntoConstraints = false
+        redirectOverlayButton.backgroundColor = .clear
+        redirectOverlayButton.accessibilityLabel = "유튜브에서 열기"
+        redirectOverlayButton.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.handleVideoTap),
+            for: .touchUpInside
+        )
+        webView.addSubview(redirectOverlayButton)
+        NSLayoutConstraint.activate([
+            redirectOverlayButton.topAnchor.constraint(equalTo: webView.topAnchor),
+            redirectOverlayButton.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
+            redirectOverlayButton.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
+            redirectOverlayButton.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
+        ])
+
+        context.coordinator.openExternalURL = { targetURL in
+            openURL(targetURL)
+        }
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.openExternalURL = { targetURL in
+            openURL(targetURL)
+        }
+
         guard
             let videoURL,
             let videoID = extractVideoID(from: videoURL)
         else {
+            context.coordinator.redirectURL = nil
             return
         }
+
+        context.coordinator.redirectURL = makeWatchURL(videoID: videoID) ?? videoURL
 
         let targetStart = normalizedSeconds(startSeconds)
         let targetEnd = max(normalizedSeconds(endSeconds), targetStart + 0.1)
@@ -131,11 +163,53 @@ struct YoutubePlayerView: UIViewRepresentable {
         Coordinator()
     }
 
-    final class Coordinator {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var loadedVideoID: String?
         var lastSyncedStart: Double?
         var lastSyncedEnd: Double?
         var lastSyncedIsPlaying: Bool?
+        var redirectURL: URL?
+        var openExternalURL: ((URL) -> Void)?
+
+        @objc
+        func handleVideoTap() {
+            openRedirectURL()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            let isUserNavigation =
+                navigationAction.navigationType == .linkActivated
+                || navigationAction.navigationType == .formSubmitted
+                || navigationAction.navigationType == .formResubmitted
+                || navigationAction.targetFrame == nil
+
+            guard isUserNavigation else {
+                decisionHandler(.allow)
+                return
+            }
+
+            openRedirectURL()
+            decisionHandler(.cancel)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            openRedirectURL()
+            return nil
+        }
+
+        private func openRedirectURL() {
+            guard let redirectURL else { return }
+            openExternalURL?(redirectURL)
+        }
     }
 
     private var appRefererURL: URL? {
@@ -384,6 +458,31 @@ struct YoutubePlayerView: UIViewRepresentable {
             }
         }
 
+        if let shortsIndex = pathComponents.firstIndex(of: "shorts"),
+           pathComponents.indices.contains(shortsIndex + 1) {
+            let candidate = pathComponents[shortsIndex + 1]
+            if !candidate.isEmpty {
+                return candidate
+            }
+        }
+
+        if let liveIndex = pathComponents.firstIndex(of: "live"),
+           pathComponents.indices.contains(liveIndex + 1) {
+            let candidate = pathComponents[liveIndex + 1]
+            if !candidate.isEmpty {
+                return candidate
+            }
+        }
+
+        if
+            let host = URLComponents(url: url, resolvingAgainstBaseURL: false)?.host?.lowercased(),
+            host.contains("youtu.be"),
+            let firstPath = pathComponents.first,
+            !firstPath.isEmpty
+        {
+            return firstPath
+        }
+
         if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
            let v = components.queryItems?.first(where: { $0.name == "v" })?.value,
            !v.isEmpty {
@@ -426,5 +525,12 @@ struct YoutubePlayerView: UIViewRepresentable {
 
     private func jsNumber(_ value: Double) -> String {
         String(format: "%.3f", value)
+    }
+
+    private func makeWatchURL(videoID: String) -> URL? {
+        guard !videoID.isEmpty else { return nil }
+        var components = URLComponents(string: "https://www.youtube.com/watch")
+        components?.queryItems = [URLQueryItem(name: "v", value: videoID)]
+        return components?.url
     }
 }
