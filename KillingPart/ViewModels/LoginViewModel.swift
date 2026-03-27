@@ -5,6 +5,7 @@ final class LoginViewModel: ObservableObject {
     enum SocialLoginProvider {
         case kakao
         case apple
+        case tester
     }
 
     @Published var isLoading = false
@@ -86,6 +87,24 @@ final class LoginViewModel: ObservableObject {
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
+            } catch let socialError as AuthServiceError {
+                loginErrorMessage = socialError.errorDescription
+            } catch {
+                loginErrorMessage = "로그인 중 오류가 발생했어요. 다시 시도해 주세요."
+            }
+        }
+    }
+
+    func loginWithTester() {
+        guard startSocialLogin(for: .tester) else { return }
+
+        Task {
+            defer { finishSocialLogin() }
+
+            do {
+                _ = try await authService.loginWithTester()
+                isNewUser = true
+                onLoginSuccess?(true)
             } catch let socialError as AuthServiceError {
                 loginErrorMessage = socialError.errorDescription
             } catch {

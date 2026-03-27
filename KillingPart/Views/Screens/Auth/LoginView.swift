@@ -59,6 +59,35 @@ struct LoginView: View {
                                 action: viewModel.loginWithApple
                             )
                         }
+
+                        Button(action: viewModel.loginWithTester) {
+                            ZStack {
+                                Text("체험하기(Demo)")
+                                    .font(AppFont.paperlogy5Medium(size: 14))
+                                    .opacity(
+                                        viewModel.isLoading
+                                            && viewModel.activeSocialLoginProvider == .tester ? 0 : 1
+                                    )
+
+                                if viewModel.isLoading
+                                    && viewModel.activeSocialLoginProvider == .tester {
+                                    ProgressView()
+                                        .tint(.white)
+                                }
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, AppSpacing.l)
+                            .padding(.vertical, AppSpacing.s)
+                            .background(Color.white.opacity(0.16))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.28), lineWidth: 1)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isLoading)
+                        .accessibilityLabel("체험하기")
                     }
                     .padding(.horizontal, horizontalPadding)
                     .padding(.bottom, bottomPadding)
