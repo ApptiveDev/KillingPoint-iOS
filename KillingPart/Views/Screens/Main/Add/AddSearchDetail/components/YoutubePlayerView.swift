@@ -124,6 +124,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let shouldForceSeekJS = isRangeChanged ? "true" : "false"
         let playbackControlJS = isPlaying
             ? """
+            window.kpAutoplayAudioRestoreAttempted = false;
             if (window.kpApplyDesiredRange) {
                 window.kpApplyDesiredRange(\(shouldForceSeekJS));
                 if (window.kpScheduleAutoplayRetry) {
@@ -139,6 +140,11 @@ struct YoutubePlayerView: UIViewRepresentable {
             : """
             if (window.kpStopAutoplayRetry) {
                 window.kpStopAutoplayRetry();
+            }
+            window.kpAutoplayMutedFallbackActive = false;
+            window.kpAutoplayAudioRestoreAttempted = false;
+            if (window.kpPlayer.unMute) {
+                window.kpPlayer.unMute();
             }
             if (\(shouldForceSeekJS)) {
                 window.kpPlayer.seekTo(window.kpDesiredStart, true);
@@ -185,7 +191,6 @@ struct YoutubePlayerView: UIViewRepresentable {
                 navigationAction.navigationType == .linkActivated
                 || navigationAction.navigationType == .formSubmitted
                 || navigationAction.navigationType == .formResubmitted
-                || navigationAction.targetFrame == nil
 
             guard isUserNavigation else {
                 decisionHandler(.allow)
@@ -267,6 +272,9 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpAutoplayRetryCount = 0;
                 window.kpAutoplayMaxRetryCount = 14;
                 window.kpAutoplayRetryDelayMs = 220;
+                window.kpAutoplayMuteFallbackAfterCount = 3;
+                window.kpAutoplayMutedFallbackActive = false;
+                window.kpAutoplayAudioRestoreAttempted = false;
 
                 window.kpStopAutoplayRetry = function() {
                     if (window.kpAutoplayRetryTimer) {
@@ -308,6 +316,9 @@ struct YoutubePlayerView: UIViewRepresentable {
                         window.kpPlayer.seekTo(targetStart, true);
                     }
 
+                    if (window.kpAutoplayMutedFallbackActive && window.kpPlayer.mute) {
+                        window.kpPlayer.mute();
+                    }
                     window.kpPlayer.playVideo();
                 };
 
@@ -337,6 +348,13 @@ struct YoutubePlayerView: UIViewRepresentable {
                         }
 
                         window.kpAutoplayRetryCount += 1;
+                        if (
+                            !window.kpAutoplayMutedFallbackActive
+                            && window.kpAutoplayRetryCount >= window.kpAutoplayMuteFallbackAfterCount
+                        ) {
+                            window.kpAutoplayMutedFallbackActive = true;
+                            window.kpAutoplayAudioRestoreAttempted = false;
+                        }
                         window.kpScheduleAutoplayRetry(false);
                     }, window.kpAutoplayRetryDelayMs);
                 };
@@ -398,11 +416,16 @@ struct YoutubePlayerView: UIViewRepresentable {
                         events: {
                             onReady: function() {
                                 window.kpPlayerReady = true;
+                                window.kpAutoplayMutedFallbackActive = false;
+                                window.kpAutoplayAudioRestoreAttempted = false;
                                 if (window.kpShouldAutoplay) {
                                     window.kpApplyDesiredRange(true);
                                     window.kpStartRangeLoop();
                                     window.kpScheduleAutoplayRetry(true);
                                 } else {
+                                    if (window.kpPlayer.unMute) {
+                                        window.kpPlayer.unMute();
+                                    }
                                     window.kpPlayer.seekTo(window.kpDesiredStart, true);
                                     window.kpPlayer.pauseVideo();
                                 }
@@ -415,6 +438,38 @@ struct YoutubePlayerView: UIViewRepresentable {
 
                                 if (state === 1 || state === 3) {
                                     window.kpStopAutoplayRetry();
+                                    if (
+                                        window.kpAutoplayMutedFallbackActive
+                                        && !window.kpAutoplayAudioRestoreAttempted
+                                    ) {
+                                        window.kpAutoplayAudioRestoreAttempted = true;
+                                        setTimeout(function() {
+                                            if (
+                                                !window.kpShouldAutoplay
+                                                || !window.kpPlayer
+                                                || !window.kpPlayer.unMute
+                                            ) {
+                                                return;
+                                            }
+
+                                            window.kpPlayer.unMute();
+
+                                            var stateAfterUnmute = Number(
+                                                window.kpPlayer.getPlayerState
+                                                    ? window.kpPlayer.getPlayerState()
+                                                    : -1
+                                            );
+                                            if (stateAfterUnmute === 1 || stateAfterUnmute === 3) {
+                                                window.kpAutoplayMutedFallbackActive = false;
+                                                return;
+                                            }
+
+                                            if (window.kpPlayer.mute) {
+                                                window.kpPlayer.mute();
+                                            }
+                                            window.kpPlayer.playVideo();
+                                        }, 160);
+                                    }
                                     return;
                                 }
 
