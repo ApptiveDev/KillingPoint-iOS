@@ -62,14 +62,13 @@ struct MyTabView: View {
         Picker("마이 탭", selection: segmentedSelectionBinding) {
             ForEach(MyTopTab.allCases, id: \.self) { tab in
                 Text(tab.title)
-                    .font(AppFont.paperlogy6SemiBold(size: 16))
+                    .font(AppFont.paperlogy4Regular(size: 11))
                     .tag(tab)
             }
         }
         .pickerStyle(.segmented)
         .controlSize(.large)
         .scaleEffect(x: 1, y: 1.08, anchor: .center)
-        .padding(.vertical, AppSpacing.xs)
         .onAppear {
             configureSegmentedControlFontIfNeeded()
         }
@@ -108,8 +107,8 @@ struct MyTabView: View {
         guard !Self.hasConfiguredSegmentedControlAppearance else { return }
         Self.hasConfiguredSegmentedControlAppearance = true
 
-        let fallbackFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
-        let segmentFont = UIFont(name: "Paperlogy-6SemiBold", size: 15) ?? fallbackFont
+        let fallbackFont = UIFont.systemFont(ofSize: 13, weight: .regular)
+        let segmentFont = UIFont(name: "Paperlogy-4Regular", size: 13) ?? fallbackFont
 
         UISegmentedControl.appearance().setTitleTextAttributes(
             [.font: segmentFont],
