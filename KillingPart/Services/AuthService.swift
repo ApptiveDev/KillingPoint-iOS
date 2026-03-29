@@ -9,6 +9,9 @@ protocol AuthServicing {
 
     @MainActor
     func loginWithApple() async throws -> AppleAuthPayload
+
+    @MainActor
+    func loginWithTester() async throws -> AuthLoginResponse
 }
 
 struct AppleAuthPayload {
@@ -29,6 +32,7 @@ enum AuthServiceError: LocalizedError {
     case missingAppleAuthorizationCode
     case invalidAppleIdentityTokenEncoding
     case invalidAppleAuthorizationCodeEncoding
+    case testLoginFailed(underlying: Error)
 
     var errorDescription: String? {
         switch self {
@@ -50,6 +54,16 @@ enum AuthServiceError: LocalizedError {
             return "애플 authorization code를 가져오지 못했어요."
         case .invalidAppleIdentityTokenEncoding, .invalidAppleAuthorizationCodeEncoding:
             return "애플 로그인 인증값 인코딩에 실패했어요."
+        case .testLoginFailed(let underlying):
+            if
+                let apiError = underlying as? APIClientError,
+                case .serverError(_, let message) = apiError,
+                let message,
+                !message.isEmpty
+            {
+                return message
+            }
+            return "체험하기 로그인에 실패했어요. 다시 시도해 주세요."
         }
     }
 }
@@ -58,6 +72,17 @@ final class AuthService: NSObject, AuthServicing {
     private var appleLoginContinuation: CheckedContinuation<AppleAuthPayload, Error>?
     private var applePresentationAnchor: ASPresentationAnchor?
     private var appleAuthorizationController: ASAuthorizationController?
+    private let apiClient: APIClienting
+    private let tokenStore: TokenStoring
+
+    init(
+        apiClient: APIClienting = APIClient.shared,
+        tokenStore: TokenStoring = TokenStore.shared
+    ) {
+        self.apiClient = apiClient
+        self.tokenStore = tokenStore
+        super.init()
+    }
 
     func loginWithKakao() async throws -> String {
         let appKey = (Bundle.main.object(forInfoDictionaryKey: "KAKAO_NATIVE_APP_KEY") as? String ?? "")
@@ -90,6 +115,29 @@ final class AuthService: NSObject, AuthServicing {
             controller.presentationContextProvider = self
             appleAuthorizationController = controller
             controller.performRequests()
+        }
+    }
+
+    func loginWithTester() async throws -> AuthLoginResponse {
+        do {
+            let request = APIRequest(
+                path: "/oauth2/test",
+                method: .get,
+                requiresAuthorization: false
+            )
+            let response = try await apiClient.request(
+                request,
+                responseType: AuthLoginResponse.self
+            )
+            let normalizedResponse = response.withIsNew(true)
+
+            tokenStore.save(
+                accessToken: normalizedResponse.accessToken,
+                refreshToken: normalizedResponse.refreshToken
+            )
+            return normalizedResponse
+        } catch {
+            throw AuthServiceError.testLoginFailed(underlying: error)
         }
     }
 

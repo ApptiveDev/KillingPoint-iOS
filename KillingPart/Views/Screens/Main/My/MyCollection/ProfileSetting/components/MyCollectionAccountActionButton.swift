@@ -10,8 +10,12 @@ struct MyCollectionAccountActionButton: View {
                 .font(AppFont.paperlogy5Medium(size: 15))
                 .underline()
                 .foregroundStyle(.white.opacity(0.9))
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, AppSpacing.xs)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(isProcessing)
+        .opacity(isProcessing ? 0.45 : 1)
     }
 }
