@@ -41,6 +41,11 @@ struct SocialView: View {
             guard selectedTopTab == .friend else { return }
             await viewModel.loadInitialDataIfNeeded()
         }
+        .onChange(of: searchText) { query in
+            Task {
+                await viewModel.searchUsers(with: query)
+            }
+        }
     }
 
     private var topToggleTabs: some View {
@@ -59,7 +64,11 @@ struct SocialView: View {
     private var friendSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.m) {
             searchBar
-            friendToggleTabs
+            if viewModel.isSearching {
+                searchedResultHeader
+            } else {
+                friendToggleTabs
+            }
             friendList
         }
     }
@@ -94,6 +103,12 @@ struct SocialView: View {
         }
     }
 
+    private var searchedResultHeader: some View {
+        Text("검색 결과 \(viewModel.searchedUserTotalCount.formatted())명")
+            .font(AppFont.paperlogy4Regular(size: 12))
+            .foregroundStyle(Color.white.opacity(0.8))
+    }
+
     private var friendToggleTabs: some View {
         HStack(spacing: AppSpacing.s) {
             ForEach(SocialFriendSection.allCases, id: \.self) { section in
@@ -113,23 +128,23 @@ struct SocialView: View {
                     }
                     .padding(.vertical, AppSpacing.xs)
                     .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(
-                                    selectedFriendSection == section
-                                        ? AppColors.primary600.opacity(0.2)
-                                        : Color.white.opacity(0.06)
-                                )
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(
-                                    selectedFriendSection == section
-                                        ? AppColors.primary600.opacity(0.8)
-                                        : Color.white.opacity(0.2),
-                                    lineWidth: 1
-                                )
-                        }
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(
+                                selectedFriendSection == section
+                                    ? AppColors.primary600.opacity(0.2)
+                                    : Color.white.opacity(0.06)
+                            )
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(
+                                selectedFriendSection == section
+                                    ? AppColors.primary600.opacity(0.8)
+                                    : Color.white.opacity(0.2),
+                                lineWidth: 1
+                            )
+                    }
                 }
                 .buttonStyle(.plain)
                 .opacity(selectedFriendSection == section ? 1 : 0.45)
@@ -154,7 +169,7 @@ struct SocialView: View {
 
                         Button("다시 시도") {
                             Task {
-                                await viewModel.refresh()
+                                await viewModel.refreshCurrentList()
                             }
                         }
                         .font(AppFont.paperlogy5Medium(size: 13))
@@ -162,7 +177,7 @@ struct SocialView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, AppSpacing.xl)
-                } else if filteredFriends.isEmpty {
+                } else if currentSectionUsers.isEmpty {
                     Text("표시할 친구가 없어요.")
                         .font(AppFont.paperlogy4Regular(size: 13))
                         .foregroundStyle(Color.white.opacity(0.7))
@@ -170,13 +185,24 @@ struct SocialView: View {
                         .padding(.top, AppSpacing.xl)
                 } else {
                     LazyVStack(spacing: AppSpacing.s) {
-                        ForEach(filteredFriends) { friend in
-                            friendRow(friend)
-                                .onAppear {
-                                    Task {
-                                        await loadMoreIfNeeded(currentUserId: friend.userId)
-                                    }
+                        ForEach(currentSectionUsers) { user in
+                            NavigationLink {
+                                SocialMyCollectionView(
+                                    viewModel: viewModel.makeSocialMyCollectionViewModel(for: user)
+                                )
+                                .id(user.userId)
+                            } label: {
+                                friendRow(user)
+                            }
+                            .buttonStyle(.plain)
+                            .onAppear {
+                                Task {
+                                    await viewModel.loadMoreCurrentSectionIfNeeded(
+                                        currentUserId: user.userId,
+                                        isMyPickSection: selectedFriendSection == .myPick
+                                    )
                                 }
+                            }
                         }
                     }
                     .padding(.top, AppSpacing.xs)
@@ -192,13 +218,13 @@ struct SocialView: View {
             .padding(.bottom, AppSpacing.l)
         }
         .refreshable {
-            await viewModel.refresh()
+            await viewModel.refreshCurrentList()
         }
     }
 
-    private func friendRow(_ friend: SubscribeUserModel) -> some View {
+    private func friendRow(_ user: SocialListUser) -> some View {
         HStack(spacing: AppSpacing.s) {
-            if let profileImageURL = friend.profileImageURL {
+            if let profileImageURL = user.profileImageURL {
                 AsyncImage(url: profileImageURL) { phase in
                     switch phase {
                     case .success(let image):
@@ -219,11 +245,11 @@ struct SocialView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(friend.displayName)
+                Text(user.displayName)
                     .font(AppFont.paperlogy5Medium(size: 14))
                     .foregroundStyle(.white)
 
-                Text(friend.displayTag)
+                Text(user.displayTag)
                     .font(AppFont.paperlogy4Regular(size: 12))
                     .foregroundStyle(Color.white.opacity(0.7))
             }
@@ -248,47 +274,20 @@ struct SocialView: View {
             }
     }
 
-    private var currentSectionUsers: [SubscribeUserModel] {
-        selectedFriendSection == .myPick ? viewModel.myPickUsers : viewModel.myFandomUsers
+    private var currentSectionUsers: [SocialListUser] {
+        viewModel.users(for: selectedFriendSection == .myPick)
     }
 
     private var isCurrentSectionLoading: Bool {
-        selectedFriendSection == .myPick ? viewModel.isLoadingMyPick : viewModel.isLoadingMyFandom
+        viewModel.isLoading(for: selectedFriendSection == .myPick)
     }
 
     private var isCurrentSectionLoadingMore: Bool {
-        selectedFriendSection == .myPick ? viewModel.isLoadingMoreMyPick : viewModel.isLoadingMoreMyFandom
-    }
-
-    private var filteredFriends: [SubscribeUserModel] {
-        let source = currentSectionUsers
-        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedQuery.isEmpty else { return source }
-        return source.filter {
-            $0.displayName.localizedCaseInsensitiveContains(trimmedQuery) ||
-            $0.displayTag.localizedCaseInsensitiveContains(trimmedQuery)
-        }
-    }
-
-    private func loadMoreIfNeeded(currentUserId: Int) async {
-        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-
-        switch selectedFriendSection {
-        case .myPick:
-            await viewModel.loadMoreMyPickIfNeeded(currentUserId: currentUserId)
-        case .myFandom:
-            await viewModel.loadMoreMyFandomIfNeeded(currentUserId: currentUserId)
-        }
+        viewModel.isLoadingMore(for: selectedFriendSection == .myPick)
     }
 
     private func totalCountText(for section: SocialFriendSection) -> String {
-        switch section {
-        case .myPick:
-            return viewModel.myPickTotalCount.formatted()
-        case .myFandom:
-            return viewModel.myFandomTotalCount.formatted()
-        }
+        viewModel.totalCount(for: section == .myPick).formatted()
     }
 
     private var feedPlaceholder: some View {

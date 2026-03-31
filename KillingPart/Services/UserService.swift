@@ -3,6 +3,7 @@ import Foundation
 protocol UserServicing {
     func fetchMyUser() async throws -> UserModel
     func fetchUserStatics(userId: Int) async throws -> UserStaticsModel
+    func searchUsers(searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse
     func deleteMyProfileImage() async throws -> UserModel
     func issuePresignedURL() async throws -> PresignedURLResponse
     func uploadImageToPresignedURL(imageData: Data, presignedURL: URL) async throws
@@ -40,6 +41,9 @@ enum UserServiceError: LocalizedError {
 }
 
 struct UserService: UserServicing {
+    static let defaultPage = 0
+    static let defaultSize = 5
+
     private let apiClient: APIClienting
     private let session: URLSession
 
@@ -59,7 +63,8 @@ struct UserService: UserServicing {
                 requiresAuthorization: true
             )
 
-            return try await apiClient.request(request, responseType: UserModel.self)
+            let response = try await apiClient.request(request, responseType: UserResponseDTO.self)
+            return response.toModel()
         } catch {
             throw mapError(error)
         }
@@ -79,6 +84,39 @@ struct UserService: UserServicing {
         }
     }
 
+    func searchUsers(
+        searchCond: String? = nil,
+        page: Int = Self.defaultPage,
+        size: Int = Self.defaultSize
+    ) async throws -> UserSearchResponse {
+        let resolvedPage = max(page, Self.defaultPage)
+        let resolvedSize = size > 0 ? size : Self.defaultSize
+        let trimmedSearchCond = searchCond?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        var queryItems = [
+            URLQueryItem(name: "page", value: String(resolvedPage)),
+            URLQueryItem(name: "size", value: String(resolvedSize))
+        ]
+
+        if !trimmedSearchCond.isEmpty {
+            queryItems.insert(URLQueryItem(name: "searchCond", value: trimmedSearchCond), at: 0)
+        }
+
+        do {
+            let request = APIRequest(
+                path: "/users",
+                method: .get,
+                queryItems: queryItems,
+                requiresAuthorization: true
+            )
+            let response = try await apiClient.request(request, responseType: UserSearchResponseDTO.self)
+            return response.toModel()
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
     func deleteMyProfileImage() async throws -> UserModel {
         do {
             let request = APIRequest(
@@ -86,7 +124,8 @@ struct UserService: UserServicing {
                 method: .delete,
                 requiresAuthorization: true
             )
-            return try await apiClient.request(request, responseType: UserModel.self)
+            let response = try await apiClient.request(request, responseType: UserResponseDTO.self)
+            return response.toModel()
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)
@@ -149,7 +188,8 @@ struct UserService: UserServicing {
             )
             apiRequest.headers["Accept"] = "application/json"
             apiRequest.headers["Content-Type"] = "application/json"
-            return try await apiClient.request(apiRequest, responseType: UserModel.self)
+            let response = try await apiClient.request(apiRequest, responseType: UserResponseDTO.self)
+            return response.toModel()
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)
@@ -173,7 +213,8 @@ struct UserService: UserServicing {
             )
             apiRequest.headers["Accept"] = "application/json"
             apiRequest.headers["Content-Type"] = "application/json"
-            return try await apiClient.request(apiRequest, responseType: UserModel.self)
+            let response = try await apiClient.request(apiRequest, responseType: UserResponseDTO.self)
+            return response.toModel()
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

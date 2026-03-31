@@ -71,6 +71,57 @@ struct MyDiaryFeedsResponse: Decodable {
     let page: DiaryFeedPageModel
 }
 
+struct UserDiaryFeedModel: Decodable, Identifiable {
+    let diaryId: Int
+    let artist: String
+    let musicTitle: String
+    let albumImageUrl: String
+    let content: String
+    let videoUrl: String
+    let scope: DiaryScope
+    let duration: String
+    let totalDuration: String
+    let start: String
+    let end: String
+    let createDate: String
+    let updateDate: String
+    let isLiked: Bool
+    let isStored: Bool
+    let likeCount: Int
+
+    var id: Int { diaryId }
+
+    func toDiaryFeedModel(user: UserModel) -> DiaryFeedModel {
+        DiaryFeedModel(
+            diaryId: diaryId,
+            artist: artist,
+            musicTitle: musicTitle,
+            albumImageUrl: albumImageUrl,
+            content: content,
+            videoUrl: videoUrl,
+            scope: scope,
+            duration: duration,
+            totalDuration: totalDuration,
+            start: start,
+            end: end,
+            createDate: createDate,
+            updateDate: updateDate,
+            isLiked: isLiked,
+            isStored: isStored,
+            likeCount: likeCount,
+            userId: user.userId,
+            username: user.username,
+            tag: user.tag,
+            profileImageUrl: user.profileImageUrl
+        )
+    }
+}
+
+struct UserDiaryFeedsResponse: Decodable {
+    let content: [UserDiaryFeedModel]
+    let page: DiaryFeedPageModel
+}
+
 struct DiaryCreateRequest: Encodable {
     let artist: String
     let musicTitle: String

@@ -2,6 +2,7 @@ import Foundation
 
 protocol DiaryServicing {
     func fetchMyFeeds(page: Int, size: Int) async throws -> MyDiaryFeedsResponse
+    func fetchUserFeeds(userId: Int, page: Int, size: Int) async throws -> UserDiaryFeedsResponse
     func createDiary(request: DiaryCreateRequest) async throws -> DiaryCreateResult
     func updateDiary(diaryId: Int, request: DiaryUpdateRequest) async throws
     func deleteDiary(diaryId: Int) async throws
@@ -63,6 +64,32 @@ struct DiaryService: DiaryServicing {
             )
 
             return try await apiClient.request(request, responseType: MyDiaryFeedsResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func fetchUserFeeds(
+        userId: Int,
+        page: Int = Self.defaultPage,
+        size: Int = Self.defaultSize
+    ) async throws -> UserDiaryFeedsResponse {
+        let resolvedPage = max(page, Self.defaultPage)
+        let resolvedSize = size > 0 ? size : Self.defaultSize
+
+        do {
+            let request = APIRequest(
+                path: "/diaries/user/\(userId)",
+                method: .get,
+                queryItems: [
+                    URLQueryItem(name: "page", value: String(resolvedPage)),
+                    URLQueryItem(name: "size", value: String(resolvedSize))
+                ],
+                requiresAuthorization: true
+            )
+
+            return try await apiClient.request(request, responseType: UserDiaryFeedsResponse.self)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)
