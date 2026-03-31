@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SocialView: View {
+    @StateObject private var viewModel = SocialViewModel()
     @State private var selectedTopTab: SocialTopTab = .friend
     @State private var selectedFriendSection: SocialFriendSection = .myPick
     @State private var searchText = ""
@@ -35,6 +36,9 @@ struct SocialView: View {
                 .toolbar(.hidden, for: .navigationBar)
                 .padding(.bottom, bottomInset)
             }
+        }
+        .task {
+            await viewModel.loadInitialDataIfNeeded()
         }
     }
 
@@ -128,32 +132,79 @@ struct SocialView: View {
 
     private var friendList: some View {
         ScrollView {
-            LazyVStack(spacing: AppSpacing.s) {
-                ForEach(filteredFriends, id: \.id) { friend in
-                    friendRow(friend)
+            VStack(spacing: AppSpacing.s) {
+                if isCurrentSectionLoading {
+                    ProgressView()
+                        .tint(AppColors.primary600)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, AppSpacing.xl)
+                } else if let errorMessage = viewModel.errorMessage, currentSectionUsers.isEmpty {
+                    VStack(spacing: AppSpacing.s) {
+                        Text(errorMessage)
+                            .font(AppFont.paperlogy4Regular(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+
+                        Button("다시 시도") {
+                            Task {
+                                await viewModel.refresh()
+                            }
+                        }
+                        .font(AppFont.paperlogy5Medium(size: 13))
+                        .foregroundStyle(AppColors.primary600)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, AppSpacing.xl)
+                } else if filteredFriends.isEmpty {
+                    Text("표시할 친구가 없어요.")
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, AppSpacing.xl)
+                } else {
+                    LazyVStack(spacing: AppSpacing.s) {
+                        ForEach(filteredFriends) { friend in
+                            friendRow(friend)
+                        }
+                    }
+                    .padding(.top, AppSpacing.xs)
                 }
             }
-            .padding(.top, AppSpacing.xs)
             .padding(.bottom, AppSpacing.l)
+        }
+        .refreshable {
+            await viewModel.refresh()
         }
     }
 
-    private func friendRow(_ friend: SocialFriendItem) -> some View {
+    private func friendRow(_ friend: SubscribeUserModel) -> some View {
         HStack(spacing: AppSpacing.s) {
-            Circle()
-                .fill(Color.white.opacity(0.16))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .foregroundStyle(Color.white.opacity(0.7))
+            if let profileImageURL = friend.profileImageURL {
+                AsyncImage(url: profileImageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .empty, .failure:
+                        profilePlaceholder
+                    @unknown default:
+                        profilePlaceholder
+                    }
                 }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+            } else {
+                profilePlaceholder
+                    .frame(width: 40, height: 40)
+            }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(friend.name)
+                Text(friend.displayName)
                     .font(AppFont.paperlogy5Medium(size: 14))
                     .foregroundStyle(.white)
 
-                Text(friend.subtitle)
+                Text(friend.displayTag)
                     .font(AppFont.paperlogy4Regular(size: 12))
                     .foregroundStyle(Color.white.opacity(0.7))
             }
@@ -169,14 +220,31 @@ struct SocialView: View {
         }
     }
 
-    private var filteredFriends: [SocialFriendItem] {
-        let source = selectedFriendSection == .myPick ? SocialFriendItem.myPickSample : SocialFriendItem.myFandomSample
+    private var profilePlaceholder: some View {
+        Circle()
+            .fill(Color.white.opacity(0.16))
+            .overlay {
+                Image(systemName: "person.fill")
+                    .foregroundStyle(Color.white.opacity(0.7))
+            }
+    }
+
+    private var currentSectionUsers: [SubscribeUserModel] {
+        selectedFriendSection == .myPick ? viewModel.myPickUsers : viewModel.myFandomUsers
+    }
+
+    private var isCurrentSectionLoading: Bool {
+        selectedFriendSection == .myPick ? viewModel.isLoadingMyPick : viewModel.isLoadingMyFandom
+    }
+
+    private var filteredFriends: [SubscribeUserModel] {
+        let source = currentSectionUsers
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedQuery.isEmpty else { return source }
         return source.filter {
-            $0.name.localizedCaseInsensitiveContains(trimmedQuery) ||
-            $0.subtitle.localizedCaseInsensitiveContains(trimmedQuery)
+            $0.displayName.localizedCaseInsensitiveContains(trimmedQuery) ||
+            $0.displayTag.localizedCaseInsensitiveContains(trimmedQuery)
         }
     }
 
@@ -220,24 +288,6 @@ private enum SocialFriendSection: CaseIterable {
             return "나의 팬덤"
         }
     }
-}
-
-private struct SocialFriendItem {
-    let id: UUID = UUID()
-    let name: String
-    let subtitle: String
-
-    static let myPickSample: [SocialFriendItem] = [
-        .init(name: "@min_ji", subtitle: "재생목록 취향이 비슷한 친구"),
-        .init(name: "@jun_note", subtitle: "최근 픽을 함께 저장했어요"),
-        .init(name: "@yuna_daily", subtitle: "댓글로 자주 소통해요")
-    ]
-
-    static let myFandomSample: [SocialFriendItem] = [
-        .init(name: "@starlight", subtitle: "같은 아티스트 팬덤"),
-        .init(name: "@hypewave", subtitle: "팬덤 활동 점수 상위권"),
-        .init(name: "@moonvibe", subtitle: "팬덤 피드 업데이트 활발")
-    ]
 }
 
 #Preview {
