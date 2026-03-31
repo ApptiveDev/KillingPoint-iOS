@@ -37,7 +37,8 @@ struct SocialView: View {
                 .padding(.bottom, bottomInset)
             }
         }
-        .task {
+        .task(id: selectedTopTab) {
+            guard selectedTopTab == .friend else { return }
             await viewModel.loadInitialDataIfNeeded()
         }
     }
@@ -101,11 +102,17 @@ struct SocialView: View {
                         selectedFriendSection = section
                     }
                 } label: {
-                    Text(section.title)
-                        .font(AppFont.paperlogy5Medium(size: 13))
-                        .foregroundStyle(.white)
-                        .padding(.vertical, AppSpacing.xs)
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 6) {
+                        Text(section.title)
+                            .font(AppFont.paperlogy5Medium(size: 13))
+                            .foregroundStyle(.white)
+
+                        Text("\(totalCountText(for: section))")
+                            .font(AppFont.paperlogy4Regular(size: 12))
+                            .foregroundStyle(Color.white.opacity(0.8))
+                    }
+                    .padding(.vertical, AppSpacing.xs)
+                    .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(
@@ -165,9 +172,21 @@ struct SocialView: View {
                     LazyVStack(spacing: AppSpacing.s) {
                         ForEach(filteredFriends) { friend in
                             friendRow(friend)
+                                .onAppear {
+                                    Task {
+                                        await loadMoreIfNeeded(currentUserId: friend.userId)
+                                    }
+                                }
                         }
                     }
                     .padding(.top, AppSpacing.xs)
+
+                    if isCurrentSectionLoadingMore {
+                        ProgressView()
+                            .tint(AppColors.primary600)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, AppSpacing.s)
+                    }
                 }
             }
             .padding(.bottom, AppSpacing.l)
@@ -237,6 +256,10 @@ struct SocialView: View {
         selectedFriendSection == .myPick ? viewModel.isLoadingMyPick : viewModel.isLoadingMyFandom
     }
 
+    private var isCurrentSectionLoadingMore: Bool {
+        selectedFriendSection == .myPick ? viewModel.isLoadingMoreMyPick : viewModel.isLoadingMoreMyFandom
+    }
+
     private var filteredFriends: [SubscribeUserModel] {
         let source = currentSectionUsers
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -245,6 +268,26 @@ struct SocialView: View {
         return source.filter {
             $0.displayName.localizedCaseInsensitiveContains(trimmedQuery) ||
             $0.displayTag.localizedCaseInsensitiveContains(trimmedQuery)
+        }
+    }
+
+    private func loadMoreIfNeeded(currentUserId: Int) async {
+        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        switch selectedFriendSection {
+        case .myPick:
+            await viewModel.loadMoreMyPickIfNeeded(currentUserId: currentUserId)
+        case .myFandom:
+            await viewModel.loadMoreMyFandomIfNeeded(currentUserId: currentUserId)
+        }
+    }
+
+    private func totalCountText(for section: SocialFriendSection) -> String {
+        switch section {
+        case .myPick:
+            return viewModel.myPickTotalCount.formatted()
+        case .myFandom:
+            return viewModel.myFandomTotalCount.formatted()
         }
     }
 
