@@ -89,7 +89,8 @@ struct SocialMyCollectionView: View {
             profileImageURL: viewModel.profileImageURL,
             killingPartStatText: viewModel.killingPartStatText,
             fanStatText: viewModel.fanStatText,
-            pickStatText: viewModel.pickStatText
+            pickStatText: viewModel.pickStatText,
+            isMyPick: viewModel.isMyPick
         )
     }
 

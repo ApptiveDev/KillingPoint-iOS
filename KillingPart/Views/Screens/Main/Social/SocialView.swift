@@ -188,7 +188,12 @@ struct SocialView: View {
                         ForEach(currentSectionUsers) { user in
                             NavigationLink {
                                 SocialMyCollectionView(
-                                    viewModel: viewModel.makeSocialMyCollectionViewModel(for: user)
+                                    viewModel: viewModel.makeSocialMyCollectionViewModel(
+                                        for: user,
+                                        isMyPickSection: selectedFriendSection == .myPick
+                                            ? true
+                                            : (selectedFriendSection == .myFandom ? false : nil)
+                                    )
                                 )
                                 .id(user.userId)
                             } label: {

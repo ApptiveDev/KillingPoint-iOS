@@ -7,6 +7,7 @@ struct SocialMyCollectionProfileCard: View {
     let killingPartStatText: String
     let fanStatText: String
     let pickStatText: String
+    let isMyPick: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
@@ -39,7 +40,7 @@ struct SocialMyCollectionProfileCard: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    SocialMyCollectionPickToggleButton()
+                    SocialMyCollectionPickToggleButton(isMyPick: isMyPick)
                 }
             }
         }

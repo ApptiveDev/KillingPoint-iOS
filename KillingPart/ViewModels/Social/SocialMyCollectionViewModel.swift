@@ -58,6 +58,10 @@ final class SocialMyCollectionViewModel: ObservableObject {
         "\(userStatics?.pickCount ?? 0)"
     }
 
+    var isMyPick: Bool {
+        user.isMyPick == true
+    }
+
     func loadInitialDataIfNeeded() async {
         guard !hasLoadedInitialData else { return }
         await refresh()

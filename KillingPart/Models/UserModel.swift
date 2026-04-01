@@ -30,7 +30,7 @@ struct UserModel: Identifiable {
         self.isMyPick = isMyPick
     }
 
-    init(from subscribeUser: SubscribeUserModel) {
+    init(from subscribeUser: SubscribeUserModel, isMyPick: Bool? = nil) {
         self.init(
             userId: subscribeUser.userId,
             username: subscribeUser.username,
@@ -39,7 +39,7 @@ struct UserModel: Identifiable {
             profileImageUrl: subscribeUser.profileImageUrl,
             userRoleType: subscribeUser.userRoleType,
             socialType: subscribeUser.socialType,
-            isMyPick: nil
+            isMyPick: isMyPick
         )
     }
 
