@@ -22,10 +22,20 @@ struct SocialMyCollectionView: View {
                 } else {
                     LazyVGrid(columns: feedGridColumns, spacing: AppSpacing.s) {
                         ForEach(viewModel.feeds) { feed in
-                            SocialMyCollectionFeedCard(
-                                feed: feed,
-                                formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
-                            )
+                            NavigationLink {
+                                let diary = viewModel.feeds.first(where: { $0.diaryId == feed.diaryId }) ?? feed
+                                SocialMyCollectionDiary(
+                                    diaryId: feed.diaryId,
+                                    displayTag: viewModel.displayTag,
+                                    diary: diary
+                                )
+                            } label: {
+                                SocialMyCollectionFeedCard(
+                                    feed: feed,
+                                    formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
+                                )
+                            }
+                            .buttonStyle(.plain)
                             .onAppear {
                                 guard feed.id == viewModel.feeds.last?.id else { return }
                                 Task {
@@ -55,7 +65,7 @@ struct SocialMyCollectionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
-        .navigationTitle(viewModel.displayName)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadInitialDataIfNeeded()
