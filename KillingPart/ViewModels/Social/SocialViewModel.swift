@@ -187,6 +187,11 @@ final class SocialViewModel: ObservableObject {
         } else {
             try await subscribeService.subscribe(to: userId)
         }
+        await forceRefetchDefaultLists()
+    }
+
+    private func forceRefetchDefaultLists() async {
+        hasLoadedInitialData = false
         await refreshDefaultLists()
     }
 
