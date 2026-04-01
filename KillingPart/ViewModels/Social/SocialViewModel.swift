@@ -174,8 +174,20 @@ final class SocialViewModel: ObservableObject {
         return SocialMyCollectionViewModel(
             initialUser: resolvedUser,
             userService: userService,
-            diaryService: diaryService
+            diaryService: diaryService,
+            onToggleMyPick: { [self] userId, isCurrentlyMyPick in
+                try await toggleMyPick(for: userId, isCurrentlyMyPick: isCurrentlyMyPick)
+            }
         )
+    }
+
+    func toggleMyPick(for userId: Int, isCurrentlyMyPick: Bool) async throws {
+        if isCurrentlyMyPick {
+            try await subscribeService.unsubscribe(from: userId)
+        } else {
+            try await subscribeService.subscribe(to: userId)
+        }
+        await refreshDefaultLists()
     }
 
     private func loadMoreMyPickIfNeeded(currentUserId: Int) async {

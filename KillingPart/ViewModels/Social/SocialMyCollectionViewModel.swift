@@ -11,6 +11,7 @@ final class SocialMyCollectionViewModel: ObservableObject {
 
     private let userService: UserServicing
     private let diaryService: DiaryServicing
+    private let onToggleMyPick: (_ userId: Int, _ isCurrentlyMyPick: Bool) async throws -> Void
 
     private var hasLoadedInitialData = false
     private var nextFeedPage: Int
@@ -23,7 +24,8 @@ final class SocialMyCollectionViewModel: ObservableObject {
         initialNextFeedPage: Int = DiaryService.defaultPage,
         initialHasNextFeedPage: Bool = true,
         userService: UserServicing = UserService(),
-        diaryService: DiaryServicing = DiaryService()
+        diaryService: DiaryServicing = DiaryService(),
+        onToggleMyPick: @escaping (_ userId: Int, _ isCurrentlyMyPick: Bool) async throws -> Void = { _, _ in }
     ) {
         user = initialUser
         userStatics = initialUserStatics
@@ -32,6 +34,7 @@ final class SocialMyCollectionViewModel: ObservableObject {
         hasNextFeedPage = initialHasNextFeedPage
         self.userService = userService
         self.diaryService = diaryService
+        self.onToggleMyPick = onToggleMyPick
     }
 
     var displayName: String {
@@ -85,6 +88,30 @@ final class SocialMyCollectionViewModel: ObservableObject {
             feeds = feedResponse.content.map { $0.toDiaryFeedModel(user: user) }
             updateFeedPaging(from: feedResponse)
             hasLoadedInitialData = true
+        } catch {
+            if isRequestCancelled(error) { return }
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func toggleMyPick() async {
+        guard !isLoadingInitial else { return }
+        errorMessage = nil
+
+        do {
+            let previousIsMyPick = isMyPick
+            try await onToggleMyPick(user.userId, previousIsMyPick)
+            user = UserModel(
+                userId: user.userId,
+                username: user.username,
+                tag: user.tag,
+                identifier: user.identifier,
+                profileImageUrl: user.profileImageUrl,
+                userRoleType: user.userRoleType,
+                socialType: user.socialType,
+                isMyPick: !previousIsMyPick
+            )
+            await refresh()
         } catch {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)

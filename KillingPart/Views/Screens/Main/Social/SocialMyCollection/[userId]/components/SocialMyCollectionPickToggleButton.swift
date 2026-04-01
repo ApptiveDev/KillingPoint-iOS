@@ -2,9 +2,10 @@ import SwiftUI
 
 struct SocialMyCollectionPickToggleButton: View {
     let isMyPick: Bool
+    let onTap: () -> Void
 
     var body: some View {
-        Button(action: {}) {
+        Button(action: onTap) {
             HStack(alignment: .center, spacing: 6) {
                 Text(isMyPick ? "나의 PICK!" : "나의 픽으로 추가")
                     .font(AppFont.paperlogy5Medium(size: 14))

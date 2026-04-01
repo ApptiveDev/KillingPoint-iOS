@@ -113,9 +113,7 @@ struct SocialView: View {
         HStack(spacing: AppSpacing.s) {
             ForEach(SocialFriendSection.allCases, id: \.self) { section in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedFriendSection = section
-                    }
+                    selectedFriendSection = section
                 } label: {
                     HStack(spacing: 6) {
                         Text(section.title)
@@ -221,9 +219,6 @@ struct SocialView: View {
                 }
             }
             .padding(.bottom, AppSpacing.l)
-        }
-        .refreshable {
-            await viewModel.refreshCurrentList()
         }
     }
 

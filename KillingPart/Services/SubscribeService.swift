@@ -3,6 +3,8 @@ import Foundation
 protocol SubscribeServicing {
     func fetchSubscribers(userId: Int, page: Int, size: Int) async throws -> SubscribeListResponse
     func fetchSubscribes(userId: Int, page: Int, size: Int) async throws -> SubscribeListResponse
+    func subscribe(to subscribeToUserId: Int) async throws
+    func unsubscribe(from subscribeToUserId: Int) async throws
 }
 
 enum SubscribeServiceError: LocalizedError {
@@ -84,6 +86,34 @@ struct SubscribeService: SubscribeServicing {
             )
 
             return try await apiClient.request(request, responseType: SubscribeListResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func subscribe(to subscribeToUserId: Int) async throws {
+        do {
+            let request = APIRequest(
+                path: "/subscribes/\(subscribeToUserId)",
+                method: .post,
+                requiresAuthorization: true
+            )
+            try await apiClient.request(request)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func unsubscribe(from subscribeToUserId: Int) async throws {
+        do {
+            let request = APIRequest(
+                path: "/subscribes/\(subscribeToUserId)",
+                method: .delete,
+                requiresAuthorization: true
+            )
+            try await apiClient.request(request)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

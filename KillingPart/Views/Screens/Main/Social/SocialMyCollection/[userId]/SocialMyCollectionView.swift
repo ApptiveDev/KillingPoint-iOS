@@ -70,9 +70,6 @@ struct SocialMyCollectionView: View {
         .task {
             await viewModel.loadInitialDataIfNeeded()
         }
-        .refreshable {
-            await viewModel.refresh()
-        }
     }
 
     private var feedGridColumns: [GridItem] {
@@ -90,7 +87,12 @@ struct SocialMyCollectionView: View {
             killingPartStatText: viewModel.killingPartStatText,
             fanStatText: viewModel.fanStatText,
             pickStatText: viewModel.pickStatText,
-            isMyPick: viewModel.isMyPick
+            isMyPick: viewModel.isMyPick,
+            onPickToggleTap: {
+                Task {
+                    await viewModel.toggleMyPick()
+                }
+            }
         )
     }
 
