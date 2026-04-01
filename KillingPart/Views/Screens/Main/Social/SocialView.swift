@@ -190,7 +190,7 @@ struct SocialView: View {
                                 SocialMyCollectionView(
                                     viewModel: viewModel.makeSocialMyCollectionViewModel(
                                         for: user,
-                                        isMyPickSection: selectedFriendSection == .myPick
+                                        fallbackIsMyPick: selectedFriendSection == .myPick
                                             ? true
                                             : (selectedFriendSection == .myFandom ? false : nil)
                                     )

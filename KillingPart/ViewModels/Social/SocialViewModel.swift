@@ -162,11 +162,11 @@ final class SocialViewModel: ObservableObject {
         return isMyPickSection ? myPickTotalCount : myFandomTotalCount
     }
 
-    func makeSocialMyCollectionViewModel(for user: SocialListUser, isMyPickSection: Bool?) -> SocialMyCollectionViewModel {
+    func makeSocialMyCollectionViewModel(for user: SocialListUser, fallbackIsMyPick: Bool?) -> SocialMyCollectionViewModel {
         let resolvedUser: UserModel
         switch user {
         case .subscribed(let subscribedUser):
-            resolvedUser = UserModel(from: subscribedUser, isMyPick: isMyPickSection)
+            resolvedUser = UserModel(from: subscribedUser, isMyPick: fallbackIsMyPick)
         case .searched(let searchedUser):
             resolvedUser = searchedUser
         }
