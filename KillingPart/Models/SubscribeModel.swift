@@ -23,18 +23,7 @@ struct SubscribeUserModel: Decodable, Identifiable {
     }
 
     var profileImageURL: URL? {
-        let trimmed = profileImageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        if let parsed = URL(string: trimmed), parsed.scheme != nil {
-            return parsed
-        }
-
-        if trimmed.hasPrefix("//"), let parsed = URL(string: "https:\(trimmed)") {
-            return parsed
-        }
-
-        return URL(string: "https://\(trimmed)")
+        resolvedProfileImageURL(from: profileImageUrl)
     }
 }
 
