@@ -91,6 +91,7 @@ struct YoutubePlayerView: UIViewRepresentable {
             context.coordinator.lastSyncedEnd = targetEnd
             context.coordinator.lastSyncedIsPlaying = isPlaying
             context.coordinator.lastSyncedShouldLoopPlayback = shouldLoopPlayback
+            context.coordinator.hasDispatchedEnded = false
             webView.loadHTMLString(
                 makePlayerHTML(
                     videoID: videoID,
@@ -119,6 +120,10 @@ struct YoutubePlayerView: UIViewRepresentable {
         let isPlayStateChanged = !isSamePlayState
         let isLoopStateChanged = !isSameLoopState
         guard isRangeChanged || isPlayStateChanged || isLoopStateChanged else { return }
+        
+        if isPlayStateChanged && isPlaying {
+            context.coordinator.hasDispatchedEnded = false
+        }
 
         if isRangeChanged {
             context.coordinator.lastSyncedStart = targetStart
@@ -140,6 +145,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let shouldForceSeekJS = isRangeChanged ? "true" : "false"
         let playbackControlJS = isPlaying
             ? """
+            window.kpHasDispatchedEnded = false;
             window.kpAutoplayAudioRestoreAttempted = false;
             if (window.kpApplyDesiredRange) {
                 window.kpApplyDesiredRange(\(shouldForceSeekJS));
@@ -197,6 +203,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         var redirectURL: URL?
         var openExternalURL: ((URL) -> Void)?
         var onPlaybackEnded: (() -> Void)?
+        var hasDispatchedEnded = false
 
         @objc
         func handleVideoTap() {
@@ -244,6 +251,8 @@ struct YoutubePlayerView: UIViewRepresentable {
             guard message.name == Self.playbackEventMessageName else { return }
             guard let event = message.body as? String else { return }
             guard event == "ended" else { return }
+            guard !hasDispatchedEnded else { return }
+            hasDispatchedEnded = true
             DispatchQueue.main.async {
                 self.onPlaybackEnded?()
             }

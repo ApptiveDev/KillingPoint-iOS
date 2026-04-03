@@ -7,6 +7,7 @@ struct SocialFeedPageCardView: View {
     let onLikeTap: () -> Void
     let onStoreTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
+    @State private var playerReloadToken = UUID()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,7 +69,8 @@ struct SocialFeedPageCardView: View {
                     SocialFeedVideoSection(
                         feed: feed,
                         isVideoPlaying: isVideoPlaying,
-                        onPlaybackEnded: onVideoPlaybackEnded
+                        onPlaybackEnded: onVideoPlaybackEnded,
+                        playerReloadToken: playerReloadToken
                     )
 
                     VStack(alignment: .center, spacing: AppSpacing.xl) {
@@ -88,6 +90,9 @@ struct SocialFeedPageCardView: View {
                 .padding(AppSpacing.m)
             }
             .scrollIndicators(.hidden)
+            .onAppear {
+                playerReloadToken = UUID()
+            }
 
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text("재생 구간")
@@ -151,6 +156,7 @@ private struct SocialFeedVideoSection: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
     let onPlaybackEnded: () -> Void
+    let playerReloadToken: UUID
 
     var body: some View {
         YoutubePlayerView(
@@ -161,7 +167,7 @@ private struct SocialFeedVideoSection: View {
             shouldLoopPlayback: false,
             onPlaybackEnded: onPlaybackEnded
         )
-        .id(feed.id)
+        .id("\(feed.diaryId)-\(playerReloadToken)")
         .frame(height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
