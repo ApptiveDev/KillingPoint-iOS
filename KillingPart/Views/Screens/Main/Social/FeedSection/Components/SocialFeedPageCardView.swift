@@ -3,6 +3,8 @@ import SwiftUI
 struct SocialFeedPageCardView: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
+    let elapsedInCurrentRange: TimeInterval
+    let onVideoPlaybackEnded: () -> Void
 
     var body: some View {
         ScrollView {
@@ -51,7 +53,8 @@ struct SocialFeedPageCardView: View {
 
                 SocialFeedVideoSection(
                     feed: feed,
-                    isVideoPlaying: isVideoPlaying
+                    isVideoPlaying: isVideoPlaying,
+                    onPlaybackEnded: onVideoPlaybackEnded
                 )
 
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
@@ -73,7 +76,8 @@ struct SocialFeedPageCardView: View {
                     SocialFeedPlaybackRangeBar(
                         startSeconds: parsedSeconds(from: feed.start) ?? 0,
                         endSeconds: parsedEndSeconds,
-                        totalSeconds: parsedTotalSeconds
+                        totalSeconds: parsedTotalSeconds,
+                        elapsedInCurrentRange: elapsedInCurrentRange
                     )
                     .frame(height: 34)
                 }
@@ -82,11 +86,7 @@ struct SocialFeedPageCardView: View {
         }
         .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-        }
+        .padding(.bottom, AppSpacing.s)
     }
 
     private var parsedEndSeconds: Double {
@@ -130,13 +130,16 @@ struct SocialFeedPageCardView: View {
 private struct SocialFeedVideoSection: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
+    let onPlaybackEnded: () -> Void
 
     var body: some View {
         YoutubePlayerView(
             videoURL: resolvedVideoURL(from: feed.videoUrl),
             startSeconds: parsedSeconds(from: feed.start) ?? 0,
             endSeconds: parsedEndSeconds,
-            isPlaying: isVideoPlaying
+            isPlaying: isVideoPlaying,
+            shouldLoopPlayback: false,
+            onPlaybackEnded: onPlaybackEnded
         )
         .id("\(feed.id)-\(isVideoPlaying)")
         .frame(height: 220)

@@ -4,6 +4,7 @@ struct SocialFeedPlaybackRangeBar: View {
     let startSeconds: Double
     let endSeconds: Double
     let totalSeconds: Double
+    let elapsedInCurrentRange: TimeInterval
 
     var body: some View {
         GeometryReader { proxy in
@@ -11,6 +12,7 @@ struct SocialFeedPlaybackRangeBar: View {
             let startX = width * startProgress
             let endX = width * endProgress
             let segmentWidth = max(endX - startX, 2)
+            let playheadX = width * playheadProgress
             let labelLayout = resolvedLabelLayout(
                 rangeWidth: width,
                 startX: startX,
@@ -27,6 +29,15 @@ struct SocialFeedPlaybackRangeBar: View {
                         .fill(AppColors.primary600)
                         .frame(width: segmentWidth, height: 10)
                         .offset(x: startX)
+
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 11, height: 11)
+                        .overlay {
+                            Circle()
+                                .stroke(AppColors.primary600, lineWidth: 1)
+                        }
+                        .offset(x: min(max(playheadX - 5.5, 0), width - 11))
                 }
                 .frame(width: width, height: 12, alignment: .center)
 
@@ -55,6 +66,11 @@ struct SocialFeedPlaybackRangeBar: View {
 
     private var endProgress: CGFloat {
         CGFloat(min(max(endSeconds / totalSeconds, startSeconds / totalSeconds), 1))
+    }
+
+    private var playheadProgress: CGFloat {
+        let absoluteSeconds = min(startSeconds + elapsedInCurrentRange, endSeconds)
+        return CGFloat(min(max(absoluteSeconds / totalSeconds, 0), 1))
     }
 
     private func resolvedLabelLayout(

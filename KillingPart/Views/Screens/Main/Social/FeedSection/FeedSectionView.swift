@@ -3,6 +3,9 @@ import SwiftUI
 struct FeedSectionView: View {
     @ObservedObject var viewModel: FeedViewModel
     @State private var currentPageIndex = 0
+    @State private var elapsedInCurrentRange: TimeInterval = 0
+
+    private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     var body: some View {
         GeometryReader { geometry in
@@ -51,7 +54,21 @@ struct FeedSectionView: View {
 
                     SocialFeedPageCardView(
                         feed: feed,
-                        isVideoPlaying: isActive
+                        isVideoPlaying: isActive,
+                        elapsedInCurrentRange: isActive ? elapsedInCurrentRange : 0,
+                        onVideoPlaybackEnded: {
+                            guard currentPageIndex == index else { return }
+                            Task {
+                                await viewModel.loadMoreIfNeeded(currentDiaryId: feed.diaryId)
+                                guard index + 1 < viewModel.feeds.count else { return }
+                                await MainActor.run {
+                                    elapsedInCurrentRange = 0
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        currentPageIndex = index + 1
+                                    }
+                                }
+                            }
+                        }
                     )
                     .tag(index)
                     .padding(.top, AppSpacing.xs)
@@ -61,7 +78,7 @@ struct FeedSectionView: View {
                     }
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .always))
+            .tabViewStyle(.page(indexDisplayMode: .never))
 
             if viewModel.isLoadingMore {
                 ProgressView()
@@ -70,5 +87,11 @@ struct FeedSectionView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onReceive(playbackTimer) { _ in
+            elapsedInCurrentRange += 0.25
+        }
+        .onChange(of: currentPageIndex) { _ in
+            elapsedInCurrentRange = 0
+        }
     }
 }
