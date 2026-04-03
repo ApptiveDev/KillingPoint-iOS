@@ -6,6 +6,7 @@ struct FeedSectionView: View {
     @State private var currentPageIndex = 0
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var isViewActive = false
+    @State private var previousFeedCount = 0
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -49,6 +50,7 @@ struct FeedSectionView: View {
         .onAppear {
             isViewActive = true
             elapsedInCurrentRange = 0
+            previousFeedCount = viewModel.feeds.count
         }
         .onDisappear {
             isViewActive = false
@@ -58,18 +60,25 @@ struct FeedSectionView: View {
                 elapsedInCurrentRange = 0
             }
         }
+        .onChange(of: viewModel.feeds.count) { newCount in
+            previousFeedCount = newCount
+        }
     }
 
     private var feedPager: some View {
         VStack(spacing: AppSpacing.s) {
             TabView(selection: $currentPageIndex) {
-                ForEach(Array(viewModel.feeds.enumerated()), id: \.element.id) { index, feed in
+                ForEach(viewModel.feeds.indices, id: \.self) { index in
+                    let feed = viewModel.feeds[index]
                     let isActive = index == currentPageIndex && isViewActive
+                    // 현재 페이지만 로드
+                    let shouldLoadPlayer = index == currentPageIndex
 
                     SocialFeedPageCardView(
                         feed: feed,
                         isVideoPlaying: isActive,
                         elapsedInCurrentRange: isActive ? elapsedInCurrentRange : 0,
+                        shouldLoadPlayer: shouldLoadPlayer,
                         onLikeTap: {
                             Task { await viewModel.toggleLike(diaryId: feed.diaryId) }
                         },
@@ -113,17 +122,23 @@ struct FeedSectionView: View {
         Task {
             let nextIndex = currentIndex + 1
             
+            // 미리 다음 페이지 데이터 로드
             if nextIndex >= viewModel.feeds.count - 2 {
                 await viewModel.loadMoreIfNeeded(currentDiaryId: feed.diaryId)
             }
             
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            // 데이터 로딩 대기
+            var waitCount = 0
+            while viewModel.isLoadingMore && waitCount < 20 {
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                waitCount += 1
+            }
             
             guard nextIndex < viewModel.feeds.count else { return }
             
             await MainActor.run {
                 elapsedInCurrentRange = 0
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(.easeInOut(duration: 0.3)) {
                     currentPageIndex = nextIndex
                 }
             }

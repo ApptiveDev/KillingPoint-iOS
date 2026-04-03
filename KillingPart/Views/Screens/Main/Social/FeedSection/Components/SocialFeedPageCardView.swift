@@ -4,10 +4,10 @@ struct SocialFeedPageCardView: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
     let elapsedInCurrentRange: TimeInterval
+    let shouldLoadPlayer: Bool
     let onLikeTap: () -> Void
     let onStoreTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
-    @State private var playerReloadToken = UUID()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,8 +69,8 @@ struct SocialFeedPageCardView: View {
                     SocialFeedVideoSection(
                         feed: feed,
                         isVideoPlaying: isVideoPlaying,
-                        onPlaybackEnded: onVideoPlaybackEnded,
-                        playerReloadToken: playerReloadToken
+                        shouldLoadPlayer: shouldLoadPlayer,
+                        onPlaybackEnded: onVideoPlaybackEnded
                     )
 
                     VStack(alignment: .center, spacing: AppSpacing.xl) {
@@ -90,9 +90,6 @@ struct SocialFeedPageCardView: View {
                 .padding(AppSpacing.m)
             }
             .scrollIndicators(.hidden)
-            .onAppear {
-                playerReloadToken = UUID()
-            }
 
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text("재생 구간")
@@ -155,19 +152,26 @@ struct SocialFeedPageCardView: View {
 private struct SocialFeedVideoSection: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
+    let shouldLoadPlayer: Bool
     let onPlaybackEnded: () -> Void
-    let playerReloadToken: UUID
 
     var body: some View {
-        YoutubePlayerView(
-            videoURL: resolvedVideoURL(from: feed.videoUrl),
-            startSeconds: parsedSeconds(from: feed.start) ?? 0,
-            endSeconds: parsedEndSeconds,
-            isPlaying: isVideoPlaying,
-            shouldLoopPlayback: false,
-            onPlaybackEnded: onPlaybackEnded
-        )
-        .id("\(feed.diaryId)-\(playerReloadToken)")
+        Group {
+            if shouldLoadPlayer {
+                YoutubePlayerView(
+                    videoURL: resolvedVideoURL(from: feed.videoUrl),
+                    startSeconds: parsedSeconds(from: feed.start) ?? 0,
+                    endSeconds: parsedEndSeconds,
+                    isPlaying: isVideoPlaying,
+                    shouldLoopPlayback: false,
+                    onPlaybackEnded: onPlaybackEnded
+                )
+                .id(feed.diaryId)
+            } else {
+                Color.black.opacity(0.3)
+                    .id("placeholder-\(feed.diaryId)")
+            }
+        }
         .frame(height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {

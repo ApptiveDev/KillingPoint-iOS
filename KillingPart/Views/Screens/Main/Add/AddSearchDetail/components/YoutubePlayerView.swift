@@ -438,10 +438,12 @@ struct YoutubePlayerView: UIViewRepresentable {
                             var targetStart = kpNormalizedStart();
                             var targetEnd = kpNormalizedEnd(targetStart);
                             var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
+                            
+                            // 영상 끝 감지 - 0.3초 여유를 둠
                             if (
                                 !window.kpShouldLoopPlayback
                                 && !isNaN(current)
-                                && current >= targetEnd
+                                && current >= (targetEnd - 0.3)
                             ) {
                                 if (window.kpPlayer.pauseVideo) {
                                     window.kpPlayer.pauseVideo();
