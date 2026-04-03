@@ -7,86 +7,90 @@ struct SocialFeedPageCardView: View {
     let onVideoPlaybackEnded: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.s) {
-                HStack {
-                    SocialFeedProfileView(feed: feed)
-                    Spacer()
-                }
-
-                HStack(alignment: .top, spacing: AppSpacing.s) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(feed.musicTitle)
-                            .font(AppFont.paperlogy6SemiBold(size: 16))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-
-                        Text(feed.artist)
-                            .font(AppFont.paperlogy4Regular(size: 14))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .lineLimit(2)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.s) {
+                    HStack {
+                        SocialFeedProfileView(feed: feed)
+                        Spacer()
                     }
 
-                    Spacer(minLength: 0)
+                    HStack(alignment: .top, spacing: AppSpacing.s) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(feed.musicTitle)
+                                .font(AppFont.paperlogy6SemiBold(size: 16))
+                                .foregroundStyle(.white)
+                                .lineLimit(2)
 
-                    HStack(spacing: AppSpacing.s) {
-                        HStack(spacing: 4) {
-                            Image(systemName: feed.isLiked ? "heart.fill" : "heart")
-                                .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.75))
-                            Text(feed.likeCount.formatted())
-                                .font(AppFont.paperlogy4Regular(size: 12))
-                                .foregroundStyle(.white.opacity(0.85))
+                            Text(feed.artist)
+                                .font(AppFont.paperlogy4Regular(size: 14))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .lineLimit(2)
                         }
 
-                        Button {
-                        } label: {
-                            Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(AppColors.primary600)
-                                .padding(.horizontal, AppSpacing.xs)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.1), in: Capsule())
+                        Spacer(minLength: 0)
+
+                        HStack(spacing: AppSpacing.s) {
+                            HStack(spacing: 4) {
+                                Image(systemName: feed.isLiked ? "heart.fill" : "heart")
+                                    .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.75))
+                                Text(feed.likeCount.formatted())
+                                    .font(AppFont.paperlogy4Regular(size: 12))
+                                    .foregroundStyle(.white.opacity(0.85))
+                            }
+
+                            Button {
+                            } label: {
+                                Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(AppColors.primary600)
+                                    .padding(.horizontal, AppSpacing.xs)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.1), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
-                }
 
-                SocialFeedVideoSection(
-                    feed: feed,
-                    isVideoPlaying: isVideoPlaying,
-                    onPlaybackEnded: onVideoPlaybackEnded
-                )
-
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text("킬링파트 일기")
-                        .font(AppFont.paperlogy5Medium(size: 13))
-                        .foregroundStyle(AppColors.primary600)
-
-                    Text(feed.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "작성된 킬링파트 일기가 없어요." : feed.content)
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(.white.opacity(0.86))
-                        .lineSpacing(2)
-                }
-
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text("재생 구간")
-                        .font(AppFont.paperlogy5Medium(size: 13))
-                        .foregroundStyle(AppColors.primary600)
-
-                    SocialFeedPlaybackRangeBar(
-                        startSeconds: parsedSeconds(from: feed.start) ?? 0,
-                        endSeconds: parsedEndSeconds,
-                        totalSeconds: parsedTotalSeconds,
-                        elapsedInCurrentRange: elapsedInCurrentRange
+                    SocialFeedVideoSection(
+                        feed: feed,
+                        isVideoPlaying: isVideoPlaying,
+                        onPlaybackEnded: onVideoPlaybackEnded
                     )
-                    .frame(height: 34)
+
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        Text("킬링파트 일기")
+                            .font(AppFont.paperlogy5Medium(size: 13))
+                            .foregroundStyle(AppColors.primary600)
+
+                        Text(feed.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "작성된 킬링파트 일기가 없어요." : feed.content)
+                            .font(AppFont.paperlogy4Regular(size: 13))
+                            .foregroundStyle(.white.opacity(0.86))
+                            .lineSpacing(2)
+                    }
                 }
+                .padding(AppSpacing.m)
             }
-            .padding(AppSpacing.m)
+            .scrollIndicators(.hidden)
+
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text("재생 구간")
+                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .foregroundStyle(AppColors.primary600)
+
+                SocialFeedPlaybackRangeBar(
+                    startSeconds: parsedSeconds(from: feed.start) ?? 0,
+                    endSeconds: parsedEndSeconds,
+                    totalSeconds: parsedTotalSeconds,
+                    elapsedInCurrentRange: elapsedInCurrentRange
+                )
+                .frame(height: 34)
+            }
+            .padding(.horizontal, AppSpacing.m)
+            .padding(.top, AppSpacing.xs)
+            .padding(.bottom, AppSpacing.l)
         }
-        .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.bottom, AppSpacing.s)
     }
 
     private var parsedEndSeconds: Double {

@@ -9,7 +9,7 @@ struct FeedSectionView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let bottomInset = max(geometry.safeAreaInsets.bottom, AppSpacing.s) + AppSpacing.s
+            let bottomInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
             Group {
                 if viewModel.isLoadingInitial {
                     ProgressView()
