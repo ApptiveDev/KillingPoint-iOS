@@ -9,17 +9,23 @@ struct YoutubePlayerView: UIViewRepresentable {
     let startSeconds: Double
     let endSeconds: Double
     let isPlaying: Bool
+    let shouldLoopPlayback: Bool
+    let onPlaybackEnded: (() -> Void)?
 
     init(
         videoURL: URL?,
         startSeconds: Double,
         endSeconds: Double,
-        isPlaying: Bool = true
+        isPlaying: Bool = true,
+        shouldLoopPlayback: Bool = true,
+        onPlaybackEnded: (() -> Void)? = nil
     ) {
         self.videoURL = videoURL
         self.startSeconds = startSeconds
         self.endSeconds = endSeconds
         self.isPlaying = isPlaying
+        self.shouldLoopPlayback = shouldLoopPlayback
+        self.onPlaybackEnded = onPlaybackEnded
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -27,6 +33,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        configuration.userContentController.add(context.coordinator, name: Coordinator.playbackEventMessageName)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.scrollView.isScrollEnabled = false
@@ -64,6 +71,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         context.coordinator.openExternalURL = { targetURL in
             openURL(targetURL)
         }
+        context.coordinator.onPlaybackEnded = onPlaybackEnded
 
         guard
             let videoURL,
@@ -82,12 +90,15 @@ struct YoutubePlayerView: UIViewRepresentable {
             context.coordinator.lastSyncedStart = targetStart
             context.coordinator.lastSyncedEnd = targetEnd
             context.coordinator.lastSyncedIsPlaying = isPlaying
+            context.coordinator.lastSyncedShouldLoopPlayback = shouldLoopPlayback
+            context.coordinator.hasDispatchedEnded = false
             webView.loadHTMLString(
                 makePlayerHTML(
                     videoID: videoID,
                     startSeconds: targetStart,
                     endSeconds: targetEnd,
-                    shouldAutoplay: isPlaying
+                    shouldAutoplay: isPlaying,
+                    shouldLoopPlayback: shouldLoopPlayback
                 ),
                 baseURL: appRefererURL
             )
@@ -105,8 +116,14 @@ struct YoutubePlayerView: UIViewRepresentable {
         let isRangeChanged = !(isSameStart && isSameEnd)
 
         let isSamePlayState = context.coordinator.lastSyncedIsPlaying == isPlaying
+        let isSameLoopState = context.coordinator.lastSyncedShouldLoopPlayback == shouldLoopPlayback
         let isPlayStateChanged = !isSamePlayState
-        guard isRangeChanged || isPlayStateChanged else { return }
+        let isLoopStateChanged = !isSameLoopState
+        guard isRangeChanged || isPlayStateChanged || isLoopStateChanged else { return }
+        
+        if isPlayStateChanged && isPlaying {
+            context.coordinator.hasDispatchedEnded = false
+        }
 
         if isRangeChanged {
             context.coordinator.lastSyncedStart = targetStart
@@ -115,15 +132,20 @@ struct YoutubePlayerView: UIViewRepresentable {
         if isPlayStateChanged {
             context.coordinator.lastSyncedIsPlaying = isPlaying
         }
+        if isLoopStateChanged {
+            context.coordinator.lastSyncedShouldLoopPlayback = shouldLoopPlayback
+        }
 
         let targetStartJS = jsNumber(targetStart)
         let targetEndJS = jsNumber(targetEnd)
         let shouldAutoplayJS = isPlaying ? "true" : "false"
+        let shouldLoopPlaybackJS = shouldLoopPlayback ? "true" : "false"
         // Keep playback position when only play/pause state changes.
         // Force seek is only needed when the target range itself changed.
         let shouldForceSeekJS = isRangeChanged ? "true" : "false"
         let playbackControlJS = isPlaying
             ? """
+            window.kpHasDispatchedEnded = false;
             window.kpAutoplayAudioRestoreAttempted = false;
             if (window.kpApplyDesiredRange) {
                 window.kpApplyDesiredRange(\(shouldForceSeekJS));
@@ -157,6 +179,7 @@ struct YoutubePlayerView: UIViewRepresentable {
             window.kpDesiredStart = \(targetStartJS);
             window.kpDesiredEnd = \(targetEndJS);
             window.kpShouldAutoplay = \(shouldAutoplayJS);
+            window.kpShouldLoopPlayback = \(shouldLoopPlaybackJS);
             if (window.kpPlayerReady && window.kpPlayer) {
                 \(playbackControlJS)
             }
@@ -169,13 +192,18 @@ struct YoutubePlayerView: UIViewRepresentable {
         Coordinator()
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+        static let playbackEventMessageName = "kpPlaybackEvent"
+
         var loadedVideoID: String?
         var lastSyncedStart: Double?
         var lastSyncedEnd: Double?
         var lastSyncedIsPlaying: Bool?
+        var lastSyncedShouldLoopPlayback: Bool?
         var redirectURL: URL?
         var openExternalURL: ((URL) -> Void)?
+        var onPlaybackEnded: (() -> Void)?
+        var hasDispatchedEnded = false
 
         @objc
         func handleVideoTap() {
@@ -215,6 +243,20 @@ struct YoutubePlayerView: UIViewRepresentable {
             guard let redirectURL else { return }
             openExternalURL?(redirectURL)
         }
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == Self.playbackEventMessageName else { return }
+            guard let event = message.body as? String else { return }
+            guard event == "ended" else { return }
+            guard !hasDispatchedEnded else { return }
+            hasDispatchedEnded = true
+            DispatchQueue.main.async {
+                self.onPlaybackEnded?()
+            }
+        }
     }
 
     private var appRefererURL: URL? {
@@ -228,7 +270,8 @@ struct YoutubePlayerView: UIViewRepresentable {
         videoID: String,
         startSeconds: Double,
         endSeconds: Double,
-        shouldAutoplay: Bool
+        shouldAutoplay: Bool,
+        shouldLoopPlayback: Bool
     ) -> String {
         let safeVideoID = escapeForJavaScript(videoID)
         let safeReferer = escapeForJavaScript(appRefererURLString ?? "")
@@ -236,6 +279,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let initialStartJS = jsNumber(startSeconds)
         let initialEndJS = jsNumber(endSeconds)
         let initialShouldAutoplayJS = shouldAutoplay ? "true" : "false"
+        let shouldLoopPlaybackJS = shouldLoopPlayback ? "true" : "false"
         let autoplayFlag = shouldAutoplay ? 1 : 0
 
         return """
@@ -265,6 +309,8 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpDesiredStart = \(initialStartJS);
                 window.kpDesiredEnd = \(initialEndJS);
                 window.kpShouldAutoplay = \(initialShouldAutoplayJS);
+                window.kpShouldLoopPlayback = \(shouldLoopPlaybackJS);
+                window.kpHasDispatchedEnded = false;
                 window.kpPlayer = null;
                 window.kpPlayerReady = false;
                 window.kpLoopTimer = null;
@@ -282,6 +328,20 @@ struct YoutubePlayerView: UIViewRepresentable {
                         window.kpAutoplayRetryTimer = null;
                     }
                     window.kpAutoplayRetryCount = 0;
+                };
+
+                window.kpDispatchPlaybackEnded = function() {
+                    if (window.kpHasDispatchedEnded) {
+                        return;
+                    }
+                    window.kpHasDispatchedEnded = true;
+                    if (
+                        window.webkit
+                        && window.webkit.messageHandlers
+                        && window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName)
+                    ) {
+                        window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName).postMessage('ended');
+                    }
                 };
 
                 function kpNormalizedStart() {
@@ -378,6 +438,20 @@ struct YoutubePlayerView: UIViewRepresentable {
                             var targetStart = kpNormalizedStart();
                             var targetEnd = kpNormalizedEnd(targetStart);
                             var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
+                            
+                            // 영상 끝 감지 - 0.3초 여유를 둠
+                            if (
+                                !window.kpShouldLoopPlayback
+                                && !isNaN(current)
+                                && current >= (targetEnd - 0.3)
+                            ) {
+                                if (window.kpPlayer.pauseVideo) {
+                                    window.kpPlayer.pauseVideo();
+                                }
+                                window.kpDispatchPlaybackEnded();
+                                return;
+                            }
+
                             if (isNaN(current) || current < targetStart || current >= targetEnd) {
                                 window.kpPlayer.seekTo(targetStart, true);
                                 window.kpPlayer.playVideo();
@@ -437,6 +511,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                                 }
 
                                 if (state === 1 || state === 3) {
+                                    window.kpHasDispatchedEnded = false;
                                     window.kpStopAutoplayRetry();
                                     if (
                                         window.kpAutoplayMutedFallbackActive
@@ -474,8 +549,12 @@ struct YoutubePlayerView: UIViewRepresentable {
                                 }
 
                                 if (state === 0) {
-                                    window.kpApplyDesiredRange(true);
-                                    window.kpScheduleAutoplayRetry(true);
+                                    if (window.kpShouldLoopPlayback) {
+                                        window.kpApplyDesiredRange(true);
+                                        window.kpScheduleAutoplayRetry(true);
+                                    } else {
+                                        window.kpDispatchPlaybackEnded();
+                                    }
                                     return;
                                 }
 

@@ -12,11 +12,19 @@ struct MainTabView: View {
                 }
                 .tag(MainRootTab.my)
 
+            
             AddTabView()
                 .tabItem {
                     Label("추가", systemImage: "plus.square")
                 }
                 .tag(MainRootTab.add)
+            
+            SocialView()
+                .tabItem {
+                    Label("소셜", systemImage: "person.2")
+                }
+                .tag(MainRootTab.social)
+
         }
         .tint(AppColors.primary600)
         .preferredColorScheme(.dark)
@@ -33,5 +41,6 @@ struct MainTabView: View {
 
 private enum MainRootTab: Hashable {
     case my
+    case social
     case add
 }
