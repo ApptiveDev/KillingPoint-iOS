@@ -13,9 +13,9 @@ struct SocialFeedProfileView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
 
-                Text(feed.tag?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "#\(feed.tag ?? "")" : "")
+                Text(feed.tag?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "@\(feed.tag ?? "")" : "")
                     .font(AppFont.paperlogy4Regular(size: 11))
-                    .foregroundStyle(.white.opacity(0.72))
+                    .foregroundStyle(Color.kpPrimary)
                     .lineLimit(1)
             }
         }

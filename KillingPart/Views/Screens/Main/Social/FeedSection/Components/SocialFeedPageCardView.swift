@@ -2,49 +2,220 @@ import SwiftUI
 
 struct SocialFeedPageCardView: View {
     let feed: DiaryFeedModel
+    let isVideoPlaying: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.s) {
-            HStack {
-                SocialFeedProfileView(feed: feed)
-                Spacer()
-                SocialFeedScopeBadgeView(scope: feed.scope)
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.s) {
+                HStack {
+                    SocialFeedProfileView(feed: feed)
+                    Spacer()
+                }
+
+                HStack(alignment: .top, spacing: AppSpacing.s) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(feed.musicTitle)
+                            .font(AppFont.paperlogy6SemiBold(size: 16))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+
+                        Text(feed.artist)
+                            .font(AppFont.paperlogy4Regular(size: 14))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: AppSpacing.s) {
+                        HStack(spacing: 4) {
+                            Image(systemName: feed.isLiked ? "heart.fill" : "heart")
+                                .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.75))
+                            Text(feed.likeCount.formatted())
+                                .font(AppFont.paperlogy4Regular(size: 12))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+
+                        Button {
+                        } label: {
+                            Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(AppColors.primary600)
+                                .padding(.horizontal, AppSpacing.xs)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.1), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                SocialFeedVideoSection(
+                    feed: feed,
+                    isVideoPlaying: isVideoPlaying
+                )
+
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    Text("킬링파트 일기")
+                        .font(AppFont.paperlogy5Medium(size: 13))
+                        .foregroundStyle(AppColors.primary600)
+
+                    Text(feed.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "작성된 킬링파트 일기가 없어요." : feed.content)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.white.opacity(0.86))
+                        .lineSpacing(2)
+                }
+
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    Text("재생 구간")
+                        .font(AppFont.paperlogy5Medium(size: 13))
+                        .foregroundStyle(AppColors.primary600)
+
+                    SocialFeedPlaybackRangeBar(
+                        startSeconds: parsedSeconds(from: feed.start) ?? 0,
+                        endSeconds: parsedEndSeconds,
+                        totalSeconds: parsedTotalSeconds
+                    )
+                    .frame(height: 34)
+                }
             }
-
-            SocialFeedAlbumImageView(url: feed.albumImageURL)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(feed.musicTitle)
-                    .font(AppFont.paperlogy6SemiBold(size: 16))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Text(feed.artist)
-                    .font(AppFont.paperlogy4Regular(size: 14))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(1)
-            }
-
-            Text(feed.content)
-                .font(AppFont.paperlogy4Regular(size: 13))
-                .foregroundStyle(.white.opacity(0.85))
-                .lineLimit(3)
-
-            HStack(spacing: AppSpacing.xs) {
-                Image(systemName: feed.isLiked ? "heart.fill" : "heart")
-                    .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.7))
-                Text(feed.likeCount.formatted())
-                    .font(AppFont.paperlogy4Regular(size: 12))
-                    .foregroundStyle(.white.opacity(0.8))
-                Spacer()
-            }
+            .padding(AppSpacing.m)
         }
-        .padding(AppSpacing.m)
+        .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         }
+    }
+
+    private var parsedEndSeconds: Double {
+        let start = parsedSeconds(from: feed.start) ?? 0
+        return max(parsedSeconds(from: feed.end) ?? start, start + 0.1)
+    }
+
+    private var parsedTotalSeconds: Double {
+        max(parsedSeconds(from: feed.totalDuration) ?? 0, parsedEndSeconds, 1)
+    }
+
+    private func parsedSeconds(from value: String) -> Double? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let raw = Double(trimmed) {
+            return max(raw, 0)
+        }
+
+        let sanitized = trimmed.replacingOccurrences(of: "초", with: "")
+        if sanitized.contains(":") {
+            let parts = sanitized.split(separator: ":").map(String.init)
+            guard
+                parts.count == 2,
+                let minutes = Double(parts[0]),
+                let seconds = Double(parts[1])
+            else {
+                return nil
+            }
+            return max((minutes * 60) + seconds, 0)
+        }
+
+        if let raw = Double(sanitized) {
+            return max(raw, 0)
+        }
+
+        return nil
+    }
+}
+
+private struct SocialFeedVideoSection: View {
+    let feed: DiaryFeedModel
+    let isVideoPlaying: Bool
+
+    var body: some View {
+        YoutubePlayerView(
+            videoURL: resolvedVideoURL(from: feed.videoUrl),
+            startSeconds: parsedSeconds(from: feed.start) ?? 0,
+            endSeconds: parsedEndSeconds,
+            isPlaying: isVideoPlaying
+        )
+        .id("\(feed.id)-\(isVideoPlaying)")
+        .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
+    }
+
+    private var parsedEndSeconds: Double {
+        let start = parsedSeconds(from: feed.start) ?? 0
+        return max(parsedSeconds(from: feed.end) ?? start, start + 0.1)
+    }
+
+    private func parsedSeconds(from value: String) -> Double? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let raw = Double(trimmed) {
+            return max(raw, 0)
+        }
+
+        let sanitized = trimmed.replacingOccurrences(of: "초", with: "")
+        if sanitized.contains(":") {
+            let parts = sanitized.split(separator: ":").map(String.init)
+            guard
+                parts.count == 2,
+                let minutes = Double(parts[0]),
+                let seconds = Double(parts[1])
+            else {
+                return nil
+            }
+            return max((minutes * 60) + seconds, 0)
+        }
+
+        if let raw = Double(sanitized) {
+            return max(raw, 0)
+        }
+
+        return nil
+    }
+
+    private func resolvedVideoURL(from rawVideoURL: String) -> URL? {
+        let trimmed = rawVideoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let normalizedURLText: String
+        if isLikelyYouTubeVideoID(trimmed) {
+            normalizedURLText = "https://www.youtube.com/embed/\(trimmed)?playsinline=1"
+        } else {
+            normalizedURLText = trimmed
+        }
+
+        if let parsed = URL(string: normalizedURLText), parsed.scheme != nil {
+            return parsed
+        }
+
+        if normalizedURLText.hasPrefix("//") {
+            return URL(string: "https:\(normalizedURLText)")
+        }
+
+        return URL(string: "https://\(normalizedURLText)")
+    }
+
+    private func isLikelyYouTubeVideoID(_ value: String) -> Bool {
+        if value.hasPrefix("//") {
+            return false
+        }
+
+        if let components = URLComponents(string: value),
+           components.scheme != nil || components.host != nil {
+            return false
+        }
+
+        return !value.contains("/")
+            && !value.contains("?")
+            && !value.contains("&")
+            && !value.contains("=")
+            && !value.contains(".")
     }
 }
