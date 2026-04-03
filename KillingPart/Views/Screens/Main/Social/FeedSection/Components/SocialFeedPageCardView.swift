@@ -149,7 +149,9 @@ private struct SocialFeedVideoSection: View {
 
     private var parsedEndSeconds: Double {
         let start = parsedSeconds(from: feed.start) ?? 0
-        return max(parsedSeconds(from: feed.end) ?? start, start + 0.1)
+        let total = parsedSeconds(from: feed.totalDuration) ?? 0
+        let resolvedEnd = parsedSeconds(from: feed.end) ?? total
+        return max(resolvedEnd, start + 0.1)
     }
 
     private func parsedSeconds(from value: String) -> Double? {
