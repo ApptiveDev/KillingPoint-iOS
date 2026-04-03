@@ -34,25 +34,28 @@ struct SocialFeedPageCardView: View {
 
                         HStack(spacing: AppSpacing.s) {
                             HStack(spacing: 4) {
-                            Button {
-                                onLikeTap()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: feed.isLiked ? "heart.fill" : "heart")
-                                        .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.75))
-                                    Text(feed.likeCount.formatted())
-                                        .font(AppFont.paperlogy4Regular(size: 12))
-                                        .foregroundStyle(.white.opacity(0.85))
+                                Button {
+                                    onLikeTap()
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: feed.isLiked ? "heart.fill" : "heart")
+                                            .foregroundStyle(feed.isLiked ? Color.kpPrimary : .white.opacity(0.75))
+                                        Text(feed.likeCount.formatted())
+                                            .font(AppFont.paperlogy4Regular(size: 12))
+                                            .foregroundStyle(.white.opacity(0.85))
+                                    }
+                                    .padding(.horizontal, AppSpacing.xs)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.1), in: Capsule())
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                        }
 
-                        Button {
-                            onStoreTap()
-                        } label: {
-                            Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
-                                .font(.system(size: 14, weight: .semibold))
+                            Button {
+                                onStoreTap()
+                            } label: {
+                                Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(AppColors.primary600)
                                     .padding(.horizontal, AppSpacing.xs)
                                     .padding(.vertical, 6)
@@ -68,15 +71,18 @@ struct SocialFeedPageCardView: View {
                         onPlaybackEnded: onVideoPlaybackEnded
                     )
 
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    VStack(alignment: .center, spacing: AppSpacing.xl) {
                         Text("킬링파트 일기")
                             .font(AppFont.paperlogy5Medium(size: 13))
-                            .foregroundStyle(AppColors.primary600)
+                            .foregroundStyle(Color.kpGray300)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
                         Text(feed.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "작성된 킬링파트 일기가 없어요." : feed.content)
                             .font(AppFont.paperlogy4Regular(size: 13))
-                            .foregroundStyle(.white.opacity(0.86))
+                            .foregroundStyle(.white)
                             .lineSpacing(2)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .multilineTextAlignment(.center)
                     }
                 }
                 .padding(AppSpacing.m)

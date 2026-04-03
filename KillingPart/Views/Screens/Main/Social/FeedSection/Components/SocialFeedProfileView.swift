@@ -10,7 +10,7 @@ struct SocialFeedProfileView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(feed.username?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? (feed.username ?? "") : "알 수 없음")
                     .font(AppFont.paperlogy5Medium(size: 13))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.kpPrimary)
                     .lineLimit(1)
 
                 Text(feed.tag?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "@\(feed.tag ?? "")" : "")
