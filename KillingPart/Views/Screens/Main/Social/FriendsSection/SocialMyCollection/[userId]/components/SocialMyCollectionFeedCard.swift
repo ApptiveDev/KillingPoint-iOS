@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct MyCollectionFeedCard: View {
+struct SocialMyCollectionFeedCard: View {
     let feed: DiaryFeedModel
     let formattedUpdateDate: String
 

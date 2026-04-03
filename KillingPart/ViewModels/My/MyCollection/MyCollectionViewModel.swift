@@ -242,7 +242,7 @@ final class MyCollectionViewModel: ObservableObject {
         }
 
         do {
-            let response = try await diaryService.fetchMyFeeds(page: page, size: size)
+            let response = try await diaryService.fetchMyDiaries(page: page, size: size)
             let normalizedFeeds = normalizeFeedVideoURLs(in: response.content)
             if mode == .initial {
                 myFeeds = normalizedFeeds

@@ -1,13 +1,14 @@
 import SwiftUI
 
-struct MyCollectionProfileCard: View {
+struct SocialMyCollectionProfileCard: View {
     let displayName: String
     let displayTag: String
     let profileImageURL: URL?
     let killingPartStatText: String
     let fanStatText: String
     let pickStatText: String
-    let onEditProfileTap: () -> Void
+    let isMyPick: Bool
+    let onPickToggleTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
@@ -40,11 +41,12 @@ struct MyCollectionProfileCard: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    MyCollectionEditProfileButton(action: onEditProfileTap)
+                    SocialMyCollectionPickToggleButton(
+                        isMyPick: isMyPick,
+                        onTap: onPickToggleTap
+                    )
                 }
             }
-
-            
         }
         .padding(AppSpacing.m)
     }
