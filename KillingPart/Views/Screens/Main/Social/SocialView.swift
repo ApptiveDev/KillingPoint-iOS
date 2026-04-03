@@ -2,9 +2,8 @@ import SwiftUI
 
 struct SocialView: View {
     @StateObject private var viewModel = SocialViewModel()
+    @StateObject private var feedViewModel = FeedViewModel()
     @State private var selectedTopTab: SocialTopTab = .friend
-    @State private var selectedFriendSection: SocialFriendSection = .myPick
-    @State private var searchText = ""
 
     var body: some View {
         NavigationStack {
@@ -23,9 +22,9 @@ struct SocialView: View {
                         SocialTopToggleTabsView(selectedTopTab: $selectedTopTab)
 
                         if selectedTopTab == .friend {
-                            friendSection
+                            FriendsSectionView(viewModel: viewModel)
                         } else {
-                            SocialFeedPlaceholderView()
+                            FeedSectionView(viewModel: feedViewModel)
                         }
                     }
                     .padding(.horizontal, AppSpacing.m)
@@ -38,62 +37,13 @@ struct SocialView: View {
             }
         }
         .task(id: selectedTopTab) {
-            guard selectedTopTab == .friend else { return }
-            await viewModel.loadInitialDataIfNeeded()
-        }
-        .onChange(of: searchText) { query in
-            Task {
-                await viewModel.searchUsers(with: query)
+            switch selectedTopTab {
+            case .friend:
+                await viewModel.loadInitialDataIfNeeded()
+            case .feed:
+                await feedViewModel.loadInitialDataIfNeeded()
             }
         }
-    }
-
-    private var friendSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.m) {
-            SocialSearchBarView(searchText: $searchText)
-            if viewModel.isSearching {
-                SocialSearchedResultHeaderView(totalCount: viewModel.searchedUserTotalCount)
-            } else {
-                SocialFriendToggleTabsView(
-                    selectedFriendSection: $selectedFriendSection,
-                    myPickCount: viewModel.totalCount(for: true),
-                    myFandomCount: viewModel.totalCount(for: false)
-                )
-            }
-            SocialFriendListView(
-                users: currentSectionUsers,
-                isLoading: isCurrentSectionLoading,
-                isLoadingMore: isCurrentSectionLoadingMore,
-                errorMessage: viewModel.errorMessage,
-                selectedFriendSection: selectedFriendSection,
-                onRetry: {
-                    Task { await viewModel.refreshCurrentList() }
-                },
-                onUserAppear: { userId in
-                    Task {
-                        await viewModel.loadMoreCurrentSectionIfNeeded(
-                            currentUserId: userId,
-                            isMyPickSection: selectedFriendSection == .myPick
-                        )
-                    }
-                },
-                makeCollectionViewModel: { user, fallbackIsMyPick in
-                    viewModel.makeSocialMyCollectionViewModel(for: user, fallbackIsMyPick: fallbackIsMyPick)
-                }
-            )
-        }
-    }
-
-    private var currentSectionUsers: [SocialListUser] {
-        viewModel.users(for: selectedFriendSection == .myPick)
-    }
-
-    private var isCurrentSectionLoading: Bool {
-        viewModel.isLoading(for: selectedFriendSection == .myPick)
-    }
-
-    private var isCurrentSectionLoadingMore: Bool {
-        viewModel.isLoadingMore(for: selectedFriendSection == .myPick)
     }
 }
 

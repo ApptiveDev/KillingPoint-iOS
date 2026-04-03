@@ -54,7 +54,7 @@ struct DiaryService: DiaryServicing {
 
         do {
             let request = APIRequest(
-                path: "/diaries/my",
+                path: "/diaries/my/feeds",
                 method: .get,
                 queryItems: [
                     URLQueryItem(name: "page", value: String(resolvedPage)),
