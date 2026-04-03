@@ -321,6 +321,20 @@ struct YoutubePlayerView: UIViewRepresentable {
                     window.kpAutoplayRetryCount = 0;
                 };
 
+                window.kpDispatchPlaybackEnded = function() {
+                    if (window.kpHasDispatchedEnded) {
+                        return;
+                    }
+                    window.kpHasDispatchedEnded = true;
+                    if (
+                        window.webkit
+                        && window.webkit.messageHandlers
+                        && window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName)
+                    ) {
+                        window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName).postMessage('ended');
+                    }
+                };
+
                 function kpNormalizedStart() {
                     var targetStart = Number(window.kpDesiredStart || 0);
                     if (isNaN(targetStart) || targetStart < 0) {
@@ -415,6 +429,18 @@ struct YoutubePlayerView: UIViewRepresentable {
                             var targetStart = kpNormalizedStart();
                             var targetEnd = kpNormalizedEnd(targetStart);
                             var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
+                            if (
+                                !window.kpShouldLoopPlayback
+                                && !isNaN(current)
+                                && current >= targetEnd
+                            ) {
+                                if (window.kpPlayer.pauseVideo) {
+                                    window.kpPlayer.pauseVideo();
+                                }
+                                window.kpDispatchPlaybackEnded();
+                                return;
+                            }
+
                             if (isNaN(current) || current < targetStart || current >= targetEnd) {
                                 window.kpPlayer.seekTo(targetStart, true);
                                 window.kpPlayer.playVideo();
@@ -515,15 +541,8 @@ struct YoutubePlayerView: UIViewRepresentable {
                                     if (window.kpShouldLoopPlayback) {
                                         window.kpApplyDesiredRange(true);
                                         window.kpScheduleAutoplayRetry(true);
-                                    } else if (!window.kpHasDispatchedEnded) {
-                                        window.kpHasDispatchedEnded = true;
-                                        if (
-                                            window.webkit
-                                            && window.webkit.messageHandlers
-                                            && window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName)
-                                        ) {
-                                            window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName).postMessage('ended');
-                                        }
+                                    } else {
+                                        window.kpDispatchPlaybackEnded();
                                     }
                                     return;
                                 }

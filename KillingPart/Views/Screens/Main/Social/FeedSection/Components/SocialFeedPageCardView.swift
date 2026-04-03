@@ -141,7 +141,7 @@ private struct SocialFeedVideoSection: View {
             shouldLoopPlayback: false,
             onPlaybackEnded: onPlaybackEnded
         )
-        .id("\(feed.id)-\(isVideoPlaying)")
+        .id(feed.id)
         .frame(height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
@@ -151,10 +151,16 @@ private struct SocialFeedVideoSection: View {
     }
 
     private var parsedEndSeconds: Double {
+        let minimumRangeDuration = 1.0
         let start = parsedSeconds(from: feed.start) ?? 0
         let total = parsedSeconds(from: feed.totalDuration) ?? 0
-        let resolvedEnd = parsedSeconds(from: feed.end) ?? total
-        return max(resolvedEnd, start + 0.1)
+        if let explicitEnd = parsedSeconds(from: feed.end), explicitEnd > start + minimumRangeDuration {
+            return explicitEnd
+        }
+        if total > start + minimumRangeDuration {
+            return total
+        }
+        return start + 15
     }
 
     private func parsedSeconds(from value: String) -> Double? {
@@ -168,14 +174,18 @@ private struct SocialFeedVideoSection: View {
         let sanitized = trimmed.replacingOccurrences(of: "초", with: "")
         if sanitized.contains(":") {
             let parts = sanitized.split(separator: ":").map(String.init)
-            guard
-                parts.count == 2,
-                let minutes = Double(parts[0]),
-                let seconds = Double(parts[1])
-            else {
-                return nil
+            if parts.count == 2,
+               let minutes = Double(parts[0]),
+               let seconds = Double(parts[1]) {
+                return max((minutes * 60) + seconds, 0)
             }
-            return max((minutes * 60) + seconds, 0)
+            if parts.count == 3,
+               let hours = Double(parts[0]),
+               let minutes = Double(parts[1]),
+               let seconds = Double(parts[2]) {
+                return max((hours * 3600) + (minutes * 60) + seconds, 0)
+            }
+            return nil
         }
 
         if let raw = Double(sanitized) {
