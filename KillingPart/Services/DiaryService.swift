@@ -8,6 +8,8 @@ protocol DiaryServicing {
     func updateDiary(diaryId: Int, request: DiaryUpdateRequest) async throws
     func deleteDiary(diaryId: Int) async throws
     func updateMyDiaryOrder(request: DiaryOrderUpdateRequest) async throws
+    func toggleDiaryLike(diaryId: Int) async throws -> DiaryLikeToggleResponse
+    func toggleDiaryStore(diaryId: Int) async throws -> DiaryStoreToggleResponse
 }
 
 enum DiaryServiceError: LocalizedError {
@@ -208,6 +210,34 @@ struct DiaryService: DiaryServicing {
             apiRequest.headers["Accept"] = "application/json"
             apiRequest.headers["Content-Type"] = "application/json"
             try await apiClient.request(apiRequest)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func toggleDiaryLike(diaryId: Int) async throws -> DiaryLikeToggleResponse {
+        do {
+            let request = APIRequest(
+                path: "/diaries/\(diaryId)/like",
+                method: .post,
+                requiresAuthorization: true
+            )
+            return try await apiClient.request(request, responseType: DiaryLikeToggleResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func toggleDiaryStore(diaryId: Int) async throws -> DiaryStoreToggleResponse {
+        do {
+            let request = APIRequest(
+                path: "/diaries/\(diaryId)/stores",
+                method: .post,
+                requiresAuthorization: true
+            )
+            return try await apiClient.request(request, responseType: DiaryStoreToggleResponse.self)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

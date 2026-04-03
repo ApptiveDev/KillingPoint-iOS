@@ -4,6 +4,8 @@ struct SocialFeedPageCardView: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
     let elapsedInCurrentRange: TimeInterval
+    let onLikeTap: () -> Void
+    let onStoreTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
 
     var body: some View {
@@ -32,17 +34,25 @@ struct SocialFeedPageCardView: View {
 
                         HStack(spacing: AppSpacing.s) {
                             HStack(spacing: 4) {
-                                Image(systemName: feed.isLiked ? "heart.fill" : "heart")
-                                    .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.75))
-                                Text(feed.likeCount.formatted())
-                                    .font(AppFont.paperlogy4Regular(size: 12))
-                                    .foregroundStyle(.white.opacity(0.85))
-                            }
-
                             Button {
+                                onLikeTap()
                             } label: {
-                                Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
-                                    .font(.system(size: 14, weight: .semibold))
+                                HStack(spacing: 4) {
+                                    Image(systemName: feed.isLiked ? "heart.fill" : "heart")
+                                        .foregroundStyle(feed.isLiked ? .red : .white.opacity(0.75))
+                                    Text(feed.likeCount.formatted())
+                                        .font(AppFont.paperlogy4Regular(size: 12))
+                                        .foregroundStyle(.white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button {
+                            onStoreTap()
+                        } label: {
+                            Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
+                                .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(AppColors.primary600)
                                     .padding(.horizontal, AppSpacing.xs)
                                     .padding(.vertical, 6)

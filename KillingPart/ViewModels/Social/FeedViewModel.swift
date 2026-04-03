@@ -62,6 +62,56 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    func toggleLike(diaryId: Int) async {
+        guard let index = feeds.firstIndex(where: { $0.diaryId == diaryId }) else { return }
+        let originalFeed = feeds[index]
+        let toggledIsLiked = !originalFeed.isLiked
+        let optimisticLikeCount = max(originalFeed.likeCount + (toggledIsLiked ? 1 : -1), 0)
+        feeds[index] = originalFeed.replacingInteraction(
+            isLiked: toggledIsLiked,
+            likeCount: optimisticLikeCount
+        )
+
+        do {
+            let response = try await diaryService.toggleDiaryLike(diaryId: diaryId)
+            guard let refreshedIndex = feeds.firstIndex(where: { $0.diaryId == diaryId }) else { return }
+            let current = feeds[refreshedIndex]
+            let confirmedLikeCount = max(
+                current.likeCount + (response.isLiked == current.isLiked ? 0 : (response.isLiked ? 1 : -1)),
+                0
+            )
+            feeds[refreshedIndex] = current.replacingInteraction(
+                isLiked: response.isLiked,
+                likeCount: confirmedLikeCount
+            )
+        } catch {
+            if isRequestCancelled(error) { return }
+            if let rollbackIndex = feeds.firstIndex(where: { $0.diaryId == diaryId }) {
+                feeds[rollbackIndex] = originalFeed
+            }
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func toggleStore(diaryId: Int) async {
+        guard let index = feeds.firstIndex(where: { $0.diaryId == diaryId }) else { return }
+        let originalFeed = feeds[index]
+        let toggledIsStored = !originalFeed.isStored
+        feeds[index] = originalFeed.replacingInteraction(isStored: toggledIsStored)
+
+        do {
+            let response = try await diaryService.toggleDiaryStore(diaryId: diaryId)
+            guard let refreshedIndex = feeds.firstIndex(where: { $0.diaryId == diaryId }) else { return }
+            feeds[refreshedIndex] = feeds[refreshedIndex].replacingInteraction(isStored: response.isStored)
+        } catch {
+            if isRequestCancelled(error) { return }
+            if let rollbackIndex = feeds.firstIndex(where: { $0.diaryId == diaryId }) {
+                feeds[rollbackIndex] = originalFeed
+            }
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
     private func appendFeeds(with newFeeds: [DiaryFeedModel]) {
         let existingIDs = Set(feeds.map(\.id))
         let filtered = newFeeds.filter { !existingIDs.contains($0.id) }

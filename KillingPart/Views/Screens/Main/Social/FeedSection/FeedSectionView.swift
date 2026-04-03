@@ -56,6 +56,12 @@ struct FeedSectionView: View {
                         feed: feed,
                         isVideoPlaying: isActive,
                         elapsedInCurrentRange: isActive ? elapsedInCurrentRange : 0,
+                        onLikeTap: {
+                            Task { await viewModel.toggleLike(diaryId: feed.diaryId) }
+                        },
+                        onStoreTap: {
+                            Task { await viewModel.toggleStore(diaryId: feed.diaryId) }
+                        },
                         onVideoPlaybackEnded: {
                             guard currentPageIndex == index else { return }
                             Task {

@@ -66,6 +66,14 @@ struct DiaryFeedPageModel: Decodable {
     let totalPages: Int
 }
 
+struct DiaryLikeToggleResponse: Decodable {
+    let isLiked: Bool
+}
+
+struct DiaryStoreToggleResponse: Decodable {
+    let isStored: Bool
+}
+
 struct MyDiaryFeedsResponse: Decodable {
     let content: [DiaryFeedModel]
     let page: DiaryFeedPageModel
@@ -444,5 +452,34 @@ extension DiaryFeedModel {
         let trimmed = rawDate.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
         return trimmed.split(separator: "T").first.map(String.init) ?? trimmed
+    }
+
+    func replacingInteraction(
+        isLiked: Bool? = nil,
+        isStored: Bool? = nil,
+        likeCount: Int? = nil
+    ) -> DiaryFeedModel {
+        DiaryFeedModel(
+            diaryId: diaryId,
+            artist: artist,
+            musicTitle: musicTitle,
+            albumImageUrl: albumImageUrl,
+            content: content,
+            videoUrl: videoUrl,
+            scope: scope,
+            duration: duration,
+            totalDuration: totalDuration,
+            start: start,
+            end: end,
+            createDate: createDate,
+            updateDate: updateDate,
+            isLiked: isLiked ?? self.isLiked,
+            isStored: isStored ?? self.isStored,
+            likeCount: likeCount ?? self.likeCount,
+            userId: userId,
+            username: username,
+            tag: tag,
+            profileImageUrl: profileImageUrl
+        )
     }
 }
