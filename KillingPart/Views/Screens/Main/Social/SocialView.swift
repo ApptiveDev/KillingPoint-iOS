@@ -27,7 +27,10 @@ struct SocialView: View {
                         } else {
                             FeedSectionView(
                                 viewModel: feedViewModel,
-                                isParentActive: isRootTabSelected && selectedTopTab == .feed
+                                isParentActive: isRootTabSelected && selectedTopTab == .feed,
+                                makeCollectionViewModel: { user in
+                                    viewModel.makeSocialMyCollectionViewModel(for: user)
+                                }
                             )
                         }
                     }

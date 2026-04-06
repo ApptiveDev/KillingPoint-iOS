@@ -198,6 +198,22 @@ final class SocialMyCollectionViewModel: ObservableObject {
         await loadConnections(type: activeConnectionType)
     }
 
+    func makeSocialMyCollectionViewModel(for user: SubscribeUserModel) -> SocialMyCollectionViewModel {
+        makeSocialMyCollectionViewModel(for: UserModel(from: user))
+    }
+
+    func makeSocialMyCollectionViewModel(for user: UserModel) -> SocialMyCollectionViewModel {
+        SocialMyCollectionViewModel(
+            initialUser: user,
+            userService: userService,
+            diaryService: diaryService,
+            subscribeService: subscribeService,
+            onToggleMyPick: { [self] userId, isCurrentlyMyPick in
+                try await onToggleMyPick(userId, isCurrentlyMyPick)
+            }
+        )
+    }
+
     func formattedUpdateDate(from rawUpdateDate: String) -> String {
         let datePart = rawUpdateDate.split(separator: "T").first.map(String.init) ?? rawUpdateDate
         return datePart.replacingOccurrences(of: "-", with: ".")

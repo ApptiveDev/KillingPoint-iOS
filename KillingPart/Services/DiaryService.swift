@@ -4,6 +4,7 @@ protocol DiaryServicing {
     func fetchMyDiaries(page: Int, size: Int) async throws -> MyDiaryFeedsResponse
     func fetchMyFeeds(page: Int, size: Int) async throws -> MyDiaryFeedsResponse
     func fetchUserFeeds(userId: Int, page: Int, size: Int) async throws -> UserDiaryFeedsResponse
+    func fetchDiaryLikeUsers(diaryId: Int, searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse
     func createDiary(request: DiaryCreateRequest) async throws -> DiaryCreateResult
     func updateDiary(diaryId: Int, request: DiaryUpdateRequest) async throws
     func deleteDiary(diaryId: Int) async throws
@@ -118,6 +119,40 @@ struct DiaryService: DiaryServicing {
             )
 
             return try await apiClient.request(request, responseType: UserDiaryFeedsResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func fetchDiaryLikeUsers(
+        diaryId: Int,
+        searchCond: String? = nil,
+        page: Int = Self.defaultPage,
+        size: Int = Self.defaultSize
+    ) async throws -> UserSearchResponse {
+        let resolvedPage = max(page, Self.defaultPage)
+        let resolvedSize = size > 0 ? size : Self.defaultSize
+        let trimmedSearchCond = searchCond?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        var queryItems = [
+            URLQueryItem(name: "page", value: String(resolvedPage)),
+            URLQueryItem(name: "size", value: String(resolvedSize))
+        ]
+
+        if !trimmedSearchCond.isEmpty {
+            queryItems.insert(URLQueryItem(name: "searchCond", value: trimmedSearchCond), at: 0)
+        }
+
+        do {
+            let request = APIRequest(
+                path: "/diaries/\(diaryId)/like",
+                method: .get,
+                queryItems: queryItems,
+                requiresAuthorization: true
+            )
+            let response = try await apiClient.request(request, responseType: UserSearchResponseDTO.self)
+            return response.toModel()
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

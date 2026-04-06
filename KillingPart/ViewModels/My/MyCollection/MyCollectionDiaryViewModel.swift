@@ -11,11 +11,20 @@ final class MyCollectionDiaryViewModel: ObservableObject {
     @Published private(set) var isProcessing = false
     @Published private(set) var isUpdatingInteraction = false
     @Published private(set) var isDeleted = false
+    @Published private(set) var likeUsers: [UserModel] = []
+    @Published private(set) var isLoadingLikeUsers = false
+    @Published private(set) var isLoadingMoreLikeUsers = false
+    @Published var likeUsersErrorMessage: String?
     @Published var errorMessage: String?
 
     private let diaryService: DiaryServicing
     private var isRefreshingInteractionState = false
     private let maxRefreshScanPageCount = 100
+    private let likeUsersPageSize = 20
+    private var activeLikeUsersSearchCond: String?
+    private var likeUsersNextPage = DiaryService.defaultPage
+    private var hasNextLikeUsersPage = true
+    private var likeUsersRequestID = 0
 
     init(
         diary: DiaryFeedModel,
@@ -197,6 +206,76 @@ final class MyCollectionDiaryViewModel: ObservableObject {
         }
     }
 
+    func loadLikeUsers(searchCond: String? = nil) async {
+        likeUsersRequestID += 1
+        let requestID = likeUsersRequestID
+        activeLikeUsersSearchCond = normalizedSearchCond(searchCond)
+        likeUsers = []
+        likeUsersErrorMessage = nil
+        likeUsersNextPage = DiaryService.defaultPage
+        hasNextLikeUsersPage = true
+        isLoadingLikeUsers = true
+        defer {
+            if likeUsersRequestID == requestID {
+                isLoadingLikeUsers = false
+            }
+        }
+
+        do {
+            let response = try await diaryService.fetchDiaryLikeUsers(
+                diaryId: diary.diaryId,
+                searchCond: activeLikeUsersSearchCond,
+                page: DiaryService.defaultPage,
+                size: likeUsersPageSize
+            )
+            guard likeUsersRequestID == requestID else { return }
+            likeUsers = response.content
+            updateLikeUsersPaging(from: response)
+        } catch {
+            guard likeUsersRequestID == requestID else { return }
+            if isRequestCancelled(error) { return }
+            likeUsersErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func loadMoreLikeUsersIfNeeded(currentUserId: Int) async {
+        guard likeUsers.last?.userId == currentUserId else { return }
+        guard hasNextLikeUsersPage else { return }
+        guard !isLoadingLikeUsers, !isLoadingMoreLikeUsers else { return }
+
+        isLoadingMoreLikeUsers = true
+        defer { isLoadingMoreLikeUsers = false }
+
+        do {
+            let response = try await diaryService.fetchDiaryLikeUsers(
+                diaryId: diary.diaryId,
+                searchCond: activeLikeUsersSearchCond,
+                page: likeUsersNextPage,
+                size: likeUsersPageSize
+            )
+            appendLikeUsers(with: response.content)
+            updateLikeUsersPaging(from: response)
+        } catch {
+            if isRequestCancelled(error) { return }
+            likeUsersErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func retryLikeUsersLoading() async {
+        await loadLikeUsers(searchCond: activeLikeUsersSearchCond)
+    }
+
+    func clearLikeUsersState() {
+        likeUsersRequestID += 1
+        activeLikeUsersSearchCond = nil
+        likeUsers = []
+        likeUsersErrorMessage = nil
+        likeUsersNextPage = DiaryService.defaultPage
+        hasNextLikeUsersPage = true
+        isLoadingLikeUsers = false
+        isLoadingMoreLikeUsers = false
+    }
+
     private var trimmedEditContent: String {
         editContentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -316,6 +395,25 @@ final class MyCollectionDiaryViewModel: ObservableObject {
         }
 
         return nil
+    }
+
+    private func appendLikeUsers(with newUsers: [UserModel]) {
+        let existingIDs = Set(likeUsers.map(\.userId))
+        let filtered = newUsers.filter { !existingIDs.contains($0.userId) }
+        likeUsers.append(contentsOf: filtered)
+    }
+
+    private func updateLikeUsersPaging(from response: UserSearchResponse) {
+        likeUsersNextPage = max(response.page.number, 0) + 1
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = likeUsersNextPage < totalPages
+        let hasNextByCount = response.content.count >= likeUsersPageSize
+        hasNextLikeUsersPage = hasNextByPage || hasNextByCount
+    }
+
+    private func normalizedSearchCond(_ searchCond: String?) -> String? {
+        let trimmed = searchCond?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func resolveErrorMessage(from error: Error) -> String {

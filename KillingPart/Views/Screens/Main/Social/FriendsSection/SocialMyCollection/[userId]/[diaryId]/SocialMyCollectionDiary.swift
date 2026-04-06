@@ -10,10 +10,17 @@ struct SocialMyCollectionDiary: View {
     let displayTag: String
     let onDiaryUpdated: (() -> Void)?
     let onDiaryDeleted: ((Int) -> Void)?
+    let makeCollectionViewModel: ((UserModel) -> SocialMyCollectionViewModel)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
     @State private var keyboardHeight: CGFloat = 0
     @State private var playerReloadToken = UUID()
+    @State private var shouldIgnoreNextLikeTap = false
+    @State private var isLikeUsersSheetPresented = false
+    @State private var likeUsersSearchText = ""
+    @State private var pendingNavigationUser: UserModel?
+    @State private var selectedNavigationUser: UserModel?
+    @State private var isUserCollectionNavigationActive = false
 
     private let commentFocusAnchorID = "social-my-collection-diary-comment-focus-anchor"
 
@@ -23,12 +30,14 @@ struct SocialMyCollectionDiary: View {
         diary: DiaryFeedModel,
         onDiaryUpdated: (() -> Void)? = nil,
         onDiaryDeleted: ((Int) -> Void)? = nil,
+        makeCollectionViewModel: ((UserModel) -> SocialMyCollectionViewModel)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.diaryId = diaryId
         self.displayTag = displayTag
         self.onDiaryUpdated = onDiaryUpdated
         self.onDiaryDeleted = onDiaryDeleted
+        self.makeCollectionViewModel = makeCollectionViewModel
         _viewModel = StateObject(
             wrappedValue: MyCollectionDiaryViewModel(
                 diary: diary,
@@ -143,6 +152,23 @@ struct SocialMyCollectionDiary: View {
             guard phase == .active else { return }
             handleFocusActivated()
         }
+        .onChange(of: isLikeUsersSheetPresented) { isPresented in
+            guard !isPresented else { return }
+            viewModel.clearLikeUsersState()
+            likeUsersSearchText = ""
+
+            guard let pendingNavigationUser else { return }
+            self.pendingNavigationUser = nil
+            selectedNavigationUser = pendingNavigationUser
+            DispatchQueue.main.async {
+                isUserCollectionNavigationActive = true
+            }
+        }
+        .onChange(of: isUserCollectionNavigationActive) { isActive in
+            if !isActive {
+                selectedNavigationUser = nil
+            }
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -152,6 +178,45 @@ struct SocialMyCollectionDiary: View {
                 storeButton
             }
         }
+        .sheet(isPresented: $isLikeUsersSheetPresented) {
+            SocialDiaryLikeUsersSheet(
+                title: "좋아요한 사용자",
+                searchText: $likeUsersSearchText,
+                users: viewModel.likeUsers,
+                isLoading: viewModel.isLoadingLikeUsers,
+                isLoadingMore: viewModel.isLoadingMoreLikeUsers,
+                errorMessage: viewModel.likeUsersErrorMessage,
+                emptyMessage: "좋아요를 누른 사용자가 아직 없어요.",
+                onSearchSubmit: {
+                    Task {
+                        await viewModel.loadLikeUsers(searchCond: normalizedLikeUsersSearchCond)
+                    }
+                },
+                onSearchClear: {
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(searchCond: nil)
+                    }
+                },
+                onRetry: {
+                    Task {
+                        await viewModel.retryLikeUsersLoading()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreLikeUsersIfNeeded(currentUserId: userId)
+                    }
+                },
+                onUserTap: { user in
+                    if makeCollectionViewModel != nil {
+                        pendingNavigationUser = user
+                    }
+                    isLikeUsersSheetPresented = false
+                }
+            )
+        }
+        .background(userCollectionNavigationLink)
     }
 
     private var videoURL: URL? {
@@ -266,6 +331,10 @@ struct SocialMyCollectionDiary: View {
 
     private var likeButton: some View {
         Button {
+            if shouldIgnoreNextLikeTap {
+                shouldIgnoreNextLikeTap = false
+                return
+            }
             Task {
                 let isSuccess = await viewModel.toggleLike()
                 guard isSuccess else { return }
@@ -284,8 +353,23 @@ struct SocialMyCollectionDiary: View {
             .background(Color.white.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted)
-        .opacity((viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted) ? 0.6 : 1)
+        .disabled(isLikeInteractionDisabled)
+        .opacity(isLikeInteractionDisabled ? 0.6 : 1)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in
+                    guard !isLikeInteractionDisabled else { return }
+                    shouldIgnoreNextLikeTap = true
+                    isLikeUsersSheetPresented = true
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(searchCond: nil)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        shouldIgnoreNextLikeTap = false
+                    }
+                }
+        )
     }
 
     private var storeButton: some View {
@@ -304,8 +388,8 @@ struct SocialMyCollectionDiary: View {
                 .background(Color.white.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-        .disabled(viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted)
-        .opacity((viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted) ? 0.6 : 1)
+        .disabled(isLikeInteractionDisabled)
+        .opacity(isLikeInteractionDisabled ? 0.6 : 1)
     }
 
     private func handleFocusActivated() {
@@ -315,6 +399,36 @@ struct SocialMyCollectionDiary: View {
                 preferredUserId: viewModel.diary.userId > 0 ? viewModel.diary.userId : nil
             )
         }
+    }
+
+    private var userCollectionNavigationLink: some View {
+        NavigationLink(
+            isActive: $isUserCollectionNavigationActive,
+            destination: {
+                if let selectedNavigationUser,
+                   let makeCollectionViewModel {
+                    SocialMyCollectionView(
+                        viewModel: makeCollectionViewModel(selectedNavigationUser)
+                    )
+                    .id(selectedNavigationUser.userId)
+                } else {
+                    EmptyView()
+                }
+            },
+            label: {
+                EmptyView()
+            }
+        )
+        .hidden()
+    }
+
+    private var normalizedLikeUsersSearchCond: String? {
+        let trimmed = likeUsersSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var isLikeInteractionDisabled: Bool {
+        viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted
     }
 
     private func dismissKeyboard() {

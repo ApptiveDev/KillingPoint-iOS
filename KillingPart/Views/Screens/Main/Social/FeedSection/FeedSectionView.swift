@@ -4,13 +4,17 @@ struct FeedSectionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var viewModel: FeedViewModel
     let isParentActive: Bool
+    let makeCollectionViewModel: (UserModel) -> SocialMyCollectionViewModel
     @State private var currentPageIndex = 0
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var isViewActive = false
     @State private var previousFeedCount = 0
     @State private var playbackFocusToken = 0
-    @State private var selectedProfileDestination: ProfileDestination?
+    @State private var selectedProfileUser: UserModel?
     @State private var isProfileNavigationActive = false
+    @State private var activeLikeUsersSheet: LikeUsersSheetContext?
+    @State private var pendingLikeUserDestination: UserModel?
+    @State private var likeUsersSearchText = ""
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -75,6 +79,57 @@ struct FeedSectionView: View {
                 bumpPlaybackFocusToken()
             }
         }
+        .onChange(of: activeLikeUsersSheet) { sheetContext in
+            if sheetContext == nil {
+                viewModel.clearLikeUsersState()
+                likeUsersSearchText = ""
+                guard let pendingLikeUserDestination else { return }
+                self.pendingLikeUserDestination = nil
+                selectedProfileUser = pendingLikeUserDestination
+                DispatchQueue.main.async {
+                    isProfileNavigationActive = true
+                }
+            }
+        }
+        .sheet(item: $activeLikeUsersSheet) { sheetContext in
+            SocialDiaryLikeUsersSheet(
+                title: "좋아요한 사용자",
+                searchText: $likeUsersSearchText,
+                users: viewModel.likeUsers,
+                isLoading: viewModel.isLoadingLikeUsers,
+                isLoadingMore: viewModel.isLoadingMoreLikeUsers,
+                errorMessage: viewModel.likeUsersErrorMessage,
+                emptyMessage: "좋아요를 누른 사용자가 아직 없어요.",
+                onSearchSubmit: {
+                    Task {
+                        await viewModel.loadLikeUsers(
+                            diaryId: sheetContext.diaryId,
+                            searchCond: normalizedLikeUsersSearchCond
+                        )
+                    }
+                },
+                onSearchClear: {
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(diaryId: sheetContext.diaryId, searchCond: nil)
+                    }
+                },
+                onRetry: {
+                    Task {
+                        await viewModel.retryLikeUsersLoading()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreLikeUsersIfNeeded(currentUserId: userId)
+                    }
+                },
+                onUserTap: { user in
+                    pendingLikeUserDestination = user
+                    activeLikeUsersSheet = nil
+                }
+            )
+        }
     }
 
     private var feedPager: some View {
@@ -94,11 +149,18 @@ struct FeedSectionView: View {
                         shouldLoadPlayer: shouldLoadPlayer,
                         onProfileTap: {
                             guard feed.userId > 0 else { return }
-                            selectedProfileDestination = makeProfileDestination(from: feed)
+                            selectedProfileUser = makeUserModel(from: feed)
                             isProfileNavigationActive = true
                         },
                         onLikeTap: {
                             Task { await viewModel.toggleLike(diaryId: feed.diaryId) }
+                        },
+                        onLikeLongPress: {
+                            likeUsersSearchText = ""
+                            activeLikeUsersSheet = LikeUsersSheetContext(diaryId: feed.diaryId)
+                            Task {
+                                await viewModel.loadLikeUsers(diaryId: feed.diaryId, searchCond: nil)
+                            }
                         },
                         onStoreTap: {
                             Task { await viewModel.toggleStore(diaryId: feed.diaryId) }
@@ -137,7 +199,7 @@ struct FeedSectionView: View {
         }
         .onChange(of: isProfileNavigationActive) { isActive in
             if !isActive {
-                selectedProfileDestination = nil
+                selectedProfileUser = nil
                 handleFocusActivated()
             }
         }
@@ -152,9 +214,9 @@ struct FeedSectionView: View {
         NavigationLink(
             isActive: $isProfileNavigationActive,
             destination: {
-                if let selectedProfileDestination {
+                if let selectedProfileUser {
                     SocialMyCollectionView(
-                        viewModel: makeSocialMyCollectionViewModel(for: selectedProfileDestination)
+                        viewModel: makeCollectionViewModel(selectedProfileUser)
                     )
                 } else {
                     EmptyView()
@@ -180,44 +242,24 @@ struct FeedSectionView: View {
         }
     }
 
-    private func makeSocialMyCollectionViewModel(for destination: ProfileDestination) -> SocialMyCollectionViewModel {
-        let initialUser = makeUserModel(from: destination)
-
-        return SocialMyCollectionViewModel(
-            initialUser: initialUser,
-            onToggleMyPick: { userId, isCurrentlyMyPick in
-                let subscribeService = SubscribeService()
-                if isCurrentlyMyPick {
-                    try await subscribeService.unsubscribe(from: userId)
-                } else {
-                    try await subscribeService.subscribe(to: userId)
-                }
-            }
-        )
+    private var normalizedLikeUsersSearchCond: String? {
+        let trimmed = likeUsersSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
-    private func makeUserModel(from destination: ProfileDestination) -> UserModel {
-        let username = trimmedString(destination.username, fallback: "킬링파트 사용자")
-        let tag = normalizeTag(trimmedString(destination.tag, fallback: "killingpart_user"))
-        let profileImageUrl = trimmedString(destination.profileImageUrl, fallback: "")
+    private func makeUserModel(from feed: DiaryFeedModel) -> UserModel {
+        let username = trimmedString(feed.username, fallback: "킬링파트 사용자")
+        let tag = normalizeTag(trimmedString(feed.tag, fallback: "killingpart_user"))
+        let profileImageUrl = trimmedString(feed.profileImageUrl, fallback: "")
         return UserModel(
-            userId: destination.userId,
+            userId: feed.userId,
             username: username,
             tag: tag,
-            identifier: String(destination.userId),
+            identifier: String(feed.userId),
             profileImageUrl: profileImageUrl,
             userRoleType: "USER",
             socialType: "UNKNOWN",
             isMyPick: nil
-        )
-    }
-
-    private func makeProfileDestination(from feed: DiaryFeedModel) -> ProfileDestination {
-        ProfileDestination(
-            userId: feed.userId,
-            username: feed.username,
-            tag: feed.tag,
-            profileImageUrl: feed.profileImageUrl
         )
     }
 
@@ -238,13 +280,9 @@ struct FeedSectionView: View {
         return rawTag
     }
 
-    private struct ProfileDestination: Hashable, Identifiable {
-        let userId: Int
-        let username: String?
-        let tag: String?
-        let profileImageUrl: String?
-
-        var id: Int { userId }
+    private struct LikeUsersSheetContext: Identifiable, Equatable {
+        let diaryId: Int
+        var id: Int { diaryId }
     }
      
     private func handleVideoPlaybackEnded(currentIndex: Int, feed: DiaryFeedModel) {

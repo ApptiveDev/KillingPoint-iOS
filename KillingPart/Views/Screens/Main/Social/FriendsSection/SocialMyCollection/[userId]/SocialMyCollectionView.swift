@@ -31,7 +31,10 @@ struct SocialMyCollectionView: View {
                                 SocialMyCollectionDiary(
                                     diaryId: feed.diaryId,
                                     displayTag: viewModel.displayTag,
-                                    diary: diary
+                                    diary: diary,
+                                    makeCollectionViewModel: { user in
+                                        viewModel.makeSocialMyCollectionViewModel(for: user)
+                                    }
                                 )
                             } label: {
                                 SocialMyCollectionFeedCard(
@@ -166,7 +169,7 @@ struct SocialMyCollectionView: View {
             destination: {
                 if let selectedNavigationUser {
                     SocialMyCollectionView(
-                        viewModel: makeCollectionViewModel(for: selectedNavigationUser)
+                        viewModel: viewModel.makeSocialMyCollectionViewModel(for: selectedNavigationUser)
                     )
                     .id(selectedNavigationUser.userId)
                 } else {
@@ -185,20 +188,6 @@ struct SocialMyCollectionView: View {
         Task {
             await viewModel.loadConnections(type: sheetType.connectionType)
         }
-    }
-
-    private func makeCollectionViewModel(for user: SubscribeUserModel) -> SocialMyCollectionViewModel {
-        SocialMyCollectionViewModel(
-            initialUser: UserModel(from: user),
-            onToggleMyPick: { userId, isCurrentlyMyPick in
-                let subscribeService = SubscribeService()
-                if isCurrentlyMyPick {
-                    try await subscribeService.unsubscribe(from: userId)
-                } else {
-                    try await subscribeService.subscribe(to: userId)
-                }
-            }
-        )
     }
 
     private enum ConnectionSheetType: String, Identifiable {

@@ -8,8 +8,10 @@ struct SocialFeedPageCardView: View {
     let shouldLoadPlayer: Bool
     let onProfileTap: () -> Void
     let onLikeTap: () -> Void
+    let onLikeLongPress: () -> Void
     let onStoreTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
+    @State private var shouldIgnoreNextLikeTap = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,6 +43,10 @@ struct SocialFeedPageCardView: View {
                         HStack(spacing: AppSpacing.s) {
                             HStack(spacing: 4) {
                                 Button {
+                                    if shouldIgnoreNextLikeTap {
+                                        shouldIgnoreNextLikeTap = false
+                                        return
+                                    }
                                     onLikeTap()
                                 } label: {
                                     HStack(spacing: 4) {
@@ -55,6 +61,16 @@ struct SocialFeedPageCardView: View {
                                     .background(Color.white.opacity(0.1), in: Capsule())
                                 }
                                 .buttonStyle(.plain)
+                                .simultaneousGesture(
+                                    LongPressGesture(minimumDuration: 0.45)
+                                        .onEnded { _ in
+                                            shouldIgnoreNextLikeTap = true
+                                            onLikeLongPress()
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                                shouldIgnoreNextLikeTap = false
+                                            }
+                                        }
+                                )
                             }
 
                             Button {
