@@ -53,23 +53,20 @@ struct FeedSectionView: View {
         }
         .onAppear {
             isViewActive = true
-            elapsedInCurrentRange = 0
             previousFeedCount = viewModel.feeds.count
-            bumpPlaybackFocusToken()
+            handleFocusActivated()
         }
         .onDisappear {
             isViewActive = false
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
-                elapsedInCurrentRange = 0
-                bumpPlaybackFocusToken()
+                handleFocusActivated()
             }
         }
         .onChange(of: isParentActive) { isParentActive in
             guard isParentActive else { return }
-            elapsedInCurrentRange = 0
-            bumpPlaybackFocusToken()
+            handleFocusActivated()
         }
         .onChange(of: viewModel.feeds.count) { newCount in
             let hasAppendedFeed = newCount > previousFeedCount
@@ -141,6 +138,7 @@ struct FeedSectionView: View {
         .onChange(of: isProfileNavigationActive) { isActive in
             if !isActive {
                 selectedProfileDestination = nil
+                handleFocusActivated()
             }
         }
         .background(profileNavigationLink)
@@ -171,6 +169,15 @@ struct FeedSectionView: View {
 
     private func bumpPlaybackFocusToken() {
         playbackFocusToken &+= 1
+    }
+
+    private func handleFocusActivated() {
+        guard isPlaybackActive else { return }
+        elapsedInCurrentRange = 0
+        bumpPlaybackFocusToken()
+        Task {
+            await viewModel.refreshLoadedFeedInteractionsIfNeeded()
+        }
     }
 
     private func makeSocialMyCollectionViewModel(for destination: ProfileDestination) -> SocialMyCollectionViewModel {

@@ -11,6 +11,9 @@ final class FeedViewModel: ObservableObject {
     private var hasLoadedInitialData = false
     private var nextPage = DiaryService.defaultPage
     private var hasNextPage = true
+    private var isRefreshingInteractions = false
+    private var lastInteractionRefreshAt: Date?
+    private let interactionRefreshCooldown: TimeInterval = 0.75
 
     init(diaryService: DiaryServicing = DiaryService()) {
         self.diaryService = diaryService
@@ -35,6 +38,67 @@ final class FeedViewModel: ObservableObject {
             feeds = response.content
             updatePaging(from: response)
             hasLoadedInitialData = true
+        } catch {
+            if isRequestCancelled(error) { return }
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func refreshLoadedFeedInteractionsIfNeeded(force: Bool = false) async {
+        guard hasLoadedInitialData else {
+            await loadInitialDataIfNeeded()
+            return
+        }
+        guard !feeds.isEmpty else { return }
+        guard !isRefreshingInteractions else { return }
+
+        if !force,
+           let lastInteractionRefreshAt,
+           Date().timeIntervalSince(lastInteractionRefreshAt) < interactionRefreshCooldown {
+            return
+        }
+
+        isRefreshingInteractions = true
+        defer {
+            isRefreshingInteractions = false
+            lastInteractionRefreshAt = Date()
+        }
+
+        do {
+            let loadedPageCount = max(
+                1,
+                Int(ceil(Double(feeds.count) / Double(max(DiaryService.defaultSize, 1))))
+            )
+
+            var latestByDiaryId: [Int: DiaryFeedModel] = [:]
+            var page = DiaryService.defaultPage
+
+            for _ in 0..<loadedPageCount {
+                let response = try await diaryService.fetchMyFeeds(
+                    page: page,
+                    size: DiaryService.defaultSize
+                )
+                response.content.forEach { latestByDiaryId[$0.diaryId] = $0 }
+
+                let nextPage = max(response.page.number, 0) + 1
+                let totalPages = max(response.page.totalPages, 0)
+                let hasNextByPage = nextPage < totalPages
+                let hasNextByCount = response.content.count >= DiaryService.defaultSize
+                let hasNext = hasNextByPage || hasNextByCount
+
+                guard hasNext else { break }
+                page = nextPage
+            }
+
+            guard !latestByDiaryId.isEmpty else { return }
+            feeds = feeds.map { feed in
+                guard let latestFeed = latestByDiaryId[feed.diaryId] else { return feed }
+                return feed.replacingInteraction(
+                    isLiked: latestFeed.isLiked,
+                    isStored: latestFeed.isStored,
+                    likeCount: latestFeed.likeCount
+                )
+            }
         } catch {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
