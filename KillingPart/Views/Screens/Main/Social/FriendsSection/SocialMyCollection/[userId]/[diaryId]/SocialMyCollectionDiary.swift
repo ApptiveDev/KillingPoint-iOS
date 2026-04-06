@@ -136,9 +136,12 @@ struct SocialMyCollectionDiary: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
             updateKeyboardHeight(from: notification)
         }
+        .onAppear {
+            handleFocusActivated()
+        }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
-            playerReloadToken = UUID()
+            handleFocusActivated()
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -303,6 +306,15 @@ struct SocialMyCollectionDiary: View {
         .buttonStyle(.plain)
         .disabled(viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted)
         .opacity((viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted) ? 0.6 : 1)
+    }
+
+    private func handleFocusActivated() {
+        playerReloadToken = UUID()
+        Task {
+            await viewModel.refreshInteractionStateIfNeeded(
+                preferredUserId: viewModel.diary.userId > 0 ? viewModel.diary.userId : nil
+            )
+        }
     }
 
     private func dismissKeyboard() {

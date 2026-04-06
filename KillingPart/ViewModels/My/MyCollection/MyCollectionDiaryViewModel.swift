@@ -14,6 +14,8 @@ final class MyCollectionDiaryViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let diaryService: DiaryServicing
+    private var isRefreshingInteractionState = false
+    private let maxRefreshScanPageCount = 100
 
     init(
         diary: DiaryFeedModel,
@@ -173,6 +175,28 @@ final class MyCollectionDiaryViewModel: ObservableObject {
         }
     }
 
+    func refreshInteractionStateIfNeeded(preferredUserId: Int? = nil) async {
+        guard !isDeleted, !isProcessing, !isUpdatingInteraction else { return }
+        guard !isRefreshingInteractionState else { return }
+
+        isRefreshingInteractionState = true
+        defer { isRefreshingInteractionState = false }
+
+        do {
+            guard let latestInteraction = try await fetchLatestInteractionState(preferredUserId: preferredUserId) else {
+                return
+            }
+            diary = diary.replacingInteraction(
+                isLiked: latestInteraction.isLiked,
+                isStored: latestInteraction.isStored,
+                likeCount: latestInteraction.likeCount
+            )
+        } catch {
+            if isRequestCancelled(error) { return }
+            errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
     private var trimmedEditContent: String {
         editContentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -204,6 +228,91 @@ final class MyCollectionDiaryViewModel: ObservableObject {
 
         if let raw = Double(sanitized) {
             return max(raw, 0)
+        }
+
+        return nil
+    }
+
+    private func fetchLatestInteractionState(
+        preferredUserId: Int?
+    ) async throws -> (isLiked: Bool, isStored: Bool, likeCount: Int)? {
+        let resolvedUserId: Int?
+        if let preferredUserId, preferredUserId > 0 {
+            resolvedUserId = preferredUserId
+        } else if diary.userId > 0 {
+            resolvedUserId = diary.userId
+        } else {
+            resolvedUserId = nil
+        }
+
+        if let resolvedUserId,
+           let userFeedInteraction = try await findInteractionInUserFeeds(userId: resolvedUserId) {
+            return userFeedInteraction
+        }
+
+        return try await findInteractionInMyFeeds()
+    }
+
+    private func findInteractionInUserFeeds(
+        userId: Int
+    ) async throws -> (isLiked: Bool, isStored: Bool, likeCount: Int)? {
+        var page = DiaryService.defaultPage
+
+        for _ in 0..<maxRefreshScanPageCount {
+            let response = try await diaryService.fetchUserFeeds(
+                userId: userId,
+                page: page,
+                size: DiaryService.defaultSize
+            )
+
+            if let targetDiary = response.content.first(where: { $0.diaryId == diary.diaryId }) {
+                return (
+                    isLiked: targetDiary.isLiked,
+                    isStored: targetDiary.isStored,
+                    likeCount: targetDiary.likeCount
+                )
+            }
+
+            let nextPage = max(response.page.number, 0) + 1
+            let totalPages = max(response.page.totalPages, 0)
+            let hasNextByPage = nextPage < totalPages
+            let hasNextByCount = response.content.count >= DiaryService.defaultSize
+            guard hasNextByPage || hasNextByCount else {
+                return nil
+            }
+
+            page = nextPage
+        }
+
+        return nil
+    }
+
+    private func findInteractionInMyFeeds() async throws -> (isLiked: Bool, isStored: Bool, likeCount: Int)? {
+        var page = DiaryService.defaultPage
+
+        for _ in 0..<maxRefreshScanPageCount {
+            let response = try await diaryService.fetchMyFeeds(
+                page: page,
+                size: DiaryService.defaultSize
+            )
+
+            if let targetDiary = response.content.first(where: { $0.diaryId == diary.diaryId }) {
+                return (
+                    isLiked: targetDiary.isLiked,
+                    isStored: targetDiary.isStored,
+                    likeCount: targetDiary.likeCount
+                )
+            }
+
+            let nextPage = max(response.page.number, 0) + 1
+            let totalPages = max(response.page.totalPages, 0)
+            let hasNextByPage = nextPage < totalPages
+            let hasNextByCount = response.content.count >= DiaryService.defaultSize
+            guard hasNextByPage || hasNextByCount else {
+                return nil
+            }
+
+            page = nextPage
         }
 
         return nil
