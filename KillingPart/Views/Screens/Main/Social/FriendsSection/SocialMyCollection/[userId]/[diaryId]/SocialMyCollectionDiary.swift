@@ -143,6 +143,12 @@ struct SocialMyCollectionDiary: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                likeButton
+                storeButton
+            }
+        }
     }
 
     private var videoURL: URL? {
@@ -253,6 +259,50 @@ struct SocialMyCollectionDiary: View {
             guard isSuccess else { return }
             onDiaryUpdated?()
         }
+    }
+
+    private var likeButton: some View {
+        Button {
+            Task {
+                let isSuccess = await viewModel.toggleLike()
+                guard isSuccess else { return }
+                onDiaryUpdated?()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: viewModel.diary.isLiked ? "heart.fill" : "heart")
+                    .foregroundStyle(viewModel.diary.isLiked ? Color.kpPrimary : .white.opacity(0.75))
+                Text(viewModel.diary.likeCount.formatted())
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .padding(.horizontal, AppSpacing.xs)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted)
+        .opacity((viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted) ? 0.6 : 1)
+    }
+
+    private var storeButton: some View {
+        Button {
+            Task {
+                let isSuccess = await viewModel.toggleStore()
+                guard isSuccess else { return }
+                onDiaryUpdated?()
+            }
+        } label: {
+            Image(systemName: viewModel.diary.isStored ? "bookmark.fill" : "bookmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(AppColors.primary600)
+                .padding(.horizontal, AppSpacing.xs)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted)
+        .opacity((viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted) ? 0.6 : 1)
     }
 
     private func dismissKeyboard() {

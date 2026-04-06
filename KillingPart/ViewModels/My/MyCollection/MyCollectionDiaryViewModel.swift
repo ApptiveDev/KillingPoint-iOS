@@ -9,6 +9,7 @@ final class MyCollectionDiaryViewModel: ObservableObject {
     @Published var editContentDraft: String
     @Published var isEditMode = false
     @Published private(set) var isProcessing = false
+    @Published private(set) var isUpdatingInteraction = false
     @Published private(set) var isDeleted = false
     @Published var errorMessage: String?
 
@@ -111,6 +112,62 @@ final class MyCollectionDiaryViewModel: ObservableObject {
             return true
         } catch {
             if isRequestCancelled(error) { return false }
+            errorMessage = resolveErrorMessage(from: error)
+            return false
+        }
+    }
+
+    func toggleLike() async -> Bool {
+        guard !isProcessing, !isUpdatingInteraction, !isDeleted else { return false }
+
+        let originalDiary = diary
+        let toggledIsLiked = !originalDiary.isLiked
+        let optimisticLikeCount = max(originalDiary.likeCount + (toggledIsLiked ? 1 : -1), 0)
+        diary = originalDiary.replacingInteraction(
+            isLiked: toggledIsLiked,
+            likeCount: optimisticLikeCount
+        )
+        errorMessage = nil
+        isUpdatingInteraction = true
+        defer { isUpdatingInteraction = false }
+
+        do {
+            let response = try await diaryService.toggleDiaryLike(diaryId: originalDiary.diaryId)
+            let currentDiary = diary
+            let confirmedLikeCount = max(
+                currentDiary.likeCount + (response.isLiked == currentDiary.isLiked ? 0 : (response.isLiked ? 1 : -1)),
+                0
+            )
+            diary = currentDiary.replacingInteraction(
+                isLiked: response.isLiked,
+                likeCount: confirmedLikeCount
+            )
+            return true
+        } catch {
+            if isRequestCancelled(error) { return false }
+            diary = originalDiary
+            errorMessage = resolveErrorMessage(from: error)
+            return false
+        }
+    }
+
+    func toggleStore() async -> Bool {
+        guard !isProcessing, !isUpdatingInteraction, !isDeleted else { return false }
+
+        let originalDiary = diary
+        let toggledIsStored = !originalDiary.isStored
+        diary = originalDiary.replacingInteraction(isStored: toggledIsStored)
+        errorMessage = nil
+        isUpdatingInteraction = true
+        defer { isUpdatingInteraction = false }
+
+        do {
+            let response = try await diaryService.toggleDiaryStore(diaryId: originalDiary.diaryId)
+            diary = diary.replacingInteraction(isStored: response.isStored)
+            return true
+        } catch {
+            if isRequestCancelled(error) { return false }
+            diary = originalDiary
             errorMessage = resolveErrorMessage(from: error)
             return false
         }
