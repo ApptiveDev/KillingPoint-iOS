@@ -6,6 +6,7 @@ struct SocialFeedPageCardView: View {
     let playbackFocusToken: Int
     let elapsedInCurrentRange: TimeInterval
     let shouldLoadPlayer: Bool
+    let onProfileTap: () -> Void
     let onLikeTap: () -> Void
     let onStoreTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
@@ -15,7 +16,10 @@ struct SocialFeedPageCardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppSpacing.s) {
                     HStack {
-                        SocialFeedProfileView(feed: feed)
+                        Button(action: onProfileTap) {
+                            SocialFeedProfileView(feed: feed)
+                        }
+                        .buttonStyle(.plain)
                         Spacer()
                     }
 

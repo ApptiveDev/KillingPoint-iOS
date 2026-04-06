@@ -9,6 +9,8 @@ struct FeedSectionView: View {
     @State private var isViewActive = false
     @State private var previousFeedCount = 0
     @State private var playbackFocusToken = 0
+    @State private var selectedProfileDestination: ProfileDestination?
+    @State private var isProfileNavigationActive = false
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -93,6 +95,11 @@ struct FeedSectionView: View {
                         playbackFocusToken: isActive ? playbackFocusToken : 0,
                         elapsedInCurrentRange: isActive ? elapsedInCurrentRange : 0,
                         shouldLoadPlayer: shouldLoadPlayer,
+                        onProfileTap: {
+                            guard feed.userId > 0 else { return }
+                            selectedProfileDestination = makeProfileDestination(from: feed)
+                            isProfileNavigationActive = true
+                        },
                         onLikeTap: {
                             Task { await viewModel.toggleLike(diaryId: feed.diaryId) }
                         },
@@ -131,16 +138,108 @@ struct FeedSectionView: View {
             elapsedInCurrentRange = 0
             bumpPlaybackFocusToken()
         }
+        .onChange(of: isProfileNavigationActive) { isActive in
+            if !isActive {
+                selectedProfileDestination = nil
+            }
+        }
+        .background(profileNavigationLink)
     }
 
     private var isPlaybackActive: Bool {
         isViewActive && isParentActive && scenePhase == .active
     }
 
+    private var profileNavigationLink: some View {
+        NavigationLink(
+            isActive: $isProfileNavigationActive,
+            destination: {
+                if let selectedProfileDestination {
+                    SocialMyCollectionView(
+                        viewModel: makeSocialMyCollectionViewModel(for: selectedProfileDestination)
+                    )
+                } else {
+                    EmptyView()
+                }
+            },
+            label: {
+                EmptyView()
+            }
+        )
+        .hidden()
+    }
+
     private func bumpPlaybackFocusToken() {
         playbackFocusToken &+= 1
     }
-    
+
+    private func makeSocialMyCollectionViewModel(for destination: ProfileDestination) -> SocialMyCollectionViewModel {
+        let initialUser = makeUserModel(from: destination)
+
+        return SocialMyCollectionViewModel(
+            initialUser: initialUser,
+            onToggleMyPick: { userId, isCurrentlyMyPick in
+                let subscribeService = SubscribeService()
+                if isCurrentlyMyPick {
+                    try await subscribeService.unsubscribe(from: userId)
+                } else {
+                    try await subscribeService.subscribe(to: userId)
+                }
+            }
+        )
+    }
+
+    private func makeUserModel(from destination: ProfileDestination) -> UserModel {
+        let username = trimmedString(destination.username, fallback: "킬링파트 사용자")
+        let tag = normalizeTag(trimmedString(destination.tag, fallback: "killingpart_user"))
+        let profileImageUrl = trimmedString(destination.profileImageUrl, fallback: "")
+        return UserModel(
+            userId: destination.userId,
+            username: username,
+            tag: tag,
+            identifier: String(destination.userId),
+            profileImageUrl: profileImageUrl,
+            userRoleType: "USER",
+            socialType: "UNKNOWN",
+            isMyPick: nil
+        )
+    }
+
+    private func makeProfileDestination(from feed: DiaryFeedModel) -> ProfileDestination {
+        ProfileDestination(
+            userId: feed.userId,
+            username: feed.username,
+            tag: feed.tag,
+            profileImageUrl: feed.profileImageUrl
+        )
+    }
+
+    private func trimmedString(_ raw: String?, fallback: String) -> String {
+        guard
+            let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !raw.isEmpty
+        else {
+            return fallback
+        }
+        return raw
+    }
+
+    private func normalizeTag(_ rawTag: String) -> String {
+        if rawTag.hasPrefix("@") {
+            return String(rawTag.dropFirst())
+        }
+        return rawTag
+    }
+
+    private struct ProfileDestination: Hashable, Identifiable {
+        let userId: Int
+        let username: String?
+        let tag: String?
+        let profileImageUrl: String?
+
+        var id: Int { userId }
+    }
+     
     private func handleVideoPlaybackEnded(currentIndex: Int, feed: DiaryFeedModel) {
         Task {
             let nextIndex = currentIndex + 1
