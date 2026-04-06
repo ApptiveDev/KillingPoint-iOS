@@ -13,7 +13,8 @@ struct MyCollectionDiaryVideoSection: View {
         YoutubePlayerView(
             videoURL: videoURL,
             startSeconds: startSeconds,
-            endSeconds: endSeconds
+            endSeconds: endSeconds,
+            playbackFocusToken: playerReloadToken.hashValue
         )
         .id(playerReloadToken)
         .frame(maxWidth: .infinity)

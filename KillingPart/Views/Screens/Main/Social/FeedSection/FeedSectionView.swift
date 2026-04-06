@@ -3,10 +3,12 @@ import SwiftUI
 struct FeedSectionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var viewModel: FeedViewModel
+    let isParentActive: Bool
     @State private var currentPageIndex = 0
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var isViewActive = false
     @State private var previousFeedCount = 0
+    @State private var playbackFocusToken = 0
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -51,6 +53,7 @@ struct FeedSectionView: View {
             isViewActive = true
             elapsedInCurrentRange = 0
             previousFeedCount = viewModel.feeds.count
+            bumpPlaybackFocusToken()
         }
         .onDisappear {
             isViewActive = false
@@ -58,10 +61,20 @@ struct FeedSectionView: View {
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 elapsedInCurrentRange = 0
+                bumpPlaybackFocusToken()
             }
         }
+        .onChange(of: isParentActive) { isParentActive in
+            guard isParentActive else { return }
+            elapsedInCurrentRange = 0
+            bumpPlaybackFocusToken()
+        }
         .onChange(of: viewModel.feeds.count) { newCount in
+            let hasAppendedFeed = newCount > previousFeedCount
             previousFeedCount = newCount
+            if hasAppendedFeed && isPlaybackActive {
+                bumpPlaybackFocusToken()
+            }
         }
     }
 
@@ -70,13 +83,14 @@ struct FeedSectionView: View {
             TabView(selection: $currentPageIndex) {
                 ForEach(viewModel.feeds.indices, id: \.self) { index in
                     let feed = viewModel.feeds[index]
-                    let isActive = index == currentPageIndex && isViewActive
-                    // 현재 페이지만 로드
-                    let shouldLoadPlayer = index == currentPageIndex
+                    let isActive = index == currentPageIndex && isPlaybackActive
+                    // 현재 페이지와 인접 페이지를 미리 로드해 스와이프 전환 시 버벅임을 줄인다.
+                    let shouldLoadPlayer = abs(index - currentPageIndex) <= 1
 
                     SocialFeedPageCardView(
                         feed: feed,
                         isVideoPlaying: isActive,
+                        playbackFocusToken: isActive ? playbackFocusToken : 0,
                         elapsedInCurrentRange: isActive ? elapsedInCurrentRange : 0,
                         shouldLoadPlayer: shouldLoadPlayer,
                         onLikeTap: {
@@ -110,12 +124,21 @@ struct FeedSectionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onReceive(playbackTimer) { _ in
-            guard isViewActive else { return }
+            guard isPlaybackActive else { return }
             elapsedInCurrentRange += 0.25
         }
         .onChange(of: currentPageIndex) { _ in
             elapsedInCurrentRange = 0
+            bumpPlaybackFocusToken()
         }
+    }
+
+    private var isPlaybackActive: Bool {
+        isViewActive && isParentActive && scenePhase == .active
+    }
+
+    private func bumpPlaybackFocusToken() {
+        playbackFocusToken &+= 1
     }
     
     private func handleVideoPlaybackEnded(currentIndex: Int, feed: DiaryFeedModel) {

@@ -3,6 +3,7 @@ import SwiftUI
 struct SocialFeedPageCardView: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
+    let playbackFocusToken: Int
     let elapsedInCurrentRange: TimeInterval
     let shouldLoadPlayer: Bool
     let onLikeTap: () -> Void
@@ -69,6 +70,7 @@ struct SocialFeedPageCardView: View {
                     SocialFeedVideoSection(
                         feed: feed,
                         isVideoPlaying: isVideoPlaying,
+                        playbackFocusToken: playbackFocusToken,
                         shouldLoadPlayer: shouldLoadPlayer,
                         onPlaybackEnded: onVideoPlaybackEnded
                     )
@@ -152,6 +154,7 @@ struct SocialFeedPageCardView: View {
 private struct SocialFeedVideoSection: View {
     let feed: DiaryFeedModel
     let isVideoPlaying: Bool
+    let playbackFocusToken: Int
     let shouldLoadPlayer: Bool
     let onPlaybackEnded: () -> Void
 
@@ -163,6 +166,7 @@ private struct SocialFeedVideoSection: View {
                     startSeconds: parsedSeconds(from: feed.start) ?? 0,
                     endSeconds: parsedEndSeconds,
                     isPlaying: isVideoPlaying,
+                    playbackFocusToken: playbackFocusToken,
                     shouldLoopPlayback: false,
                     onPlaybackEnded: onPlaybackEnded
                 )

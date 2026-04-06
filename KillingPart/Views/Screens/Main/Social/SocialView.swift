@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SocialView: View {
+    let isRootTabSelected: Bool
     @StateObject private var viewModel = SocialViewModel()
     @StateObject private var feedViewModel = FeedViewModel()
     @State private var selectedTopTab: SocialTopTab = .friend
@@ -24,7 +25,10 @@ struct SocialView: View {
                         if selectedTopTab == .friend {
                             FriendsSectionView(viewModel: viewModel)
                         } else {
-                            FeedSectionView(viewModel: feedViewModel)
+                            FeedSectionView(
+                                viewModel: feedViewModel,
+                                isParentActive: isRootTabSelected && selectedTopTab == .feed
+                            )
                         }
                     }
                     .padding(.horizontal, AppSpacing.m)
@@ -48,5 +52,5 @@ struct SocialView: View {
 }
 
 #Preview {
-    SocialView()
+    SocialView(isRootTabSelected: true)
 }
