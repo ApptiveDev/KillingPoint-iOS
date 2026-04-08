@@ -30,7 +30,12 @@ struct SocialFeedPageCardView: View {
                             Button {
                                 onReportTap()
                             } label: {
-                                Label("신고하기", systemImage: "exclamationmark.triangle.fill")
+                                Label {
+                                    Text("신고하기")
+                                } icon: {
+                                    Image(systemName: "bell.fill")
+                                }
+                                .tint(.red)
                             }
                         } label: {
                             Image(systemName: "ellipsis")
