@@ -33,7 +33,7 @@ struct SocialFeedPageCardView: View {
                                 Label {
                                     Text("신고하기")
                                 } icon: {
-                                    Image(systemName: "bell.fill")
+                                    Image(systemName: "light.beacon.max")
                                 }
                                 .tint(.red)
                             }
