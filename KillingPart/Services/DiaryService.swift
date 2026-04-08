@@ -11,6 +11,7 @@ protocol DiaryServicing {
     func updateMyDiaryOrder(request: DiaryOrderUpdateRequest) async throws
     func toggleDiaryLike(diaryId: Int) async throws -> DiaryLikeToggleResponse
     func toggleDiaryStore(diaryId: Int) async throws -> DiaryStoreToggleResponse
+    func reportDiary(diaryId: Int, content: String) async throws
 }
 
 enum DiaryServiceError: LocalizedError {
@@ -279,6 +280,32 @@ struct DiaryService: DiaryServicing {
         }
     }
 
+    func reportDiary(diaryId: Int, content: String) async throws {
+        let requestBody: Data
+        do {
+            requestBody = try JSONEncoder().encode(
+                DiaryReportRequest(content: content.trimmingCharacters(in: .whitespacesAndNewlines))
+            )
+        } catch {
+            throw DiaryServiceError.requestEncodingFailed
+        }
+
+        do {
+            var request = APIRequest(
+                path: "/diaries/\(diaryId)/reports",
+                method: .post,
+                requiresAuthorization: true,
+                body: requestBody
+            )
+            request.headers["Accept"] = "application/json"
+            request.headers["Content-Type"] = "application/json"
+            try await apiClient.request(request)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
     private func mapError(_ error: Error) -> DiaryServiceError {
         if let diaryServiceError = error as? DiaryServiceError {
             return diaryServiceError
@@ -291,13 +318,51 @@ struct DiaryService: DiaryServicing {
             case .missingAccessToken, .missingRefreshToken, .unauthorized:
                 return .sessionExpired
             case .serverError(let statusCode, let message):
-                return .serverError(statusCode: statusCode, message: message)
+                return .serverError(
+                    statusCode: statusCode,
+                    message: normalizeServerErrorMessage(message)
+                )
             case .decodingFailed:
                 return .decodingFailed
             }
         }
 
         return .networkFailure(message: "네트워크 요청 중 오류가 발생했어요.")
+    }
+
+    private func normalizeServerErrorMessage(_ rawMessage: String?) -> String? {
+        guard
+            let rawMessage = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawMessage.isEmpty
+        else {
+            return nil
+        }
+
+        guard
+            rawMessage.first == "{",
+            let data = rawMessage.data(using: .utf8),
+            let parsed = try? JSONDecoder().decode(DiaryServiceErrorResponse.self, from: data)
+        else {
+            return rawMessage
+        }
+
+        if let message = parsed.message?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !message.isEmpty {
+            return message
+        }
+
+        let fieldMessages = (parsed.fieldErrors ?? [])
+            .flatMap(\.values)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let globalMessages = (parsed.globalErrors ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let merged = fieldMessages + globalMessages
+        guard !merged.isEmpty else { return rawMessage }
+        return merged.joined(separator: "\n")
     }
 
     private func extractDiaryID(from location: String?) -> Int? {
@@ -318,4 +383,10 @@ struct DiaryService: DiaryServicing {
         let nsError = error as NSError
         return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
+}
+
+private struct DiaryServiceErrorResponse: Decodable {
+    let message: String?
+    let fieldErrors: [[String: String]]?
+    let globalErrors: [String]?
 }

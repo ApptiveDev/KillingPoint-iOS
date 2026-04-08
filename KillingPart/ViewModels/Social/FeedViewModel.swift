@@ -8,8 +8,10 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var likeUsers: [UserModel] = []
     @Published private(set) var isLoadingLikeUsers = false
     @Published private(set) var isLoadingMoreLikeUsers = false
+    @Published private(set) var isReportingDiary = false
     @Published var errorMessage: String?
     @Published var likeUsersErrorMessage: String?
+    @Published var reportErrorMessage: String?
 
     private let diaryService: DiaryServicing
     private var hasLoadedInitialData = false
@@ -192,6 +194,10 @@ final class FeedViewModel: ObservableObject {
         isLoadingMoreLikeUsers = false
     }
 
+    func clearDiaryReportState() {
+        reportErrorMessage = nil
+    }
+
     func loadMoreIfNeeded(currentDiaryId: Int) async {
         guard feeds.last?.diaryId == currentDiaryId else { return }
         guard hasNextPage else { return }
@@ -260,6 +266,33 @@ final class FeedViewModel: ObservableObject {
                 feeds[rollbackIndex] = originalFeed
             }
             errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func reportDiary(diaryId: Int, content: String) async -> Bool {
+        guard !isReportingDiary else { return false }
+
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else {
+            reportErrorMessage = "빈칸은 입력할 수 없습니다."
+            return false
+        }
+        guard trimmedContent.count <= 200 else {
+            reportErrorMessage = "신고 내용은 1자 이상 200자 이하입니다."
+            return false
+        }
+
+        reportErrorMessage = nil
+        isReportingDiary = true
+        defer { isReportingDiary = false }
+
+        do {
+            try await diaryService.reportDiary(diaryId: diaryId, content: trimmedContent)
+            return true
+        } catch {
+            if isRequestCancelled(error) { return false }
+            reportErrorMessage = resolveErrorMessage(from: error)
+            return false
         }
     }
 

@@ -10,6 +10,7 @@ struct SocialFeedPageCardView: View {
     let onLikeTap: () -> Void
     let onLikeLongPress: () -> Void
     let onStoreTap: () -> Void
+    let onReportTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
     @State private var shouldIgnoreNextLikeTap = false
 
@@ -22,7 +23,23 @@ struct SocialFeedPageCardView: View {
                             SocialFeedProfileView(feed: feed)
                         }
                         .buttonStyle(.plain)
+
                         Spacer()
+
+                        Menu {
+                            Button {
+                                onReportTap()
+                            } label: {
+                                Label("신고하기", systemImage: "exclamationmark.triangle.fill")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .frame(width: 32, height: 32)
+                                .background(Color.white.opacity(0.1), in: Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     HStack(alignment: .top, spacing: AppSpacing.s) {

@@ -13,8 +13,10 @@ struct FeedSectionView: View {
     @State private var selectedProfileUser: UserModel?
     @State private var isProfileNavigationActive = false
     @State private var activeLikeUsersSheet: LikeUsersSheetContext?
+    @State private var activeDiaryReportSheet: DiaryReportSheetContext?
     @State private var pendingLikeUserDestination: UserModel?
     @State private var likeUsersSearchText = ""
+    @State private var diaryReportContent = ""
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -91,6 +93,12 @@ struct FeedSectionView: View {
                 }
             }
         }
+        .onChange(of: activeDiaryReportSheet) { sheetContext in
+            if sheetContext == nil {
+                diaryReportContent = ""
+                viewModel.clearDiaryReportState()
+            }
+        }
         .sheet(item: $activeLikeUsersSheet) { sheetContext in
             SocialDiaryLikeUsersSheet(
                 title: "좋아요한 사용자",
@@ -130,6 +138,27 @@ struct FeedSectionView: View {
                 }
             )
         }
+        .sheet(item: $activeDiaryReportSheet) { sheetContext in
+            SocialDiaryReportSheet(
+                reportReason: $diaryReportContent,
+                isSubmitting: viewModel.isReportingDiary,
+                errorMessage: viewModel.reportErrorMessage,
+                onCancel: {
+                    activeDiaryReportSheet = nil
+                },
+                onSubmit: {
+                    Task {
+                        let isSuccess = await viewModel.reportDiary(
+                            diaryId: sheetContext.diaryId,
+                            content: diaryReportContent
+                        )
+                        if isSuccess {
+                            activeDiaryReportSheet = nil
+                        }
+                    }
+                }
+            )
+        }
     }
 
     private var feedPager: some View {
@@ -164,6 +193,11 @@ struct FeedSectionView: View {
                         },
                         onStoreTap: {
                             Task { await viewModel.toggleStore(diaryId: feed.diaryId) }
+                        },
+                        onReportTap: {
+                            diaryReportContent = ""
+                            viewModel.clearDiaryReportState()
+                            activeDiaryReportSheet = DiaryReportSheetContext(diaryId: feed.diaryId)
                         },
                         onVideoPlaybackEnded: {
                             guard currentPageIndex == index else { return }
@@ -281,6 +315,11 @@ struct FeedSectionView: View {
     }
 
     private struct LikeUsersSheetContext: Identifiable, Equatable {
+        let diaryId: Int
+        var id: Int { diaryId }
+    }
+
+    private struct DiaryReportSheetContext: Identifiable, Equatable {
         let diaryId: Int
         var id: Int { diaryId }
     }
