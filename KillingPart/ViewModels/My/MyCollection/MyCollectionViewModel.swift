@@ -14,11 +14,20 @@ final class MyCollectionViewModel: ObservableObject {
     @Published private(set) var userStatics: UserStaticsModel?
     @Published private(set) var myFeeds: [DiaryFeedModel] = []
     @Published private(set) var isLoadingMoreFeeds = false
+    @Published private(set) var connectionUsers: [SubscribeUserModel] = []
+    @Published private(set) var isLoadingConnections = false
+    @Published private(set) var isLoadingMoreConnections = false
+    @Published private(set) var likeUsers: [UserModel] = []
+    @Published private(set) var isLoadingLikeUsers = false
+    @Published private(set) var isLoadingMoreLikeUsers = false
+    @Published var connectionErrorMessage: String?
+    @Published var likeUsersErrorMessage: String?
     @Published var errorMessage: String?
 
     private let authenticationService: AuthenticationServicing
     private let userService: UserServicing
     private let diaryService: DiaryServicing
+    private let subscribeService: SubscribeServicing
 
     private var hasLoadedProfile = false
     private var hasLoadedUserStatics = false
@@ -31,15 +40,27 @@ final class MyCollectionViewModel: ObservableObject {
     private var hasNextFeedPage = true
     private var hasPendingBottomPaginationRequest = false
     private var hasPendingFocusRefetchRequest = false
+    private var activeConnectionType: ConnectionType?
+    private var nextConnectionPage = SubscribeService.defaultPage
+    private var hasNextConnectionPage = true
+    private var connectionRequestID = 0
+    private let likeUsersPageSize = 20
+    private var activeLikeUsersDiaryId: Int?
+    private var activeLikeUsersSearchCond: String?
+    private var likeUsersNextPage = DiaryService.defaultPage
+    private var hasNextLikeUsersPage = true
+    private var likeUsersRequestID = 0
 
     init(
         authenticationService: AuthenticationServicing,
         userService: UserServicing = UserService(),
-        diaryService: DiaryServicing = DiaryService()
+        diaryService: DiaryServicing = DiaryService(),
+        subscribeService: SubscribeServicing = SubscribeService()
     ) {
         self.authenticationService = authenticationService
         self.userService = userService
         self.diaryService = diaryService
+        self.subscribeService = subscribeService
     }
 
     var displayName: String {
@@ -67,6 +88,168 @@ final class MyCollectionViewModel: ObservableObject {
 
     var pickStatText: String {
         "\(userStatics?.pickCount ?? 0)"
+    }
+
+    func makeSocialMyCollectionViewModel(for user: UserModel) -> SocialMyCollectionViewModel {
+        SocialMyCollectionViewModel(
+            initialUser: user,
+            userService: userService,
+            diaryService: diaryService,
+            subscribeService: subscribeService,
+            onToggleMyPick: { [self] userId, isCurrentlyMyPick in
+                try await toggleMyPick(for: userId, isCurrentlyMyPick: isCurrentlyMyPick)
+            }
+        )
+    }
+
+    func makeSocialMyCollectionViewModel(for user: SubscribeUserModel) -> SocialMyCollectionViewModel {
+        makeSocialMyCollectionViewModel(for: UserModel(from: user))
+    }
+
+    func loadConnections(type: ConnectionType) async {
+        if user == nil {
+            await loadMyProfileIfNeeded()
+        }
+        guard let myUserID = user?.userId else { return }
+
+        connectionRequestID += 1
+        let requestID = connectionRequestID
+        activeConnectionType = type
+        nextConnectionPage = SubscribeService.defaultPage
+        hasNextConnectionPage = true
+        connectionUsers = []
+        connectionErrorMessage = nil
+        isLoadingConnections = true
+        defer {
+            if connectionRequestID == requestID {
+                isLoadingConnections = false
+            }
+        }
+
+        do {
+            let response = try await fetchConnections(
+                userId: myUserID,
+                type: type,
+                page: SubscribeService.defaultPage
+            )
+            guard requestID == connectionRequestID else { return }
+            connectionUsers = response.content
+            updateConnectionPaging(from: response)
+        } catch {
+            guard requestID == connectionRequestID else { return }
+            if isRequestCancelled(error) { return }
+            connectionErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func loadMoreConnectionsIfNeeded(currentUserId: Int) async {
+        guard connectionUsers.last?.userId == currentUserId else { return }
+        guard hasNextConnectionPage else { return }
+        guard !isLoadingConnections, !isLoadingMoreConnections else { return }
+        guard let activeConnectionType else { return }
+
+        if user == nil {
+            await loadMyProfileIfNeeded()
+        }
+        guard let myUserID = user?.userId else { return }
+
+        isLoadingMoreConnections = true
+        defer { isLoadingMoreConnections = false }
+
+        do {
+            let response = try await fetchConnections(
+                userId: myUserID,
+                type: activeConnectionType,
+                page: nextConnectionPage
+            )
+            appendConnectionUsers(with: response.content)
+            updateConnectionPaging(from: response)
+        } catch {
+            if isRequestCancelled(error) { return }
+            connectionErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func refreshActiveConnections() async {
+        guard let activeConnectionType else { return }
+        await loadConnections(type: activeConnectionType)
+    }
+
+    func loadLikeUsers(diaryId: Int, searchCond: String? = nil) async {
+        likeUsersRequestID += 1
+        let requestID = likeUsersRequestID
+        activeLikeUsersDiaryId = diaryId
+        activeLikeUsersSearchCond = normalizedSearchCond(searchCond)
+        likeUsers = []
+        likeUsersErrorMessage = nil
+        likeUsersNextPage = DiaryService.defaultPage
+        hasNextLikeUsersPage = true
+        isLoadingLikeUsers = true
+        defer {
+            if likeUsersRequestID == requestID {
+                isLoadingLikeUsers = false
+            }
+        }
+
+        do {
+            let response = try await diaryService.fetchDiaryLikeUsers(
+                diaryId: diaryId,
+                searchCond: activeLikeUsersSearchCond,
+                page: DiaryService.defaultPage,
+                size: likeUsersPageSize
+            )
+            guard likeUsersRequestID == requestID else { return }
+            likeUsers = response.content
+            updateLikeUsersPaging(from: response)
+        } catch {
+            guard likeUsersRequestID == requestID else { return }
+            if isRequestCancelled(error) { return }
+            likeUsersErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func loadMoreLikeUsersIfNeeded(currentUserId: Int) async {
+        guard likeUsers.last?.userId == currentUserId else { return }
+        guard hasNextLikeUsersPage else { return }
+        guard !isLoadingLikeUsers, !isLoadingMoreLikeUsers else { return }
+        guard let activeLikeUsersDiaryId else { return }
+
+        isLoadingMoreLikeUsers = true
+        defer { isLoadingMoreLikeUsers = false }
+
+        do {
+            let response = try await diaryService.fetchDiaryLikeUsers(
+                diaryId: activeLikeUsersDiaryId,
+                searchCond: activeLikeUsersSearchCond,
+                page: likeUsersNextPage,
+                size: likeUsersPageSize
+            )
+            appendLikeUsers(with: response.content)
+            updateLikeUsersPaging(from: response)
+        } catch {
+            if isRequestCancelled(error) { return }
+            likeUsersErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func retryLikeUsersLoading() async {
+        guard let activeLikeUsersDiaryId else { return }
+        await loadLikeUsers(
+            diaryId: activeLikeUsersDiaryId,
+            searchCond: activeLikeUsersSearchCond
+        )
+    }
+
+    func clearLikeUsersState() {
+        likeUsersRequestID += 1
+        activeLikeUsersDiaryId = nil
+        activeLikeUsersSearchCond = nil
+        likeUsers = []
+        likeUsersErrorMessage = nil
+        likeUsersNextPage = DiaryService.defaultPage
+        hasNextLikeUsersPage = true
+        isLoadingLikeUsers = false
+        isLoadingMoreLikeUsers = false
     }
 
     func loadInitialDataIfNeeded() async {
@@ -270,6 +453,69 @@ final class MyCollectionViewModel: ObservableObject {
         }
     }
 
+    private func toggleMyPick(for userId: Int, isCurrentlyMyPick: Bool) async throws {
+        if isCurrentlyMyPick {
+            try await subscribeService.unsubscribe(from: userId)
+        } else {
+            try await subscribeService.subscribe(to: userId)
+        }
+        await refetchCollectionDataOnFocus()
+    }
+
+    private func fetchConnections(
+        userId: Int,
+        type: ConnectionType,
+        page: Int
+    ) async throws -> SubscribeListResponse {
+        switch type {
+        case .picks:
+            return try await subscribeService.fetchSubscribes(
+                userId: userId,
+                page: page,
+                size: SubscribeService.defaultSize
+            )
+        case .fandom:
+            return try await subscribeService.fetchSubscribers(
+                userId: userId,
+                page: page,
+                size: SubscribeService.defaultSize
+            )
+        }
+    }
+
+    private func appendConnectionUsers(with newUsers: [SubscribeUserModel]) {
+        let existingIDs = Set(connectionUsers.map(\.userId))
+        let filtered = newUsers.filter { !existingIDs.contains($0.userId) }
+        connectionUsers.append(contentsOf: filtered)
+    }
+
+    private func updateConnectionPaging(from response: SubscribeListResponse) {
+        nextConnectionPage = max(response.page.number, 0) + 1
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = nextConnectionPage < totalPages
+        let hasNextByCount = response.content.count >= SubscribeService.defaultSize
+        hasNextConnectionPage = hasNextByPage || hasNextByCount
+    }
+
+    private func appendLikeUsers(with newUsers: [UserModel]) {
+        let existingIDs = Set(likeUsers.map(\.userId))
+        let filtered = newUsers.filter { !existingIDs.contains($0.userId) }
+        likeUsers.append(contentsOf: filtered)
+    }
+
+    private func updateLikeUsersPaging(from response: UserSearchResponse) {
+        likeUsersNextPage = max(response.page.number, 0) + 1
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = likeUsersNextPage < totalPages
+        let hasNextByCount = response.content.count >= likeUsersPageSize
+        hasNextLikeUsersPage = hasNextByPage || hasNextByCount
+    }
+
+    private func normalizedSearchCond(_ searchCond: String?) -> String? {
+        let trimmed = searchCond?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private func normalizeFeedVideoURLs(in feeds: [DiaryFeedModel]) -> [DiaryFeedModel] {
         feeds.map { feed in
             let normalizedVideoURL = resolvedVideoURLForPlayback(from: feed.videoUrl)
@@ -302,12 +548,21 @@ final class MyCollectionViewModel: ObservableObject {
             && !value.contains(".")
     }
 
+    enum ConnectionType {
+        case picks
+        case fandom
+    }
+
     private enum FeedLoadMode {
         case initial
         case pagination
     }
 
     private func resolveErrorMessage(from error: Error) -> String {
+        if let subscribeError = error as? SubscribeServiceError {
+            return subscribeError.errorDescription ?? "요청 처리에 실패했어요."
+        }
+
         if let diaryServiceError = error as? DiaryServiceError {
             return diaryServiceError.errorDescription ?? "요청 처리에 실패했어요."
         }
