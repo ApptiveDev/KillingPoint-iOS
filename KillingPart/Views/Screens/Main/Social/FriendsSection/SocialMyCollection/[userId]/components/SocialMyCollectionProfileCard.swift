@@ -8,6 +8,8 @@ struct SocialMyCollectionProfileCard: View {
     let fanStatText: String
     let pickStatText: String
     let isMyPick: Bool
+    let onFanStatTap: () -> Void
+    let onPickStatTap: () -> Void
     let onPickToggleTap: () -> Void
 
     var body: some View {
@@ -36,8 +38,15 @@ struct SocialMyCollectionProfileCard: View {
 
                         HStack(alignment: .center, spacing: AppSpacing.m) {
                             MyCollectionProfileStatItemView(value: killingPartStatText, title: "킬링파트")
-                            MyCollectionProfileStatItemView(value: fanStatText, title: "팬덤")
-                            MyCollectionProfileStatItemView(value: pickStatText, title: "PICKS")
+                            Button(action: onFanStatTap) {
+                                MyCollectionProfileStatItemView(value: fanStatText, title: "팬덤")
+                            }
+                            .buttonStyle(.plain)
+
+                            Button(action: onPickStatTap) {
+                                MyCollectionProfileStatItemView(value: pickStatText, title: "PICKS")
+                            }
+                            .buttonStyle(.plain)
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     }

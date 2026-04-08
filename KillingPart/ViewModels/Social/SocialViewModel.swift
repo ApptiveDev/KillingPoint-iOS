@@ -171,8 +171,12 @@ final class SocialViewModel: ObservableObject {
             resolvedUser = searchedUser
         }
 
+        return makeSocialMyCollectionViewModel(for: resolvedUser)
+    }
+
+    func makeSocialMyCollectionViewModel(for user: UserModel) -> SocialMyCollectionViewModel {
         return SocialMyCollectionViewModel(
-            initialUser: resolvedUser,
+            initialUser: user,
             userService: userService,
             diaryService: diaryService,
             onToggleMyPick: { [self] userId, isCurrentlyMyPick in

@@ -10,10 +10,17 @@ struct SocialMyCollectionDiary: View {
     let displayTag: String
     let onDiaryUpdated: (() -> Void)?
     let onDiaryDeleted: ((Int) -> Void)?
+    let makeCollectionViewModel: ((UserModel) -> SocialMyCollectionViewModel)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
     @State private var keyboardHeight: CGFloat = 0
     @State private var playerReloadToken = UUID()
+    @State private var shouldIgnoreNextLikeTap = false
+    @State private var isLikeUsersSheetPresented = false
+    @State private var likeUsersSearchText = ""
+    @State private var pendingNavigationUser: UserModel?
+    @State private var selectedNavigationUser: UserModel?
+    @State private var isUserCollectionNavigationActive = false
 
     private let commentFocusAnchorID = "social-my-collection-diary-comment-focus-anchor"
 
@@ -23,12 +30,14 @@ struct SocialMyCollectionDiary: View {
         diary: DiaryFeedModel,
         onDiaryUpdated: (() -> Void)? = nil,
         onDiaryDeleted: ((Int) -> Void)? = nil,
+        makeCollectionViewModel: ((UserModel) -> SocialMyCollectionViewModel)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.diaryId = diaryId
         self.displayTag = displayTag
         self.onDiaryUpdated = onDiaryUpdated
         self.onDiaryDeleted = onDiaryDeleted
+        self.makeCollectionViewModel = makeCollectionViewModel
         _viewModel = StateObject(
             wrappedValue: MyCollectionDiaryViewModel(
                 diary: diary,
@@ -136,13 +145,78 @@ struct SocialMyCollectionDiary: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
             updateKeyboardHeight(from: notification)
         }
+        .onAppear {
+            handleFocusActivated()
+        }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
-            playerReloadToken = UUID()
+            handleFocusActivated()
+        }
+        .onChange(of: isLikeUsersSheetPresented) { isPresented in
+            guard !isPresented else { return }
+            viewModel.clearLikeUsersState()
+            likeUsersSearchText = ""
+
+            guard let pendingNavigationUser else { return }
+            self.pendingNavigationUser = nil
+            selectedNavigationUser = pendingNavigationUser
+            DispatchQueue.main.async {
+                isUserCollectionNavigationActive = true
+            }
+        }
+        .onChange(of: isUserCollectionNavigationActive) { isActive in
+            if !isActive {
+                selectedNavigationUser = nil
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                likeButton
+                storeButton
+            }
+        }
+        .sheet(isPresented: $isLikeUsersSheetPresented) {
+            SocialDiaryLikeUsersSheet(
+                title: "좋아요한 사용자",
+                searchText: $likeUsersSearchText,
+                users: viewModel.likeUsers,
+                isLoading: viewModel.isLoadingLikeUsers,
+                isLoadingMore: viewModel.isLoadingMoreLikeUsers,
+                errorMessage: viewModel.likeUsersErrorMessage,
+                emptyMessage: "좋아요를 누른 사용자가 아직 없어요.",
+                onSearchSubmit: {
+                    Task {
+                        await viewModel.loadLikeUsers(searchCond: normalizedLikeUsersSearchCond)
+                    }
+                },
+                onSearchClear: {
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(searchCond: nil)
+                    }
+                },
+                onRetry: {
+                    Task {
+                        await viewModel.retryLikeUsersLoading()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreLikeUsersIfNeeded(currentUserId: userId)
+                    }
+                },
+                onUserTap: { user in
+                    if makeCollectionViewModel != nil {
+                        pendingNavigationUser = user
+                    }
+                    isLikeUsersSheetPresented = false
+                }
+            )
+        }
+        .background(userCollectionNavigationLink)
     }
 
     private var videoURL: URL? {
@@ -253,6 +327,108 @@ struct SocialMyCollectionDiary: View {
             guard isSuccess else { return }
             onDiaryUpdated?()
         }
+    }
+
+    private var likeButton: some View {
+        Button {
+            if shouldIgnoreNextLikeTap {
+                shouldIgnoreNextLikeTap = false
+                return
+            }
+            Task {
+                let isSuccess = await viewModel.toggleLike()
+                guard isSuccess else { return }
+                onDiaryUpdated?()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: viewModel.diary.isLiked ? "heart.fill" : "heart")
+                    .foregroundStyle(viewModel.diary.isLiked ? Color.kpPrimary : .white.opacity(0.75))
+                Text(viewModel.diary.likeCount.formatted())
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .padding(.horizontal, AppSpacing.xs)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isLikeInteractionDisabled)
+        .opacity(isLikeInteractionDisabled ? 0.6 : 1)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in
+                    guard !isLikeInteractionDisabled else { return }
+                    shouldIgnoreNextLikeTap = true
+                    isLikeUsersSheetPresented = true
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(searchCond: nil)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        shouldIgnoreNextLikeTap = false
+                    }
+                }
+        )
+    }
+
+    private var storeButton: some View {
+        Button {
+            Task {
+                let isSuccess = await viewModel.toggleStore()
+                guard isSuccess else { return }
+                onDiaryUpdated?()
+            }
+        } label: {
+            Image(systemName: viewModel.diary.isStored ? "bookmark.fill" : "bookmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(AppColors.primary600)
+                .padding(.horizontal, AppSpacing.xs)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isLikeInteractionDisabled)
+        .opacity(isLikeInteractionDisabled ? 0.6 : 1)
+    }
+
+    private func handleFocusActivated() {
+        playerReloadToken = UUID()
+        Task {
+            await viewModel.refreshInteractionStateIfNeeded(
+                preferredUserId: viewModel.diary.userId > 0 ? viewModel.diary.userId : nil
+            )
+        }
+    }
+
+    private var userCollectionNavigationLink: some View {
+        NavigationLink(
+            isActive: $isUserCollectionNavigationActive,
+            destination: {
+                if let selectedNavigationUser,
+                   let makeCollectionViewModel {
+                    SocialMyCollectionView(
+                        viewModel: makeCollectionViewModel(selectedNavigationUser)
+                    )
+                    .id(selectedNavigationUser.userId)
+                } else {
+                    EmptyView()
+                }
+            },
+            label: {
+                EmptyView()
+            }
+        )
+        .hidden()
+    }
+
+    private var normalizedLikeUsersSearchCond: String? {
+        let trimmed = likeUsersSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var isLikeInteractionDisabled: Bool {
+        viewModel.isUpdatingInteraction || viewModel.isProcessing || viewModel.isDeleted
     }
 
     private func dismissKeyboard() {

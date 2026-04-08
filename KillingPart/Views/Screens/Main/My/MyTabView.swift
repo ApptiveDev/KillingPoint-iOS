@@ -3,6 +3,7 @@ import UIKit
 
 struct MyTabView: View {
     let onLogout: () -> Void
+    let isRootTabSelected: Bool
     @State private var selectedTab: MyTopTab = .playKillingPart
     @State private var tabTransitionDirection: Edge = .trailing
     private static var hasConfiguredSegmentedControlAppearance = false
@@ -33,7 +34,9 @@ struct MyTabView: View {
                                 MyCollectionView(onSessionEnded: onLogout)
                                     .transition(tabContentTransition)
                             } else if selectedTab == .playKillingPart {
-                                PlayKillingPartView()
+                                PlayKillingPartView(
+                                    isParentActive: isRootTabSelected && selectedTab == .playKillingPart
+                                )
                                     .transition(tabContentTransition)
                             } else {
                                 MusicCalendarView()
@@ -151,7 +154,10 @@ private enum MyTopTab: CaseIterable {
 
 
 #Preview {
-    MyTabView(onLogout: {
-        print("로그아웃")
-    })
+    MyTabView(
+        onLogout: {
+            print("로그아웃")
+        },
+        isRootTabSelected: true
+    )
 }

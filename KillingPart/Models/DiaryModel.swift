@@ -143,6 +143,10 @@ struct DiaryCreateRequest: Encodable {
     let end: String
 }
 
+struct DiaryReportRequest: Encodable {
+    let content: String
+}
+
 struct DiaryCreateResult {
     let diaryId: Int?
     let location: String?

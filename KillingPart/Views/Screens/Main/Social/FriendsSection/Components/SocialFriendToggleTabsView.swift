@@ -18,32 +18,15 @@ struct SocialFriendToggleTabsView: View {
 
                         Text(totalCountText(for: section))
                             .font(AppFont.paperlogy4Regular(size: 12))
-                            .foregroundStyle(Color.white.opacity(0.8))
+                            .foregroundStyle(Color.kpPrimary.opacity(0.8))
                     }
                     .padding(.vertical, AppSpacing.xs)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(
-                                selectedFriendSection == section
-                                    ? AppColors.primary600.opacity(0.2)
-                                    : Color.white.opacity(0.06)
-                            )
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(
-                                selectedFriendSection == section
-                                    ? AppColors.primary600.opacity(0.8)
-                                    : Color.white.opacity(0.2),
-                                lineWidth: 1
-                            )
-                    }
                 }
                 .buttonStyle(.plain)
                 .opacity(selectedFriendSection == section ? 1 : 0.45)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func totalCountText(for section: SocialFriendSection) -> String {

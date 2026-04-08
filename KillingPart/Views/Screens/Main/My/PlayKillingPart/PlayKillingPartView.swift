@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct PlayKillingPartView: View {
+    let isParentActive: Bool
     @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var viewModel: MyCollectionViewModel
@@ -17,6 +18,7 @@ struct PlayKillingPartView: View {
     @State private var hasCompletedInitialLoad = false
     @State private var lastTickDate = Date()
     @State private var playerReloadToken = UUID()
+    @State private var playbackFocusToken = 0
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
     private let controlsHeight: CGFloat = 98
@@ -24,10 +26,12 @@ struct PlayKillingPartView: View {
     private let reorderAnimationDuration: Double = 0.24
 
     init(
+        isParentActive: Bool = true,
         authenticationService: AuthenticationServicing = AuthenticationService(),
         userService: UserServicing = UserService(),
         diaryService: DiaryServicing = DiaryService()
     ) {
+        self.isParentActive = isParentActive
         _viewModel = StateObject(
             wrappedValue: MyCollectionViewModel(
                 authenticationService: authenticationService,
@@ -56,6 +60,7 @@ struct PlayKillingPartView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             resetTickReference()
+            bumpPlaybackFocusToken()
             Task {
                 let refetchResult = await refreshPlaybackFeeds()
                 hasCompletedInitialLoad = true
@@ -86,9 +91,21 @@ struct PlayKillingPartView: View {
             synchronizeSelectedTrackIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
-            if phase == .active {
+            if phase == .active && isParentActive {
                 elapsedInCurrentRange = 0
                 playerReloadToken = UUID()
+                bumpPlaybackFocusToken()
+            }
+            resetTickReference()
+        }
+        .onChange(of: isParentActive) { isParentActive in
+            if isParentActive {
+                elapsedInCurrentRange = 0
+                if currentTrack != nil {
+                    isPlaying = true
+                }
+                playerReloadToken = UUID()
+                bumpPlaybackFocusToken()
             }
             resetTickReference()
         }
@@ -113,6 +130,7 @@ struct PlayKillingPartView: View {
                 PlayKillingPartCurrentTrackContent(
                     track: currentTrack,
                     isPlaying: isPlaying,
+                    playbackFocusToken: playbackFocusToken,
                     playerReloadToken: playerReloadToken
                 )
             } else if hasCompletedInitialLoad {
@@ -415,6 +433,9 @@ struct PlayKillingPartView: View {
         guard currentTrack != nil else { return }
         guard !playViewModel.isEditMode else { return }
         isPlaying.toggle()
+        if isPlaying {
+            bumpPlaybackFocusToken()
+        }
         resetTickReference()
     }
 
@@ -445,8 +466,10 @@ struct PlayKillingPartView: View {
         }
 
         selectedTrackID = selectedTrack.id
+        isPlaying = true
         elapsedInCurrentRange = 0
         playerReloadToken = UUID()
+        bumpPlaybackFocusToken()
         resetTickReference()
     }
 
@@ -460,6 +483,7 @@ struct PlayKillingPartView: View {
 
         if !isPlaying {
             isPlaying = true
+            bumpPlaybackFocusToken()
         }
 
         if
@@ -475,6 +499,7 @@ struct PlayKillingPartView: View {
         selectedTrackID = playlistTracks[0].id
         elapsedInCurrentRange = 0
         playerReloadToken = UUID()
+        bumpPlaybackFocusToken()
         resetTickReference()
     }
 
@@ -483,6 +508,7 @@ struct PlayKillingPartView: View {
             lastTickDate = now
         }
 
+        guard isPlaybackActive else { return }
         guard isPlaying else { return }
         guard let currentTrack else { return }
 
@@ -501,6 +527,14 @@ struct PlayKillingPartView: View {
 
     private func resetTickReference() {
         lastTickDate = Date()
+    }
+
+    private var isPlaybackActive: Bool {
+        isParentActive && scenePhase == .active
+    }
+
+    private func bumpPlaybackFocusToken() {
+        playbackFocusToken &+= 1
     }
 
     private func refreshPlaybackFeeds() async -> PlaybackFeedRefetchResult {
@@ -525,6 +559,7 @@ struct PlayKillingPartView: View {
         elapsedInCurrentRange = 0
         isPlaying = true
         playerReloadToken = UUID()
+        bumpPlaybackFocusToken()
         resetTickReference()
     }
 
