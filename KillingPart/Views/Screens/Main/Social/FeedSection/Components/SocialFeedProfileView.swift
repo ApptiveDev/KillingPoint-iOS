@@ -6,6 +6,10 @@ struct SocialFeedProfileView: View {
     var body: some View {
         HStack(spacing: AppSpacing.xs) {
             SocialFriendProfileImageView(profileImageURL: profileImageURL)
+                .overlay {
+                    Circle()
+                        .stroke(Color.kpPrimary, lineWidth: 1.5)
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(feed.username?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? (feed.username ?? "") : "알 수 없음")

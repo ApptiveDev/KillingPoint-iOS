@@ -3,10 +3,22 @@ import SwiftUI
 struct FeedSectionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var viewModel: FeedViewModel
+    let isParentActive: Bool
+    let makeCollectionViewModel: (UserModel) -> SocialMyCollectionViewModel
     @State private var currentPageIndex = 0
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var isViewActive = false
     @State private var previousFeedCount = 0
+    @State private var playbackFocusToken = 0
+    @State private var selectedProfileUser: UserModel?
+    @State private var isProfileNavigationActive = false
+    @State private var activeLikeUsersSheet: LikeUsersSheetContext?
+    @State private var activeDiaryReportSheet: DiaryReportSheetContext?
+    @State private var pendingLikeUserDestination: UserModel?
+    @State private var likeUsersSearchText = ""
+    @State private var diaryReportContent = ""
+    @State private var activeInteractionFeedback: InteractionFeedback?
+    @State private var interactionFeedbackDismissTask: Task<Void, Never>?
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -46,22 +58,114 @@ struct FeedSectionView: View {
             }
             .padding(.bottom, bottomInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .center) {
+                interactionFeedbackOverlay
+            }
         }
         .onAppear {
             isViewActive = true
-            elapsedInCurrentRange = 0
             previousFeedCount = viewModel.feeds.count
+            handleFocusActivated()
         }
         .onDisappear {
             isViewActive = false
+            interactionFeedbackDismissTask?.cancel()
+            interactionFeedbackDismissTask = nil
+            activeInteractionFeedback = nil
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
-                elapsedInCurrentRange = 0
+                handleFocusActivated()
             }
         }
+        .onChange(of: isParentActive) { isParentActive in
+            guard isParentActive else { return }
+            handleFocusActivated()
+        }
         .onChange(of: viewModel.feeds.count) { newCount in
+            let hasAppendedFeed = newCount > previousFeedCount
             previousFeedCount = newCount
+            if hasAppendedFeed && isPlaybackActive {
+                bumpPlaybackFocusToken()
+            }
+        }
+        .onChange(of: activeLikeUsersSheet) { sheetContext in
+            if sheetContext == nil {
+                viewModel.clearLikeUsersState()
+                likeUsersSearchText = ""
+                guard let pendingLikeUserDestination else { return }
+                self.pendingLikeUserDestination = nil
+                selectedProfileUser = pendingLikeUserDestination
+                DispatchQueue.main.async {
+                    isProfileNavigationActive = true
+                }
+            }
+        }
+        .onChange(of: activeDiaryReportSheet) { sheetContext in
+            if sheetContext == nil {
+                diaryReportContent = ""
+                viewModel.clearDiaryReportState()
+            }
+        }
+        .sheet(item: $activeLikeUsersSheet) { sheetContext in
+            SocialDiaryLikeUsersSheet(
+                title: "좋아요한 사용자",
+                searchText: $likeUsersSearchText,
+                users: viewModel.likeUsers,
+                isLoading: viewModel.isLoadingLikeUsers,
+                isLoadingMore: viewModel.isLoadingMoreLikeUsers,
+                errorMessage: viewModel.likeUsersErrorMessage,
+                emptyMessage: "좋아요를 누른 사용자가 아직 없어요.",
+                onSearchSubmit: {
+                    Task {
+                        await viewModel.loadLikeUsers(
+                            diaryId: sheetContext.diaryId,
+                            searchCond: normalizedLikeUsersSearchCond
+                        )
+                    }
+                },
+                onSearchClear: {
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(diaryId: sheetContext.diaryId, searchCond: nil)
+                    }
+                },
+                onRetry: {
+                    Task {
+                        await viewModel.retryLikeUsersLoading()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreLikeUsersIfNeeded(currentUserId: userId)
+                    }
+                },
+                onUserTap: { user in
+                    pendingLikeUserDestination = user
+                    activeLikeUsersSheet = nil
+                }
+            )
+        }
+        .sheet(item: $activeDiaryReportSheet) { sheetContext in
+            SocialDiaryReportSheet(
+                reportReason: $diaryReportContent,
+                isSubmitting: viewModel.isReportingDiary,
+                errorMessage: viewModel.reportErrorMessage,
+                onCancel: {
+                    activeDiaryReportSheet = nil
+                },
+                onSubmit: {
+                    Task {
+                        let isSuccess = await viewModel.reportDiary(
+                            diaryId: sheetContext.diaryId,
+                            content: diaryReportContent
+                        )
+                        if isSuccess {
+                            activeDiaryReportSheet = nil
+                        }
+                    }
+                }
+            )
         }
     }
 
@@ -70,20 +174,46 @@ struct FeedSectionView: View {
             TabView(selection: $currentPageIndex) {
                 ForEach(viewModel.feeds.indices, id: \.self) { index in
                     let feed = viewModel.feeds[index]
-                    let isActive = index == currentPageIndex && isViewActive
-                    // 현재 페이지만 로드
-                    let shouldLoadPlayer = index == currentPageIndex
+                    let isActive = index == currentPageIndex && isPlaybackActive
+                    // 현재 페이지와 인접 페이지를 미리 로드해 스와이프 전환 시 버벅임을 줄인다.
+                    let shouldLoadPlayer = abs(index - currentPageIndex) <= 1
 
                     SocialFeedPageCardView(
                         feed: feed,
                         isVideoPlaying: isActive,
+                        playbackFocusToken: isActive ? playbackFocusToken : 0,
                         elapsedInCurrentRange: isActive ? elapsedInCurrentRange : 0,
                         shouldLoadPlayer: shouldLoadPlayer,
+                        onProfileTap: {
+                            guard feed.userId > 0 else { return }
+                            selectedProfileUser = makeUserModel(from: feed)
+                            isProfileNavigationActive = true
+                        },
                         onLikeTap: {
+                            presentInteractionFeedback(
+                                isLike: true,
+                                isEnabled: !feed.isLiked
+                            )
                             Task { await viewModel.toggleLike(diaryId: feed.diaryId) }
                         },
+                        onLikeLongPress: {
+                            likeUsersSearchText = ""
+                            activeLikeUsersSheet = LikeUsersSheetContext(diaryId: feed.diaryId)
+                            Task {
+                                await viewModel.loadLikeUsers(diaryId: feed.diaryId, searchCond: nil)
+                            }
+                        },
                         onStoreTap: {
+                            presentInteractionFeedback(
+                                isLike: false,
+                                isEnabled: !feed.isStored
+                            )
                             Task { await viewModel.toggleStore(diaryId: feed.diaryId) }
+                        },
+                        onReportTap: {
+                            diaryReportContent = ""
+                            viewModel.clearDiaryReportState()
+                            activeDiaryReportSheet = DiaryReportSheetContext(diaryId: feed.diaryId)
                         },
                         onVideoPlaybackEnded: {
                             guard currentPageIndex == index else { return }
@@ -110,14 +240,177 @@ struct FeedSectionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onReceive(playbackTimer) { _ in
-            guard isViewActive else { return }
+            guard isPlaybackActive else { return }
             elapsedInCurrentRange += 0.25
         }
         .onChange(of: currentPageIndex) { _ in
             elapsedInCurrentRange = 0
+            bumpPlaybackFocusToken()
+        }
+        .onChange(of: isProfileNavigationActive) { isActive in
+            if !isActive {
+                selectedProfileUser = nil
+                handleFocusActivated()
+            }
+        }
+        .background(profileNavigationLink)
+    }
+
+    private var isPlaybackActive: Bool {
+        isViewActive && isParentActive && scenePhase == .active
+    }
+
+    private var profileNavigationLink: some View {
+        NavigationLink(
+            isActive: $isProfileNavigationActive,
+            destination: {
+                if let selectedProfileUser {
+                    SocialMyCollectionView(
+                        viewModel: makeCollectionViewModel(selectedProfileUser)
+                    )
+                } else {
+                    EmptyView()
+                }
+            },
+            label: {
+                EmptyView()
+            }
+        )
+        .hidden()
+    }
+
+    private func bumpPlaybackFocusToken() {
+        playbackFocusToken &+= 1
+    }
+
+    private func handleFocusActivated() {
+        guard isPlaybackActive else { return }
+        elapsedInCurrentRange = 0
+        bumpPlaybackFocusToken()
+        Task {
+            await viewModel.refreshLoadedFeedInteractionsIfNeeded()
         }
     }
-    
+
+    private var normalizedLikeUsersSearchCond: String? {
+        let trimmed = likeUsersSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    @ViewBuilder
+    private var interactionFeedbackOverlay: some View {
+        if let feedback = activeInteractionFeedback {
+            VStack(spacing: AppSpacing.s) {
+                Image(systemName: feedback.iconName)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(feedback.iconColor)
+
+                Text(feedback.message)
+                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .foregroundStyle(.white.opacity(0.95))
+            }
+            .padding(.horizontal, AppSpacing.l)
+            .padding(.vertical, AppSpacing.m)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.black.opacity(0.78))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.32), radius: 14, y: 8)
+            .transition(
+                .asymmetric(
+                    insertion: .scale(scale: 0.84).combined(with: .opacity),
+                    removal: .offset(y: -18).combined(with: .opacity)
+                )
+            )
+            .allowsHitTesting(false)
+        }
+    }
+
+    private func makeUserModel(from feed: DiaryFeedModel) -> UserModel {
+        let username = trimmedString(feed.username, fallback: "킬링파트 사용자")
+        let tag = normalizeTag(trimmedString(feed.tag, fallback: "killingpart_user"))
+        let profileImageUrl = trimmedString(feed.profileImageUrl, fallback: "")
+        return UserModel(
+            userId: feed.userId,
+            username: username,
+            tag: tag,
+            identifier: String(feed.userId),
+            profileImageUrl: profileImageUrl,
+            userRoleType: "USER",
+            socialType: "UNKNOWN",
+            isMyPick: nil
+        )
+    }
+
+    private func trimmedString(_ raw: String?, fallback: String) -> String {
+        guard
+            let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !raw.isEmpty
+        else {
+            return fallback
+        }
+        return raw
+    }
+
+    private func normalizeTag(_ rawTag: String) -> String {
+        if rawTag.hasPrefix("@") {
+            return String(rawTag.dropFirst())
+        }
+        return rawTag
+    }
+
+    private func presentInteractionFeedback(isLike: Bool, isEnabled: Bool) {
+        let feedback: InteractionFeedback
+        if isLike {
+            feedback = InteractionFeedback(
+                iconName: isEnabled ? "heart.fill" : "heart",
+                iconColor: isEnabled ? Color.kpPrimary : Color.white.opacity(0.8),
+                message: isEnabled ? "좋아요 했어요" : "좋아요를 취소했어요"
+            )
+        } else {
+            feedback = InteractionFeedback(
+                iconName: isEnabled ? "bookmark.fill" : "bookmark",
+                iconColor: isEnabled ? AppColors.primary600 : Color.white.opacity(0.8),
+                message: isEnabled ? "보관함에 저장했어요" : "보관함을 해제했어요"
+            )
+        }
+
+        interactionFeedbackDismissTask?.cancel()
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.76)) {
+            activeInteractionFeedback = feedback
+        }
+
+        interactionFeedbackDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeIn(duration: 0.22)) {
+                    activeInteractionFeedback = nil
+                }
+            }
+        }
+    }
+
+    private struct LikeUsersSheetContext: Identifiable, Equatable {
+        let diaryId: Int
+        var id: Int { diaryId }
+    }
+
+    private struct DiaryReportSheetContext: Identifiable, Equatable {
+        let diaryId: Int
+        var id: Int { diaryId }
+    }
+
+    private struct InteractionFeedback {
+        let iconName: String
+        let iconColor: Color
+        let message: String
+    }
+     
     private func handleVideoPlaybackEnded(currentIndex: Int, feed: DiaryFeedModel) {
         Task {
             let nextIndex = currentIndex + 1

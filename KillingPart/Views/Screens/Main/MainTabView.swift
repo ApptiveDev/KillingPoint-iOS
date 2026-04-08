@@ -6,7 +6,10 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            MyTabView(onLogout: onLogout)
+            MyTabView(
+                onLogout: onLogout,
+                isRootTabSelected: selectedTab == .my
+            )
                 .tabItem {
                     Label("MY", systemImage: "house")
                 }
@@ -19,7 +22,7 @@ struct MainTabView: View {
                 }
                 .tag(MainRootTab.add)
             
-            SocialView()
+            SocialView(isRootTabSelected: selectedTab == .social)
                 .tabItem {
                     Label("소셜", systemImage: "person.2")
                 }

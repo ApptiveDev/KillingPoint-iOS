@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayKillingPartCurrentTrackContent: View {
     let track: PlayKillingPartTrack
     let isPlaying: Bool
+    let playbackFocusToken: Int
     let playerReloadToken: UUID
 
     private let videoAspectRatio: CGFloat = 16 / 9
@@ -16,7 +17,8 @@ struct PlayKillingPartCurrentTrackContent: View {
                         videoURL: videoURL,
                         startSeconds: track.startSeconds,
                         endSeconds: track.endSeconds,
-                        isPlaying: isPlaying
+                        isPlaying: isPlaying,
+                        playbackFocusToken: playbackFocusToken
                     )
                     .id("\(track.id)-\(playerReloadToken)")
                     .frame(maxWidth: .infinity)

@@ -16,6 +16,7 @@ struct FriendsSectionView: View {
                     myPickCount: viewModel.totalCount(for: true),
                     myFandomCount: viewModel.totalCount(for: false)
                 )
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             SocialFriendListView(
                 users: currentSectionUsers,

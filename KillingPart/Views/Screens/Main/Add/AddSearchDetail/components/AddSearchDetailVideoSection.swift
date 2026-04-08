@@ -17,7 +17,8 @@ struct AddSearchDetailVideoSection: View {
                         YoutubePlayerView(
                             videoURL: video.embedURL,
                             startSeconds: viewModel.startSeconds,
-                            endSeconds: viewModel.endSeconds
+                            endSeconds: viewModel.endSeconds,
+                            playbackFocusToken: playerReloadToken.hashValue
                         )
                             .id(playerReloadToken)
                             .frame(maxWidth: .infinity)
