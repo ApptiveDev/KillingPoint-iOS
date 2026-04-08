@@ -16,124 +16,112 @@ struct SocialFeedPageCardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.s) {
-                    HStack {
-                        Button(action: onProfileTap) {
-                            SocialFeedProfileView(feed: feed)
-                        }
-                        .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: AppSpacing.s) {
+                HStack {
+                    Button(action: onProfileTap) {
+                        SocialFeedProfileView(feed: feed)
+                    }
+                    .buttonStyle(.plain)
 
-                        Spacer()
+                    Spacer()
 
-                        Menu {
-                            Button {
-                                onReportTap()
-                            } label: {
-                                Label {
-                                    Text("신고하기")
-                                } icon: {
-                                    Image(systemName: "light.beacon.max")
-                                }
-                                .tint(.red)
-                            }
+                    Menu {
+                        Button {
+                            onReportTap()
                         } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.9))
-                                .frame(width: 32, height: 32)
-                                .background(Color.white.opacity(0.1), in: Circle())
+                            Label {
+                                Text("신고하기")
+                            } icon: {
+                                Image(systemName: "light.beacon.max")
+                            }
+                            .tint(.red)
                         }
-                        .buttonStyle(.plain)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(0.1), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(alignment: .top, spacing: AppSpacing.s) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(feed.musicTitle)
+                            .font(AppFont.paperlogy6SemiBold(size: 16))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+
+                        Text(feed.artist)
+                            .font(AppFont.paperlogy4Regular(size: 14))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(2)
                     }
 
-                    HStack(alignment: .top, spacing: AppSpacing.s) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(feed.musicTitle)
-                                .font(AppFont.paperlogy6SemiBold(size: 16))
-                                .foregroundStyle(.white)
-                                .lineLimit(2)
+                    Spacer(minLength: 0)
 
-                            Text(feed.artist)
-                                .font(AppFont.paperlogy4Regular(size: 14))
-                                .foregroundStyle(.white.opacity(0.8))
-                                .lineLimit(2)
-                        }
-
-                        Spacer(minLength: 0)
-
-                        HStack(spacing: AppSpacing.s) {
-                            HStack(spacing: 4) {
-                                Button {
-                                    if shouldIgnoreNextLikeTap {
-                                        shouldIgnoreNextLikeTap = false
-                                        return
-                                    }
-                                    onLikeTap()
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: feed.isLiked ? "heart.fill" : "heart")
-                                            .foregroundStyle(feed.isLiked ? Color.kpPrimary : .white.opacity(0.75))
-                                        Text(feed.likeCount.formatted())
-                                            .font(AppFont.paperlogy4Regular(size: 12))
-                                            .foregroundStyle(.white.opacity(0.85))
-                                    }
-                                    .padding(.horizontal, AppSpacing.xs)
-                                    .padding(.vertical, 6)
-                                    .background(Color.white.opacity(0.1), in: Capsule())
-                                }
-                                .buttonStyle(.plain)
-                                .simultaneousGesture(
-                                    LongPressGesture(minimumDuration: 0.45)
-                                        .onEnded { _ in
-                                            shouldIgnoreNextLikeTap = true
-                                            onLikeLongPress()
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                                shouldIgnoreNextLikeTap = false
-                                            }
-                                        }
-                                )
-                            }
-
+                    HStack(spacing: AppSpacing.s) {
+                        HStack(spacing: 4) {
                             Button {
-                                onStoreTap()
+                                if shouldIgnoreNextLikeTap {
+                                    shouldIgnoreNextLikeTap = false
+                                    return
+                                }
+                                onLikeTap()
                             } label: {
-                                Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(AppColors.primary600)
-                                    .padding(.horizontal, AppSpacing.xs)
-                                    .padding(.vertical, 6)
-                                    .background(Color.white.opacity(0.1), in: Capsule())
+                                HStack(spacing: 4) {
+                                    Image(systemName: feed.isLiked ? "heart.fill" : "heart")
+                                        .foregroundStyle(feed.isLiked ? Color.kpPrimary : .white.opacity(0.75))
+                                    Text(feed.likeCount.formatted())
+                                        .font(AppFont.paperlogy4Regular(size: 12))
+                                        .foregroundStyle(.white.opacity(0.85))
+                                }
+                                .padding(.horizontal, AppSpacing.xs)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.1), in: Capsule())
                             }
                             .buttonStyle(.plain)
+                            .simultaneousGesture(
+                                LongPressGesture(minimumDuration: 0.45)
+                                    .onEnded { _ in
+                                        shouldIgnoreNextLikeTap = true
+                                        onLikeLongPress()
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                            shouldIgnoreNextLikeTap = false
+                                        }
+                                    }
+                            )
                         }
-                    }
 
-                    SocialFeedVideoSection(
-                        feed: feed,
-                        isVideoPlaying: isVideoPlaying,
-                        playbackFocusToken: playbackFocusToken,
-                        shouldLoadPlayer: shouldLoadPlayer,
-                        onPlaybackEnded: onVideoPlaybackEnded
-                    )
-
-                    VStack(alignment: .center, spacing: AppSpacing.xl) {
-                        Text("킬링파트 일기")
-                            .font(AppFont.paperlogy5Medium(size: 13))
-                            .foregroundStyle(Color.kpGray300)
-                            .frame(maxWidth: .infinity, alignment: .center)
-
-                        Text(feed.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "작성된 킬링파트 일기가 없어요." : feed.content)
-                            .font(AppFont.paperlogy4Regular(size: 13))
-                            .foregroundStyle(.white)
-                            .lineSpacing(2)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .multilineTextAlignment(.center)
+                        Button {
+                            onStoreTap()
+                        } label: {
+                            Image(systemName: feed.isStored ? "bookmark.fill" : "bookmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(AppColors.primary600)
+                                .padding(.horizontal, AppSpacing.xs)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.1), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(AppSpacing.m)
+
+                SocialFeedVideoSection(
+                    feed: feed,
+                    isVideoPlaying: isVideoPlaying,
+                    playbackFocusToken: playbackFocusToken,
+                    shouldLoadPlayer: shouldLoadPlayer,
+                    onPlaybackEnded: onVideoPlaybackEnded
+                )
             }
-            .scrollIndicators(.hidden)
+            .padding(.horizontal, AppSpacing.m)
+            .padding(.top, AppSpacing.m)
+
+            diarySection
+                .padding(.horizontal, AppSpacing.m)
+                .padding(.top, AppSpacing.m)
 
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text("재생 구간")
@@ -153,6 +141,33 @@ struct SocialFeedPageCardView: View {
             .padding(.bottom, AppSpacing.l)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var diarySection: some View {
+        VStack(alignment: .center, spacing: AppSpacing.s) {
+            Text("킬링파트 일기")
+                .font(AppFont.paperlogy5Medium(size: 13))
+                .foregroundStyle(Color.kpGray300)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            ScrollView(.vertical) {
+                Text(diaryContentText)
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(.white)
+                    .lineSpacing(2)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, AppSpacing.xs)
+            }
+            .scrollIndicators(.hidden)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var diaryContentText: String {
+        let trimmed = feed.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "작성된 킬링파트 일기가 없어요." : feed.content
     }
 
     private var parsedEndSeconds: Double {
