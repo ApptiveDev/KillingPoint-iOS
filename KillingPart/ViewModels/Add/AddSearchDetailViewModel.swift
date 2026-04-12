@@ -5,6 +5,28 @@ enum AddSearchDetailStep: Equatable {
     case comment
 }
 
+struct AddSearchDetailPrefill {
+    let videoURL: String
+    let start: String
+    let end: String
+    let totalDuration: String
+    let selectedScope: DiaryScope?
+
+    init(
+        videoURL: String,
+        start: String,
+        end: String,
+        totalDuration: String,
+        selectedScope: DiaryScope? = nil
+    ) {
+        self.videoURL = videoURL
+        self.start = start
+        self.end = end
+        self.totalDuration = totalDuration
+        self.selectedScope = selectedScope
+    }
+}
+
 @MainActor
 final class AddSearchDetailViewModel: ObservableObject {
     @Published private(set) var videos: [YoutubeVideo] = []
@@ -29,12 +51,17 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     init(
         track: SpotifySimpleTrack,
+        prefill: AddSearchDetailPrefill? = nil,
         youtubeService: YoutubeServicing = YoutubeService(),
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.track = track
         self.youtubeService = youtubeService
         self.diaryService = diaryService
+
+        if let prefill, applyPrefill(prefill) {
+            hasLoaded = true
+        }
     }
 
     var maxDuration: Double {
@@ -189,6 +216,75 @@ final class AddSearchDetailViewModel: ObservableObject {
             saveErrorMessage = resolveSaveErrorMessage(from: error)
             return false
         }
+    }
+
+    private func applyPrefill(_ prefill: AddSearchDetailPrefill) -> Bool {
+        let parsedStart = parsedSeconds(from: prefill.start) ?? 0
+        let parsedEnd = parsedSeconds(from: prefill.end) ?? (parsedStart + minimumClipDuration)
+        let parsedTotalDuration = parsedSeconds(from: prefill.totalDuration) ?? 0
+        let resolvedDuration = max(parsedTotalDuration, parsedEnd, parsedStart + minimumClipDuration)
+
+        guard
+            let prefilledVideo = makePrefilledVideo(
+                rawVideoURL: prefill.videoURL,
+                duration: resolvedDuration
+            )
+        else {
+            return false
+        }
+
+        videos = [prefilledVideo]
+        selectedVideo = prefilledVideo
+        updateRange(start: parsedStart, end: parsedEnd)
+        if let selectedScope = prefill.selectedScope {
+            self.selectedScope = selectedScope
+        }
+        currentStep = .comment
+        errorMessage = nil
+        saveErrorMessage = nil
+        return true
+    }
+
+    private func makePrefilledVideo(rawVideoURL: String, duration: Double) -> YoutubeVideo? {
+        guard let videoID = normalizedYouTubeVideoID(from: rawVideoURL) else {
+            return nil
+        }
+
+        let embedURL = URL(string: "https://www.youtube.com/embed/\(videoID)?playsinline=1")
+        return YoutubeVideo(
+            id: videoID,
+            title: track.title,
+            duration: duration,
+            url: embedURL
+        )
+    }
+
+    private func parsedSeconds(from value: String) -> Double? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let raw = Double(trimmed) {
+            return max(raw, 0)
+        }
+
+        let sanitized = trimmed.replacingOccurrences(of: "초", with: "")
+        if sanitized.contains(":") {
+            let parts = sanitized.split(separator: ":").map(String.init)
+            guard
+                parts.count == 2,
+                let minutes = Double(parts[0]),
+                let seconds = Double(parts[1])
+            else {
+                return nil
+            }
+            return max((minutes * 60) + seconds, 0)
+        }
+
+        if let raw = Double(sanitized) {
+            return max(raw, 0)
+        }
+
+        return nil
     }
 
     private func loadVideos() async {

@@ -10,10 +10,16 @@ struct AddSearchDetailView: View {
 
     init(
         track: SpotifySimpleTrack,
+        prefill: AddSearchDetailPrefill? = nil,
         onSaved: (() -> Void)? = nil
     ) {
         self.onSaved = onSaved
-        _viewModel = StateObject(wrappedValue: AddSearchDetailViewModel(track: track))
+        _viewModel = StateObject(
+            wrappedValue: AddSearchDetailViewModel(
+                track: track,
+                prefill: prefill
+            )
+        )
     }
 
     var body: some View {

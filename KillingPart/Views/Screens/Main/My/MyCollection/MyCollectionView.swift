@@ -113,7 +113,9 @@ struct MyCollectionView: View {
             StoreKillingPartDetail(
                 diaryId: route.diaryId,
                 diary: diary
-            )
+            ) { removedDiaryId in
+                storesViewModel.removeStoredDiaryLocally(diaryId: removedDiaryId)
+            }
         }
         .onChange(of: activeConnectionSheet) { sheetType in
             guard sheetType == nil, let pendingNavigationUser else { return }

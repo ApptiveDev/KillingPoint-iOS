@@ -66,6 +66,10 @@ final class MyCollectionStoresViewModel: ObservableObject {
         await loadMoreStoredDiariesIfNeeded(currentDiaryId: lastDiaryId)
     }
 
+    func removeStoredDiaryLocally(diaryId: Int) {
+        storedDiaries.removeAll { $0.diaryId == diaryId }
+    }
+
     private func loadStoredDiaries(page: Int, size: Int, mode: StoreDiaryLoadMode) async {
         guard !isLoadingStoredDiaries else { return }
 
