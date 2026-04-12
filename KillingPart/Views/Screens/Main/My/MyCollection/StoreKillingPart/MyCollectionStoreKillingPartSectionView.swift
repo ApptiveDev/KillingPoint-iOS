@@ -23,10 +23,18 @@ struct MyCollectionStoreKillingPartSectionView: View {
             } else {
                 LazyVGrid(columns: feedGridColumns, spacing: AppSpacing.s) {
                     ForEach(diaries) { diary in
-                        MyCollectionStoreKillingPartCard(diary: diary)
-                            .onAppear {
-                                onDiaryAppear(diary)
-                            }
+                        NavigationLink(
+                            value: StoreKillingPartDetailRoute(
+                                diaryId: diary.diaryId,
+                                initialDiary: diary
+                            )
+                        ) {
+                            MyCollectionStoreKillingPartCard(diary: diary)
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            onDiaryAppear(diary)
+                        }
                     }
                 }
 

@@ -107,6 +107,14 @@ struct MyCollectionView: View {
                 }
             }
         }
+        .navigationDestination(for: StoreKillingPartDetailRoute.self) { route in
+            let diary = storesViewModel.storedDiaries.first(where: { $0.diaryId == route.diaryId }) ?? route.initialDiary
+
+            StoreKillingPartDetail(
+                diaryId: route.diaryId,
+                diary: diary
+            )
+        }
         .onChange(of: activeConnectionSheet) { sheetType in
             guard sheetType == nil, let pendingNavigationUser else { return }
             self.pendingNavigationUser = nil
