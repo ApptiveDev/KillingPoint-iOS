@@ -122,7 +122,11 @@ struct StoreKillingPartDetail: View {
             NavigationLink {
                 AddSearchDetailView(
                     track: registerTrack,
-                    prefill: registerPrefill
+                    prefill: registerPrefill,
+                    shouldNavigateToPlayKillingPartOnSave: false,
+                    onSaveCompletedAfterDismiss: {
+                        dismiss()
+                    }
                 )
             } label: {
                 Text("내 킬링파트로 등록")
