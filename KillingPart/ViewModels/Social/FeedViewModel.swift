@@ -87,10 +87,16 @@ final class FeedViewModel: ObservableObject {
         }
 
         do {
-            let loadedPageCount = max(
-                1,
-                Int(ceil(Double(feeds.count) / Double(max(DiaryService.defaultSize, 1))))
-            )
+            let loadedPageCount: Int
+            switch feedSource {
+            case .myFeeds:
+                loadedPageCount = max(
+                    1,
+                    Int(ceil(Double(feeds.count) / Double(max(DiaryService.defaultSize, 1))))
+                )
+            case .random:
+                loadedPageCount = 1
+            }
 
             var latestByDiaryId: [Int: DiaryFeedModel] = [:]
             var page = DiaryService.defaultPage
@@ -328,17 +334,17 @@ final class FeedViewModel: ObservableObject {
     }
 
     private func updatePaging(from response: MyDiaryFeedsResponse) {
-        guard feedSource == .myFeeds else {
+        switch feedSource {
+        case .myFeeds:
+            nextPage = max(response.page.number, 0) + 1
+            let totalPages = max(response.page.totalPages, 0)
+            let hasNextByPage = nextPage < totalPages
+            let hasNextByCount = response.content.count >= DiaryService.defaultSize
+            hasNextPage = hasNextByPage || hasNextByCount
+        case .random:
             nextPage = DiaryService.defaultPage
-            hasNextPage = false
-            return
+            hasNextPage = !response.content.isEmpty
         }
-
-        nextPage = max(response.page.number, 0) + 1
-        let totalPages = max(response.page.totalPages, 0)
-        let hasNextByPage = nextPage < totalPages
-        let hasNextByCount = response.content.count >= DiaryService.defaultSize
-        hasNextPage = hasNextByPage || hasNextByCount
     }
 
     private func updateLikeUsersPaging(from response: UserSearchResponse) {
