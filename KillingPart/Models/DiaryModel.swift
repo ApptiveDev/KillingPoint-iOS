@@ -79,6 +79,34 @@ struct MyDiaryFeedsResponse: Decodable {
     let page: DiaryFeedPageModel
 }
 
+struct RandomDiaryFeedsResponse: Decodable {
+    let content: [DiaryFeedModel]
+    let pageSize: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case content
+        case pageSize
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        content = try container.decode([DiaryFeedModel].self, forKey: .content)
+        pageSize = max(container.decodeFlexibleInt(forKey: .pageSize) ?? content.count, content.count)
+    }
+
+    var asMyDiaryFeedsResponse: MyDiaryFeedsResponse {
+        MyDiaryFeedsResponse(
+            content: content,
+            page: DiaryFeedPageModel(
+                size: pageSize,
+                number: 0,
+                totalElements: content.count,
+                totalPages: 1
+            )
+        )
+    }
+}
+
 struct StoredDiaryFeedModel: Decodable, Identifiable {
     let diaryId: Int
     let artist: String

@@ -2,6 +2,11 @@ import Foundation
 
 @MainActor
 final class FeedViewModel: ObservableObject {
+    enum FeedSource {
+        case myFeeds
+        case random
+    }
+
     @Published private(set) var feeds: [DiaryFeedModel] = []
     @Published private(set) var isLoadingInitial = false
     @Published private(set) var isLoadingMore = false
@@ -14,6 +19,7 @@ final class FeedViewModel: ObservableObject {
     @Published var reportErrorMessage: String?
 
     private let diaryService: DiaryServicing
+    private let feedSource: FeedSource
     private var hasLoadedInitialData = false
     private var nextPage = DiaryService.defaultPage
     private var hasNextPage = true
@@ -27,8 +33,12 @@ final class FeedViewModel: ObservableObject {
     private var hasNextLikeUsersPage = true
     private var likeUsersRequestID = 0
 
-    init(diaryService: DiaryServicing = DiaryService()) {
+    init(
+        diaryService: DiaryServicing = DiaryService(),
+        feedSource: FeedSource = .myFeeds
+    ) {
         self.diaryService = diaryService
+        self.feedSource = feedSource
     }
 
     func loadInitialDataIfNeeded() async {
@@ -43,7 +53,7 @@ final class FeedViewModel: ObservableObject {
         defer { isLoadingInitial = false }
 
         do {
-            let response = try await diaryService.fetchMyFeeds(
+            let response = try await fetchFeeds(
                 page: DiaryService.defaultPage,
                 size: DiaryService.defaultSize
             )
@@ -86,7 +96,7 @@ final class FeedViewModel: ObservableObject {
             var page = DiaryService.defaultPage
 
             for _ in 0..<loadedPageCount {
-                let response = try await diaryService.fetchMyFeeds(
+                let response = try await fetchFeeds(
                     page: page,
                     size: DiaryService.defaultSize
                 )
@@ -207,7 +217,7 @@ final class FeedViewModel: ObservableObject {
         defer { isLoadingMore = false }
 
         do {
-            let response = try await diaryService.fetchMyFeeds(
+            let response = try await fetchFeeds(
                 page: nextPage,
                 size: DiaryService.defaultSize
             )
@@ -308,7 +318,22 @@ final class FeedViewModel: ObservableObject {
         likeUsers.append(contentsOf: filtered)
     }
 
+    private func fetchFeeds(page: Int, size: Int) async throws -> MyDiaryFeedsResponse {
+        switch feedSource {
+        case .myFeeds:
+            return try await diaryService.fetchMyFeeds(page: page, size: size)
+        case .random:
+            return try await diaryService.fetchRandomDiaries().asMyDiaryFeedsResponse
+        }
+    }
+
     private func updatePaging(from response: MyDiaryFeedsResponse) {
+        guard feedSource == .myFeeds else {
+            nextPage = DiaryService.defaultPage
+            hasNextPage = false
+            return
+        }
+
         nextPage = max(response.page.number, 0) + 1
         let totalPages = max(response.page.totalPages, 0)
         let hasNextByPage = nextPage < totalPages
