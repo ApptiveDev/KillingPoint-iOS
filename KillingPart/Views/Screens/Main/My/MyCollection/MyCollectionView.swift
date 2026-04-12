@@ -4,11 +4,13 @@ struct MyCollectionView: View {
     let onSessionEnded: () -> Void
 
     @StateObject private var viewModel: MyCollectionViewModel
+    @StateObject private var storesViewModel: MyCollectionStoresViewModel
     @StateObject private var profileSettingViewModel: ProfileSettingViewModel
     @State private var screenMode: MyCollectionScreenMode = .collectionList
     @State private var navigationDirection: MyCollectionScreenTransitionDirection = .forward
     @State private var isAccountActionDialogPresented = false
     @State private var collectionListRenderID = UUID()
+    @State private var selectedKillingPartSection: MyCollectionKillingPartSection = .myKillingPart
     @State private var activeConnectionSheet: ConnectionSheetType?
     @State private var activeLikeUsersSheet: LikeUsersSheetContext?
     @State private var pendingNavigationUser: UserModel?
@@ -35,6 +37,9 @@ struct MyCollectionView: View {
         _profileSettingViewModel = StateObject(
             wrappedValue: ProfileSettingViewModel(userService: userService)
         )
+        _storesViewModel = StateObject(
+            wrappedValue: MyCollectionStoresViewModel(diaryService: diaryService)
+        )
     }
 
     var body: some View {
@@ -60,7 +65,9 @@ struct MyCollectionView: View {
         }
         .onAppear {
             Task {
-                await viewModel.refetchCollectionDataOnFocus()
+                async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
+                async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
+                _ = await (myKillingPartRefresh, storedKillingPartRefresh)
             }
         }
         .onChange(of: viewModel.user?.identifier) { _ in
@@ -71,7 +78,9 @@ struct MyCollectionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
             collectionListRenderID = UUID()
             Task {
-                await viewModel.refetchCollectionDataOnFocus()
+                async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
+                async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
+                _ = await (myKillingPartRefresh, storedKillingPartRefresh)
             }
         }
         .navigationDestination(for: MyCollectionDiaryRoute.self) { route in
@@ -84,14 +93,28 @@ struct MyCollectionView: View {
             ) {
                 collectionListRenderID = UUID()
                 Task {
-                    await viewModel.refetchCollectionDataOnFocus()
+                    async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
+                    async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
+                    _ = await (myKillingPartRefresh, storedKillingPartRefresh)
                 }
             } onDiaryDeleted: { changedDiaryId in
                 viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
                 collectionListRenderID = UUID()
                 Task {
-                    await viewModel.refetchCollectionDataOnFocus()
+                    async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
+                    async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
+                    _ = await (myKillingPartRefresh, storedKillingPartRefresh)
                 }
+            }
+        }
+        .navigationDestination(for: StoreKillingPartDetailRoute.self) { route in
+            let diary = storesViewModel.storedDiaries.first(where: { $0.diaryId == route.diaryId }) ?? route.initialDiary
+
+            StoreKillingPartDetail(
+                diaryId: route.diaryId,
+                diary: diary
+            ) { removedDiaryId in
+                storesViewModel.removeStoredDiaryLocally(diaryId: removedDiaryId)
             }
         }
         .onChange(of: activeConnectionSheet) { sheetType in
@@ -205,92 +228,93 @@ struct MyCollectionView: View {
             VStack(alignment: .leading, spacing: AppSpacing.m) {
                 profileCard
 
-                if viewModel.myFeeds.isEmpty {
-                    emptyFeedPlaceholder
-                } else {
-                    LazyVGrid(columns: feedGridColumns, spacing: AppSpacing.s) {
-                        ForEach(viewModel.myFeeds) { feed in
-                            NavigationLink(
-                                value: MyCollectionDiaryRoute(
-                                    diaryId: feed.diaryId,
-                                    initialDiary: feed
-                                )
-                            ) {
-                                MyCollectionFeedCard(
-                                    feed: feed,
-                                    formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate),
-                                    onLikeLongPress: {
-                                        likeUsersSearchText = ""
-                                        activeLikeUsersSheet = LikeUsersSheetContext(diaryId: feed.diaryId)
-                                        Task {
-                                            await viewModel.loadLikeUsers(diaryId: feed.diaryId, searchCond: nil)
-                                        }
-                                    }
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .onAppear {
-                                guard feed.id == viewModel.myFeeds.last?.id else { return }
-                                Task {
-                                    await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
-                                }
-                            }
-                        }
-                    }
+                killingPartSectionToggle
 
-                    Color.clear
-                        .frame(height: 1)
-                        .id("my-collection-bottom-trigger-\(viewModel.myFeeds.count)")
-                        .onAppear {
+                if selectedKillingPartSection == .myKillingPart {
+                    MyCollectionMyKillingPartSectionView(
+                        feeds: viewModel.myFeeds,
+                        isLoadingMoreFeeds: viewModel.isLoadingMoreFeeds,
+                        errorMessage: viewModel.errorMessage,
+                        onLikeLongPress: { feed in
+                            likeUsersSearchText = ""
+                            activeLikeUsersSheet = LikeUsersSheetContext(diaryId: feed.diaryId)
+                            Task {
+                                await viewModel.loadLikeUsers(diaryId: feed.diaryId, searchCond: nil)
+                            }
+                        },
+                        onFeedAppear: { feed in
+                            guard feed.id == viewModel.myFeeds.last?.id else { return }
+                            Task {
+                                await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
+                            }
+                        },
+                        onBottomTriggerAppear: {
                             Task {
                                 await viewModel.loadMoreMyFeedsFromBottomIfNeeded()
                             }
                         }
-                }
-
-                if viewModel.isLoadingMoreFeeds {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .tint(.white.opacity(0.88))
-                        Spacer()
-                    }
-                    .padding(.top, AppSpacing.s)
-                }
-
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(.red.opacity(0.95))
+                    )
+                } else {
+                    MyCollectionStoreKillingPartSectionView(
+                        diaries: storesViewModel.storedDiaries,
+                        isLoadingInitial: storesViewModel.isLoadingInitial,
+                        isLoadingMore: storesViewModel.isLoadingMore,
+                        errorMessage: storesViewModel.errorMessage,
+                        onDiaryAppear: { diary in
+                            guard diary.id == storesViewModel.storedDiaries.last?.id else { return }
+                            Task {
+                                await storesViewModel.loadMoreStoredDiariesIfNeeded(currentDiaryId: diary.diaryId)
+                            }
+                        },
+                        onBottomTriggerAppear: {
+                            Task {
+                                await storesViewModel.loadMoreStoredDiariesFromBottomIfNeeded()
+                            }
+                        }
+                    )
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
         .id(collectionListRenderID)
+        .onChange(of: selectedKillingPartSection) { section in
+            guard section == .storeKillingPart else { return }
+            Task {
+                await storesViewModel.loadInitialDataIfNeeded()
+            }
+        }
     }
 
-    private var feedGridColumns: [GridItem] {
-        [
-            GridItem(.flexible(minimum: 0, maximum: .infinity), spacing: AppSpacing.s),
-            GridItem(.flexible(minimum: 0, maximum: .infinity), spacing: AppSpacing.s)
-        ]
+    private var killingPartSectionToggle: some View {
+        HStack(spacing: 0) {
+            sectionToggleButton(for: .myKillingPart)
+            sectionToggleButton(for: .storeKillingPart)
+        }
+        .frame(maxWidth: .infinity)
     }
 
-    private var emptyFeedPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(Color.white.opacity(0.08))
+    private func sectionToggleButton(for section: MyCollectionKillingPartSection) -> some View {
+        let isActive = selectedKillingPartSection == section
+
+        return Button {
+            guard selectedKillingPartSection != section else { return }
+            selectedKillingPartSection = section
+        } label: {
+            VStack(spacing: 6) {
+                Text(section.title)
+                    .font(AppFont.paperlogy6SemiBold(size: 14))
+                    .foregroundStyle(.white)
+                    .opacity(isActive ? 1 : 0.45)
+                    .frame(maxWidth: .infinity)
+
+                Rectangle()
+                    .fill(Color.white.opacity(isActive ? 1 : 0.24))
+                    .frame(height: 2)
+            }
             .frame(maxWidth: .infinity)
-            .frame(height: 140)
-            .overlay {
-                Text("아직 작성한 피드가 없어요.")
-                    .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(.white.opacity(0.72))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var profileCard: some View {
@@ -496,7 +520,7 @@ private enum MyCollectionScreenTransitionDirection {
     case backward
 }
 
-private struct MyCollectionDiaryRoute: Hashable {
+struct MyCollectionDiaryRoute: Hashable {
     let diaryId: Int
     let initialDiary: DiaryFeedModel
 
@@ -506,5 +530,19 @@ private struct MyCollectionDiaryRoute: Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(diaryId)
+    }
+}
+
+private enum MyCollectionKillingPartSection: Equatable {
+    case myKillingPart
+    case storeKillingPart
+
+    var title: String {
+        switch self {
+        case .myKillingPart:
+            return "내 킬링파트"
+        case .storeKillingPart:
+            return "보관된 킬링파트"
+        }
     }
 }

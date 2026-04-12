@@ -2,7 +2,9 @@ import Foundation
 
 protocol DiaryServicing {
     func fetchMyDiaries(page: Int, size: Int) async throws -> MyDiaryFeedsResponse
+    func fetchStoredDiaries(page: Int, size: Int) async throws -> StoredDiaryFeedsResponse
     func fetchMyFeeds(page: Int, size: Int) async throws -> MyDiaryFeedsResponse
+    func fetchRandomDiaries() async throws -> RandomDiaryFeedsResponse
     func fetchUserFeeds(userId: Int, page: Int, size: Int) async throws -> UserDiaryFeedsResponse
     func fetchDiaryLikeUsers(diaryId: Int, searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse
     func createDiary(request: DiaryCreateRequest) async throws -> DiaryCreateResult
@@ -75,6 +77,31 @@ struct DiaryService: DiaryServicing {
         }
     }
 
+    func fetchStoredDiaries(
+        page: Int = Self.defaultPage,
+        size: Int = Self.defaultSize
+    ) async throws -> StoredDiaryFeedsResponse {
+        let resolvedPage = max(page, Self.defaultPage)
+        let resolvedSize = size > 0 ? size : Self.defaultSize
+
+        do {
+            let request = APIRequest(
+                path: "/diaries/stores",
+                method: .get,
+                queryItems: [
+                    URLQueryItem(name: "page", value: String(resolvedPage)),
+                    URLQueryItem(name: "size", value: String(resolvedSize))
+                ],
+                requiresAuthorization: true
+            )
+
+            return try await apiClient.request(request, responseType: StoredDiaryFeedsResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
     func fetchMyFeeds(
         page: Int = Self.defaultPage,
         size: Int = Self.defaultSize
@@ -94,6 +121,21 @@ struct DiaryService: DiaryServicing {
             )
 
             return try await apiClient.request(request, responseType: MyDiaryFeedsResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func fetchRandomDiaries() async throws -> RandomDiaryFeedsResponse {
+        do {
+            let request = APIRequest(
+                path: "/diaries/randoms",
+                method: .get,
+                requiresAuthorization: true
+            )
+
+            return try await apiClient.request(request, responseType: RandomDiaryFeedsResponse.self)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

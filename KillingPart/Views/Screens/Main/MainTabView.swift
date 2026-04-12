@@ -15,7 +15,12 @@ struct MainTabView: View {
                 }
                 .tag(MainRootTab.my)
 
-            
+            RandomSearchView(isRootTabSelected: selectedTab == .random)
+                .tabItem {
+                    Label("탐색", systemImage: "waveform.path.ecg")
+                }
+                .tag(MainRootTab.random)
+
             AddTabView()
                 .tabItem {
                     Label("추가", systemImage: "plus.square")
@@ -44,6 +49,7 @@ struct MainTabView: View {
 
 private enum MainRootTab: Hashable {
     case my
+    case random
     case social
     case add
 }

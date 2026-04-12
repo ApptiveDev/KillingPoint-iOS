@@ -79,6 +79,102 @@ struct MyDiaryFeedsResponse: Decodable {
     let page: DiaryFeedPageModel
 }
 
+struct RandomDiaryFeedsResponse: Decodable {
+    let content: [DiaryFeedModel]
+    let pageSize: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case content
+        case pageSize
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        content = try container.decode([DiaryFeedModel].self, forKey: .content)
+        pageSize = max(container.decodeFlexibleInt(forKey: .pageSize) ?? content.count, content.count)
+    }
+
+    var asMyDiaryFeedsResponse: MyDiaryFeedsResponse {
+        MyDiaryFeedsResponse(
+            content: content,
+            page: DiaryFeedPageModel(
+                size: pageSize,
+                number: 0,
+                totalElements: content.count,
+                totalPages: 1
+            )
+        )
+    }
+}
+
+struct StoredDiaryFeedModel: Decodable, Identifiable {
+    let diaryId: Int
+    let artist: String
+    let musicTitle: String
+    let albumImageUrl: String
+    let videoUrl: String
+    let originalAuthorTag: String
+    let duration: String
+    let totalDuration: String
+    let start: String
+    let end: String
+
+    var id: Int { diaryId }
+
+    var albumImageURL: URL? {
+        let trimmed = albumImageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let parsed = URL(string: trimmed), parsed.scheme != nil {
+            return parsed
+        }
+
+        if trimmed.hasPrefix("//"), let parsed = URL(string: "https:\(trimmed)") {
+            return parsed
+        }
+
+        return URL(string: "https://\(trimmed)")
+    }
+
+    var displayOriginalAuthorTag: String {
+        let trimmed = originalAuthorTag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "@killingpart_user" }
+        return trimmed.hasPrefix("@") ? trimmed : "@\(trimmed)"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case diaryId
+        case artist
+        case musicTitle
+        case albumImageUrl
+        case videoUrl
+        case originalAuthorTag
+        case duration
+        case totalDuration
+        case start
+        case end
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        diaryId = container.decodeFlexibleInt(forKey: .diaryId) ?? 0
+        artist = container.decodeFlexibleString(forKey: .artist)
+        musicTitle = container.decodeFlexibleString(forKey: .musicTitle)
+        albumImageUrl = container.decodeFlexibleString(forKey: .albumImageUrl)
+        videoUrl = container.decodeFlexibleString(forKey: .videoUrl)
+        originalAuthorTag = container.decodeFlexibleString(forKey: .originalAuthorTag)
+        duration = container.decodeFlexibleString(forKey: .duration)
+        totalDuration = container.decodeFlexibleString(forKey: .totalDuration)
+        start = container.decodeFlexibleString(forKey: .start)
+        end = container.decodeFlexibleString(forKey: .end)
+    }
+}
+
+struct StoredDiaryFeedsResponse: Decodable {
+    let content: [StoredDiaryFeedModel]
+    let page: DiaryFeedPageModel
+}
+
 struct UserDiaryFeedModel: Decodable, Identifiable {
     let diaryId: Int
     let artist: String
@@ -128,6 +224,44 @@ struct UserDiaryFeedModel: Decodable, Identifiable {
 struct UserDiaryFeedsResponse: Decodable {
     let content: [UserDiaryFeedModel]
     let page: DiaryFeedPageModel
+}
+
+private extension KeyedDecodingContainer {
+    func decodeFlexibleString(forKey key: K) -> String {
+        if let value = try? decode(String.self, forKey: key) {
+            return value
+        }
+
+        if let value = try? decode(Int.self, forKey: key) {
+            return String(value)
+        }
+
+        if let value = try? decode(Double.self, forKey: key) {
+            return String(value)
+        }
+
+        if let value = try? decode(Bool.self, forKey: key) {
+            return value ? "true" : "false"
+        }
+
+        return ""
+    }
+
+    func decodeFlexibleInt(forKey key: K) -> Int? {
+        if let value = try? decode(Int.self, forKey: key) {
+            return value
+        }
+
+        if let value = try? decode(String.self, forKey: key) {
+            return Int(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        if let value = try? decode(Double.self, forKey: key) {
+            return Int(value)
+        }
+
+        return nil
+    }
 }
 
 struct DiaryCreateRequest: Encodable {
