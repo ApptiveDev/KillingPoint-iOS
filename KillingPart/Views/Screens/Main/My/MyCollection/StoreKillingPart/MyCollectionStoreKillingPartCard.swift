@@ -16,11 +16,15 @@ struct MyCollectionStoreKillingPartCard: View {
                 .font(AppFont.paperlogy6SemiBold(size: 14))
                 .foregroundStyle(.white)
                 .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
 
             Text(diary.artist)
                 .font(AppFont.paperlogy4Regular(size: 13))
                 .foregroundStyle(.white.opacity(0.78))
                 .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppSpacing.s)
