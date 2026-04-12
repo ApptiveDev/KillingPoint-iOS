@@ -9,6 +9,7 @@ struct RandomSearchView: View {
         NavigationStack {
             GeometryReader { geometry in
                 let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
+                let extraBottomInset = AppSpacing.m
 
                 ZStack {
                     Image("my_background")
@@ -27,10 +28,10 @@ struct RandomSearchView: View {
                             }
                         )
                     }
-                    .padding(.top, AppSpacing.m)
+                    .padding(.top, AppSpacing.l)
                     .padding(.horizontal, AppSpacing.m)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.bottom, bottomInset)
+                    .padding(.bottom, bottomInset + extraBottomInset)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .toolbar(.hidden, for: .navigationBar)
