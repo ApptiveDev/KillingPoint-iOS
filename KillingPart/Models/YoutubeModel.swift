@@ -55,6 +55,18 @@ struct YoutubeVideo: Identifiable, Decodable, Equatable {
         }
     }
 
+    init(
+        id: String,
+        title: String,
+        duration: Double,
+        url: URL? = nil
+    ) {
+        self.id = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.title = title
+        self.duration = max(duration, 0)
+        self.urlString = url?.absoluteString
+    }
+
     var thumbnailURL: URL? {
         guard let videoID = normalizedVideoID else {
             return nil

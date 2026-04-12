@@ -7,13 +7,25 @@ struct AddSearchDetailView: View {
     @State private var isForwardStepTransition = true
     @State private var playerReloadToken = UUID()
     private let onSaved: (() -> Void)?
+    private let shouldNavigateToPlayKillingPartOnSave: Bool
+    private let onSaveCompletedAfterDismiss: (() -> Void)?
 
     init(
         track: SpotifySimpleTrack,
+        prefill: AddSearchDetailPrefill? = nil,
+        shouldNavigateToPlayKillingPartOnSave: Bool = true,
+        onSaveCompletedAfterDismiss: (() -> Void)? = nil,
         onSaved: (() -> Void)? = nil
     ) {
         self.onSaved = onSaved
-        _viewModel = StateObject(wrappedValue: AddSearchDetailViewModel(track: track))
+        self.shouldNavigateToPlayKillingPartOnSave = shouldNavigateToPlayKillingPartOnSave
+        self.onSaveCompletedAfterDismiss = onSaveCompletedAfterDismiss
+        _viewModel = StateObject(
+            wrappedValue: AddSearchDetailViewModel(
+                track: track,
+                prefill: prefill
+            )
+        )
     }
 
     var body: some View {
@@ -167,8 +179,15 @@ struct AddSearchDetailView: View {
             let isSuccess = await viewModel.submitDiary()
             if isSuccess {
                 onSaved?()
-                NotificationCenter.default.post(name: .navigateToPlayKillingPart, object: nil)
+                if shouldNavigateToPlayKillingPartOnSave {
+                    NotificationCenter.default.post(name: .navigateToPlayKillingPart, object: nil)
+                }
                 dismiss()
+                if let onSaveCompletedAfterDismiss {
+                    Task { @MainActor in
+                        onSaveCompletedAfterDismiss()
+                    }
+                }
             }
         }
     }
