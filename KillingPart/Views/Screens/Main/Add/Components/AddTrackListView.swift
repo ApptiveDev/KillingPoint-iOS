@@ -3,6 +3,7 @@ import SwiftUI
 struct AddTrackListView: View {
     let tracks: [SpotifySimpleTrack]
     let isLoadingMore: Bool
+    let bottomContentInset: CGFloat
     let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
     let onDiarySaved: () -> Void
 
@@ -35,7 +36,7 @@ struct AddTrackListView: View {
                 }
             }
             .padding(.top, AppSpacing.xs)
-            .padding(.bottom, AppSpacing.l)
+            .padding(.bottom, max(bottomContentInset, AppSpacing.l))
         }
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)

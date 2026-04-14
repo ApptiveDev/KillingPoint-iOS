@@ -7,6 +7,8 @@ struct AddTabView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
+                let listBottomContentInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
+
                 ZStack {
                     Image("add_background")
                         .resizable()
@@ -31,6 +33,7 @@ struct AddTabView: View {
                             errorMessage: viewModel.errorMessage,
                             shouldShowEmptyState: viewModel.shouldShowEmptyState,
                             tracks: viewModel.tracks,
+                            bottomContentInset: listBottomContentInset,
                             onRetry: viewModel.retrySearch,
                             onTrackAppear: viewModel.loadMoreIfNeeded,
                             onDiarySaved: viewModel.clearSearch
