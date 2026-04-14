@@ -22,6 +22,9 @@ struct AddSearchDetailWaveformTrimView: View {
     private let handleCornerRadius: CGFloat = 14
     private let autoScrollEdgeThreshold: CGFloat = 52
     private let autoScrollMaxVelocity: CGFloat = 260
+    private let followButtonSize: CGFloat = 30
+    private let followButtonInset: CGFloat = 10
+    private let offscreenFollowThreshold: CGFloat = 6
     private let timelineCoordinateSpaceName = "addSearchDetailTimeline"
 
     @State private var startDragBase: Double?
@@ -34,6 +37,9 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var autoScrollTimer: Timer?
     @State private var autoScrollLastTick: CFTimeInterval?
     @State private var timelineScrollView: UIScrollView?
+    @State private var timelineViewportOffsetX: CGFloat = 0
+    @State private var timelineViewportWidth: CGFloat = 0
+    @State private var timelineContentWidth: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
@@ -52,13 +58,27 @@ struct AddSearchDetailWaveformTrimView: View {
                         handleTimeLabels(contentWidth: contentWidth)
                             .frame(width: contentWidth, height: handleLabelHeight)
                     }
+                    .background {
+                        AddSearchDetailScrollViewResolver(
+                            onResolve: { scrollView in
+                                if timelineScrollView !== scrollView {
+                                    timelineScrollView = scrollView
+                                }
+                            },
+                            onViewportChange: { viewport in
+                                timelineViewportOffsetX = viewport.contentOffsetX
+                                timelineViewportWidth = viewport.viewportWidth
+                                timelineContentWidth = viewport.contentWidth
+                            }
+                        )
+                    }
                 }
                 .coordinateSpace(name: timelineCoordinateSpaceName)
-                .background {
-                    AddSearchDetailScrollViewResolver { scrollView in
-                        if timelineScrollView !== scrollView {
-                            timelineScrollView = scrollView
-                        }
+                .onAppear {
+                    if let scrollView = timelineScrollView {
+                        timelineViewportOffsetX = scrollView.contentOffset.x
+                        timelineViewportWidth = scrollView.bounds.width
+                        timelineContentWidth = scrollView.contentSize.width
                     }
                 }
 
@@ -75,6 +95,12 @@ struct AddSearchDetailWaveformTrimView: View {
         let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
         let selectedWidth = max(endX - startX, 1)
         let trailingWidth = max(contentWidth - endX, 0)
+        let visibleRange = timelineVisibleRange(
+            contentWidth: contentWidth,
+            fallbackViewportWidth: viewportWidth
+        )
+        let isStartOffscreen = startX < visibleRange.lowerBound - offscreenFollowThreshold
+        let isEndOffscreen = endX > visibleRange.upperBound + offscreenFollowThreshold
 
         return ZStack(alignment: .leading) {
             waveformBars(contentWidth: contentWidth)
@@ -115,6 +141,32 @@ struct AddSearchDetailWaveformTrimView: View {
                     )
                 )
                 .zIndex(4)
+
+            if isStartOffscreen {
+                followScrollButton(direction: .left)
+                    .position(
+                        x: followButtonCenterX(
+                            for: .left,
+                            visibleRange: visibleRange,
+                            contentWidth: contentWidth
+                        ),
+                        y: trackHeight / 2
+                    )
+                    .zIndex(5)
+            }
+
+            if isEndOffscreen {
+                followScrollButton(direction: .right)
+                    .position(
+                        x: followButtonCenterX(
+                            for: .right,
+                            visibleRange: visibleRange,
+                            contentWidth: contentWidth
+                        ),
+                        y: trackHeight / 2
+                    )
+                    .zIndex(5)
+            }
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -271,6 +323,65 @@ struct AddSearchDetailWaveformTrimView: View {
         .shadow(color: .black.opacity(0.35), radius: 5, x: 0, y: 2)
     }
 
+    private func followScrollButton(direction: HandleDirection) -> some View {
+        Button {
+            switch direction {
+            case .left:
+                scrollTimelineToStart(startSeconds, animated: true)
+            case .right:
+                scrollTimelineToEnd(endSeconds, animated: true)
+            }
+        } label: {
+            Image(systemName: direction.systemSymbolName)
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.95))
+                .frame(width: followButtonSize, height: followButtonSize)
+                .background(
+                    Circle()
+                        .fill(Color.black.opacity(0.62))
+                )
+                .overlay {
+                    Circle()
+                        .stroke(AppColors.primary600.opacity(0.85), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func followButtonCenterX(
+        for direction: HandleDirection,
+        visibleRange: ClosedRange<CGFloat>,
+        contentWidth: CGFloat
+    ) -> CGFloat {
+        let half = followButtonSize / 2
+        let rawX: CGFloat
+        switch direction {
+        case .left:
+            rawX = visibleRange.lowerBound + followButtonInset + half
+        case .right:
+            rawX = visibleRange.upperBound - followButtonInset - half
+        }
+        return min(max(rawX, half), max(contentWidth - half, half))
+    }
+
+    private func timelineVisibleRange(
+        contentWidth: CGFloat,
+        fallbackViewportWidth: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        let resolvedViewportWidth = max(
+            timelineViewportWidth > 0 ? timelineViewportWidth : fallbackViewportWidth,
+            1
+        )
+        let resolvedContentWidth = max(
+            timelineContentWidth > 0 ? timelineContentWidth : contentWidth,
+            resolvedViewportWidth
+        )
+        let maxOffset = max(resolvedContentWidth - resolvedViewportWidth, 0)
+        let clampedOffset = min(max(timelineViewportOffsetX, 0), maxOffset)
+        let upper = min(clampedOffset + resolvedViewportWidth, resolvedContentWidth)
+        return clampedOffset...upper
+    }
+
     private func startHandleDragGesture(contentWidth: CGFloat, viewportWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(timelineCoordinateSpaceName))
             .onChanged { value in
@@ -412,6 +523,9 @@ struct AddSearchDetailWaveformTrimView: View {
         guard abs(movedOffset) > 0.0001 else { return }
 
         scrollView.setContentOffset(CGPoint(x: targetOffset, y: scrollView.contentOffset.y), animated: false)
+        timelineViewportOffsetX = targetOffset
+        timelineViewportWidth = scrollView.bounds.width
+        timelineContentWidth = scrollView.contentSize.width
         autoScrollAdditionalSeconds += seconds(
             forTranslation: movedOffset,
             contentWidth: activeHandleContentWidth
@@ -474,6 +588,42 @@ struct AddSearchDetailWaveformTrimView: View {
         }
 
         onUpdateRange(newStart, newEnd)
+        scrollTimelineToStart(newStart, animated: false)
+    }
+
+    private func scrollTimelineToStart(_ seconds: Double, animated: Bool) {
+        guard let scrollView = timelineScrollView else { return }
+        let contentWidth = resolvedTimelineContentWidth(for: scrollView)
+        let targetX = xPosition(for: seconds, contentWidth: contentWidth)
+        let offsetX = max(targetX - horizontalPadding, 0)
+        setTimelineOffset(offsetX, in: scrollView, animated: animated)
+    }
+
+    private func scrollTimelineToEnd(_ seconds: Double, animated: Bool) {
+        guard let scrollView = timelineScrollView else { return }
+        let contentWidth = resolvedTimelineContentWidth(for: scrollView)
+        let targetX = xPosition(for: seconds, contentWidth: contentWidth)
+        let offsetX = max(targetX - scrollView.bounds.width + horizontalPadding, 0)
+        setTimelineOffset(offsetX, in: scrollView, animated: animated)
+    }
+
+    private func resolvedTimelineContentWidth(for scrollView: UIScrollView) -> CGFloat {
+        max(
+            CGFloat(max(duration, 1)) * pointsPerSecond + horizontalPadding * 2,
+            max(scrollView.contentSize.width, scrollView.bounds.width)
+        )
+    }
+
+    private func setTimelineOffset(_ offsetX: CGFloat, in scrollView: UIScrollView, animated: Bool) {
+        let maxOffset = max(scrollView.contentSize.width - scrollView.bounds.width, 0)
+        let clampedOffset = min(max(offsetX, 0), maxOffset)
+        scrollView.setContentOffset(
+            CGPoint(x: clampedOffset, y: scrollView.contentOffset.y),
+            animated: animated
+        )
+        timelineViewportOffsetX = clampedOffset
+        timelineViewportWidth = scrollView.bounds.width
+        timelineContentWidth = scrollView.contentSize.width
     }
 
     private enum HandleDirection {
@@ -496,8 +646,15 @@ private enum AddSearchDetailHandleRoundedSide {
     case right
 }
 
+private struct AddSearchDetailTimelineViewport {
+    let contentOffsetX: CGFloat
+    let viewportWidth: CGFloat
+    let contentWidth: CGFloat
+}
+
 private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
     let onResolve: (UIScrollView) -> Void
+    let onViewportChange: (AddSearchDetailTimelineViewport) -> Void
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
@@ -515,27 +672,95 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onResolve: onResolve)
+        Coordinator(
+            onResolve: onResolve,
+            onViewportChange: onViewportChange
+        )
     }
 
     final class Coordinator {
         private let onResolve: (UIScrollView) -> Void
+        private let onViewportChange: (AddSearchDetailTimelineViewport) -> Void
         private weak var resolvedScrollView: UIScrollView?
+        private var observations: [NSKeyValueObservation] = []
 
-        init(onResolve: @escaping (UIScrollView) -> Void) {
+        init(
+            onResolve: @escaping (UIScrollView) -> Void,
+            onViewportChange: @escaping (AddSearchDetailTimelineViewport) -> Void
+        ) {
             self.onResolve = onResolve
+            self.onViewportChange = onViewportChange
         }
 
         func resolve(from view: UIView) {
             var current: UIView? = view.superview
+            var candidates: [UIScrollView] = []
             while let candidate = current {
                 if let scrollView = candidate as? UIScrollView {
-                    guard resolvedScrollView !== scrollView else { return }
-                    resolvedScrollView = scrollView
-                    onResolve(scrollView)
-                    return
+                    candidates.append(scrollView)
                 }
                 current = candidate.superview
+            }
+
+            guard let scrollView = preferredScrollView(from: candidates) else { return }
+            if resolvedScrollView === scrollView {
+                publishViewport(for: scrollView)
+                return
+            }
+
+            resolvedScrollView = scrollView
+            observe(scrollView)
+            onResolve(scrollView)
+            publishViewport(for: scrollView)
+        }
+
+        private func preferredScrollView(from candidates: [UIScrollView]) -> UIScrollView? {
+            if let horizontalCandidate = candidates.first(where: {
+                $0.contentSize.width > $0.bounds.width + 1 || ($0.bounds.height > 0 && $0.bounds.height <= 220)
+            }) {
+                return horizontalCandidate
+            }
+            return candidates.first
+        }
+
+        private func observe(_ scrollView: UIScrollView) {
+            observations.forEach { $0.invalidate() }
+            observations.removeAll()
+
+            let contentOffsetObservation = scrollView.observe(
+                \.contentOffset,
+                options: [.new]
+            ) { [weak self] observedScrollView, _ in
+                self?.publishViewport(for: observedScrollView)
+            }
+            let contentSizeObservation = scrollView.observe(
+                \.contentSize,
+                options: [.new]
+            ) { [weak self] observedScrollView, _ in
+                self?.publishViewport(for: observedScrollView)
+            }
+            let boundsObservation = scrollView.observe(
+                \.bounds,
+                options: [.new]
+            ) { [weak self] observedScrollView, _ in
+                self?.publishViewport(for: observedScrollView)
+            }
+
+            observations = [
+                contentOffsetObservation,
+                contentSizeObservation,
+                boundsObservation
+            ]
+        }
+
+        private func publishViewport(for scrollView: UIScrollView) {
+            let snapshot = AddSearchDetailTimelineViewport(
+                contentOffsetX: scrollView.contentOffset.x,
+                viewportWidth: scrollView.bounds.width,
+                contentWidth: scrollView.contentSize.width
+            )
+            DispatchQueue.main.async {
+                self.onViewportChange(snapshot)
             }
         }
     }
