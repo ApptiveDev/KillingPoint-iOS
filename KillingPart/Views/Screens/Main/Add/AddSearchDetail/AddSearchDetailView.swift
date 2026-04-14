@@ -42,9 +42,9 @@ struct AddSearchDetailView: View {
                     detailInputSection
                         .clipped()
 
-//                    if viewModel.videos.count > 1 {
-//                        AddSearchDetailVideoCandidateSection(viewModel: viewModel)
-//                    }
+                    if viewModel.videos.count > 1 {
+                        AddSearchDetailVideoCandidateSection(viewModel: viewModel)
+                    }
                 }
                 .padding(.horizontal, AppSpacing.l)
                 .padding(.top, AppSpacing.m)
