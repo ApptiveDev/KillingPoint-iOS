@@ -11,6 +11,7 @@ struct SocialFeedPageCardView: View {
     let onLikeLongPress: () -> Void
     let onStoreTap: () -> Void
     let onReportTap: () -> Void
+    let onDoubleTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
     @State private var shouldIgnoreNextLikeTap = false
 
@@ -141,6 +142,12 @@ struct SocialFeedPageCardView: View {
             .padding(.bottom, AppSpacing.l)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .simultaneousGesture(
+            TapGesture(count: 2)
+                .onEnded {
+                    onDoubleTap()
+                }
+        )
     }
 
     private var diarySection: some View {

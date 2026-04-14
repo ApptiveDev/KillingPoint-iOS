@@ -2,14 +2,15 @@ import SwiftUI
 
 struct SocialView: View {
     let isRootTabSelected: Bool
-    @StateObject private var viewModel = SocialViewModel()
-    @StateObject private var feedViewModel = FeedViewModel()
-    @State private var selectedTopTab: SocialTopTab = .friend
+    @ObservedObject var viewModel: SocialViewModel
+    @ObservedObject var feedViewModel: FeedViewModel
+    @State private var selectedTopTab: SocialTopTab = .feed
 
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
                 let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
+                let friendsBottomContentInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
 
                 ZStack {
                     Image("my_background")
@@ -23,7 +24,10 @@ struct SocialView: View {
                         SocialTopToggleTabsView(selectedTopTab: $selectedTopTab)
 
                         if selectedTopTab == .friend {
-                            FriendsSectionView(viewModel: viewModel)
+                            FriendsSectionView(
+                                viewModel: viewModel,
+                                bottomContentInset: friendsBottomContentInset
+                            )
                         } else {
                             FeedSectionView(
                                 viewModel: feedViewModel,
@@ -51,9 +55,17 @@ struct SocialView: View {
                 await feedViewModel.loadInitialDataIfNeeded()
             }
         }
+        .task(id: isRootTabSelected) {
+            guard isRootTabSelected else { return }
+            await viewModel.refreshDefaultLists()
+        }
     }
 }
 
 #Preview {
-    SocialView(isRootTabSelected: true)
+    SocialView(
+        isRootTabSelected: true,
+        viewModel: SocialViewModel(),
+        feedViewModel: FeedViewModel()
+    )
 }

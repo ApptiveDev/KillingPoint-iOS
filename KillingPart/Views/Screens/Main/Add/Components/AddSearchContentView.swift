@@ -6,6 +6,7 @@ struct AddSearchContentView: View {
     let errorMessage: String?
     let shouldShowEmptyState: Bool
     let tracks: [SpotifySimpleTrack]
+    let bottomContentInset: CGFloat
     let onRetry: () -> Void
     let onTrackAppear: (SpotifySimpleTrack.ID) -> Void
     let onDiarySaved: () -> Void
@@ -22,6 +23,7 @@ struct AddSearchContentView: View {
                 AddTrackListView(
                     tracks: tracks,
                     isLoadingMore: isLoadingMore,
+                    bottomContentInset: bottomContentInset,
                     onTrackAppear: onTrackAppear,
                     onDiarySaved: onDiarySaved
                 )

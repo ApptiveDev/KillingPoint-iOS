@@ -17,8 +17,7 @@ struct FeedSectionView: View {
     @State private var pendingLikeUserDestination: UserModel?
     @State private var likeUsersSearchText = ""
     @State private var diaryReportContent = ""
-    @State private var activeInteractionFeedback: InteractionFeedback?
-    @State private var interactionFeedbackDismissTask: Task<Void, Never>?
+    @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
@@ -59,7 +58,7 @@ struct FeedSectionView: View {
             .padding(.bottom, bottomInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .center) {
-                interactionFeedbackOverlay
+                SocialInteractionFeedbackOverlay(feedback: interactionFeedbackPresenter.activeFeedback)
             }
         }
         .onAppear {
@@ -69,9 +68,7 @@ struct FeedSectionView: View {
         }
         .onDisappear {
             isViewActive = false
-            interactionFeedbackDismissTask?.cancel()
-            interactionFeedbackDismissTask = nil
-            activeInteractionFeedback = nil
+            interactionFeedbackPresenter.clear()
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
@@ -190,11 +187,7 @@ struct FeedSectionView: View {
                             isProfileNavigationActive = true
                         },
                         onLikeTap: {
-                            presentInteractionFeedback(
-                                isLike: true,
-                                isEnabled: !feed.isLiked
-                            )
-                            Task { await viewModel.toggleLike(diaryId: feed.diaryId) }
+                            handleLikeTap(diaryId: feed.diaryId)
                         },
                         onLikeLongPress: {
                             likeUsersSearchText = ""
@@ -204,16 +197,15 @@ struct FeedSectionView: View {
                             }
                         },
                         onStoreTap: {
-                            presentInteractionFeedback(
-                                isLike: false,
-                                isEnabled: !feed.isStored
-                            )
-                            Task { await viewModel.toggleStore(diaryId: feed.diaryId) }
+                            handleStoreTap(diaryId: feed.diaryId)
                         },
                         onReportTap: {
                             diaryReportContent = ""
                             viewModel.clearDiaryReportState()
                             activeDiaryReportSheet = DiaryReportSheetContext(diaryId: feed.diaryId)
+                        },
+                        onDoubleTap: {
+                            handleDoubleTapLike(diaryId: feed.diaryId)
                         },
                         onVideoPlaybackEnded: {
                             guard currentPageIndex == index else { return }
@@ -297,37 +289,39 @@ struct FeedSectionView: View {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    @ViewBuilder
-    private var interactionFeedbackOverlay: some View {
-        if let feedback = activeInteractionFeedback {
-            VStack(spacing: AppSpacing.s) {
-                Image(systemName: feedback.iconName)
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(feedback.iconColor)
-
-                Text(feedback.message)
-                    .font(AppFont.paperlogy5Medium(size: 13))
-                    .foregroundStyle(.white.opacity(0.95))
-            }
-            .padding(.horizontal, AppSpacing.l)
-            .padding(.vertical, AppSpacing.m)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.black.opacity(0.78))
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.32), radius: 14, y: 8)
-            .transition(
-                .asymmetric(
-                    insertion: .scale(scale: 0.84).combined(with: .opacity),
-                    removal: .offset(y: -18).combined(with: .opacity)
-                )
-            )
-            .allowsHitTesting(false)
+    private func handleLikeTap(diaryId: Int) {
+        guard let feed = feed(for: diaryId) else { return }
+        let feedback: SocialInteractionFeedbackKind = feed.isLiked ? .likeRemoved : .likeAdded
+        interactionFeedbackPresenter.show(feedback)
+        Task {
+            await viewModel.toggleLike(diaryId: diaryId)
         }
+    }
+
+    private func handleStoreTap(diaryId: Int) {
+        guard let feed = feed(for: diaryId) else { return }
+        let feedback: SocialInteractionFeedbackKind = feed.isStored ? .storeRemoved : .storeAdded
+        interactionFeedbackPresenter.show(feedback)
+        Task {
+            await viewModel.toggleStore(diaryId: diaryId)
+        }
+    }
+
+    private func handleDoubleTapLike(diaryId: Int) {
+        guard let feed = feed(for: diaryId) else { return }
+        guard !feed.isLiked else {
+            interactionFeedbackPresenter.show(.alreadyLiked)
+            return
+        }
+
+        interactionFeedbackPresenter.show(.likeAdded)
+        Task {
+            await viewModel.toggleLike(diaryId: diaryId)
+        }
+    }
+
+    private func feed(for diaryId: Int) -> DiaryFeedModel? {
+        viewModel.feeds.first(where: { $0.diaryId == diaryId })
     }
 
     private func makeUserModel(from feed: DiaryFeedModel) -> UserModel {
@@ -363,38 +357,6 @@ struct FeedSectionView: View {
         return rawTag
     }
 
-    private func presentInteractionFeedback(isLike: Bool, isEnabled: Bool) {
-        let feedback: InteractionFeedback
-        if isLike {
-            feedback = InteractionFeedback(
-                iconName: isEnabled ? "heart.fill" : "heart",
-                iconColor: isEnabled ? Color.kpPrimary : Color.white.opacity(0.8),
-                message: isEnabled ? "좋아요 했어요" : "좋아요를 취소했어요"
-            )
-        } else {
-            feedback = InteractionFeedback(
-                iconName: isEnabled ? "bookmark.fill" : "bookmark",
-                iconColor: isEnabled ? AppColors.primary600 : Color.white.opacity(0.8),
-                message: isEnabled ? "보관함에 저장했어요" : "보관함을 해제했어요"
-            )
-        }
-
-        interactionFeedbackDismissTask?.cancel()
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.76)) {
-            activeInteractionFeedback = feedback
-        }
-
-        interactionFeedbackDismissTask = Task {
-            try? await Task.sleep(nanoseconds: 900_000_000)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation(.easeIn(duration: 0.22)) {
-                    activeInteractionFeedback = nil
-                }
-            }
-        }
-    }
-
     private struct LikeUsersSheetContext: Identifiable, Equatable {
         let diaryId: Int
         var id: Int { diaryId }
@@ -403,12 +365,6 @@ struct FeedSectionView: View {
     private struct DiaryReportSheetContext: Identifiable, Equatable {
         let diaryId: Int
         var id: Int { diaryId }
-    }
-
-    private struct InteractionFeedback {
-        let iconName: String
-        let iconColor: Color
-        let message: String
     }
      
     private func handleVideoPlaybackEnded(currentIndex: Int, feed: DiaryFeedModel) {

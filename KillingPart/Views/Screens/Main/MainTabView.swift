@@ -3,6 +3,8 @@ import SwiftUI
 struct MainTabView: View {
     let onLogout: () -> Void
     @State private var selectedTab: MainRootTab = .my
+    @StateObject private var socialViewModel = SocialViewModel()
+    @StateObject private var socialFeedViewModel = FeedViewModel()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -27,7 +29,11 @@ struct MainTabView: View {
                 }
                 .tag(MainRootTab.add)
             
-            SocialView(isRootTabSelected: selectedTab == .social)
+            SocialView(
+                isRootTabSelected: selectedTab == .social,
+                viewModel: socialViewModel,
+                feedViewModel: socialFeedViewModel
+            )
                 .tabItem {
                     Label("소셜", systemImage: "person.2")
                 }
