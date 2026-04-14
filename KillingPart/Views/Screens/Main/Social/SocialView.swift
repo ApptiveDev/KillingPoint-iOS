@@ -55,6 +55,10 @@ struct SocialView: View {
                 await feedViewModel.loadInitialDataIfNeeded()
             }
         }
+        .task(id: isRootTabSelected) {
+            guard isRootTabSelected else { return }
+            await viewModel.refreshDefaultLists()
+        }
     }
 }
 

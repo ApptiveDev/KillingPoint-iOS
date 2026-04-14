@@ -56,6 +56,14 @@ struct SocialFriendListView: View {
                                 onUserAppear(user.userId)
                             }
                         }
+
+                        if let lastUserId = users.last?.userId {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                    onUserAppear(lastUserId)
+                                }
+                        }
                     }
                     .padding(.top, AppSpacing.xs)
 

@@ -30,6 +30,8 @@ final class SocialViewModel: ObservableObject {
     private var hasNextMyFandomPage = true
     private var hasNextSearchedUsersPage = true
     private var isRefreshing = false
+    private let maxPaginationRecoveryAttempts = 3
+    private let maxAutoPaginationStallAttempts = 6
 
     init(
         userService: UserServicing = UserService(),
@@ -81,12 +83,14 @@ final class SocialViewModel: ObservableObject {
                 loadingMode: .initial
             )
             let (subscriberResponse, subscribeResponse) = try await (subscribersTask, subscribesTask)
+            let initialPage = SubscribeService.defaultPage
 
             myPickUsers = subscribeResponse.content
             myFandomUsers = subscriberResponse.content
-            updateMyPickPaging(from: subscribeResponse)
-            updateMyFandomPaging(from: subscriberResponse)
+            updateMyPickPaging(from: subscribeResponse, requestedPage: initialPage)
+            updateMyFandomPaging(from: subscriberResponse, requestedPage: initialPage)
             hasLoadedInitialData = true
+            await preloadAllDefaultPagesIfNeeded()
         } catch {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
@@ -206,13 +210,34 @@ final class SocialViewModel: ObservableObject {
         guard !isLoadingMyPick, !isLoadingMoreMyPick else { return }
 
         do {
-            let response = try await loadSubscribes(
-                userId: myUserID,
-                page: myPickNextPage,
-                loadingMode: .pagination
-            )
-            appendUsers(to: &myPickUsers, with: response.content)
-            updateMyPickPaging(from: response)
+            var requestedPage = myPickNextPage
+            var recoveryAttemptCount = 0
+
+            while recoveryAttemptCount < maxPaginationRecoveryAttempts {
+                let response = try await loadSubscribes(
+                    userId: myUserID,
+                    page: requestedPage,
+                    loadingMode: .pagination
+                )
+                let appendedCount = appendUsers(to: &myPickUsers, with: response.content)
+                updateMyPickPaging(from: response, requestedPage: requestedPage)
+
+                if appendedCount > 0 {
+                    return
+                }
+
+                guard hasNextMyPickPage else { return }
+                guard !response.content.isEmpty else {
+                    hasNextMyPickPage = false
+                    return
+                }
+
+                let advancedPage = max(myPickNextPage, requestedPage + 1)
+                guard advancedPage != requestedPage else { return }
+                myPickNextPage = advancedPage
+                requestedPage = advancedPage
+                recoveryAttemptCount += 1
+            }
         } catch {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
@@ -226,16 +251,86 @@ final class SocialViewModel: ObservableObject {
         guard !isLoadingMyFandom, !isLoadingMoreMyFandom else { return }
 
         do {
-            let response = try await loadSubscribers(
-                userId: myUserID,
-                page: myFandomNextPage,
-                loadingMode: .pagination
-            )
-            appendUsers(to: &myFandomUsers, with: response.content)
-            updateMyFandomPaging(from: response)
+            var requestedPage = myFandomNextPage
+            var recoveryAttemptCount = 0
+
+            while recoveryAttemptCount < maxPaginationRecoveryAttempts {
+                let response = try await loadSubscribers(
+                    userId: myUserID,
+                    page: requestedPage,
+                    loadingMode: .pagination
+                )
+                let appendedCount = appendUsers(to: &myFandomUsers, with: response.content)
+                updateMyFandomPaging(from: response, requestedPage: requestedPage)
+
+                if appendedCount > 0 {
+                    return
+                }
+
+                guard hasNextMyFandomPage else { return }
+                guard !response.content.isEmpty else {
+                    hasNextMyFandomPage = false
+                    return
+                }
+
+                let advancedPage = max(myFandomNextPage, requestedPage + 1)
+                guard advancedPage != requestedPage else { return }
+                myFandomNextPage = advancedPage
+                requestedPage = advancedPage
+                recoveryAttemptCount += 1
+            }
         } catch {
             if isRequestCancelled(error) { return }
             errorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    private func preloadAllDefaultPagesIfNeeded() async {
+        await preloadMyPickPagesIfNeeded()
+        await preloadMyFandomPagesIfNeeded()
+    }
+
+    private func preloadMyPickPagesIfNeeded() async {
+        var stallAttemptCount = 0
+
+        while hasNextMyPickPage {
+            guard let currentUserID = myPickUsers.last?.userId else {
+                hasNextMyPickPage = false
+                return
+            }
+
+            let previousCount = myPickUsers.count
+            await loadMoreMyPickIfNeeded(currentUserId: currentUserID)
+
+            if myPickUsers.count > previousCount {
+                stallAttemptCount = 0
+                continue
+            }
+
+            stallAttemptCount += 1
+            guard stallAttemptCount < maxAutoPaginationStallAttempts else { return }
+        }
+    }
+
+    private func preloadMyFandomPagesIfNeeded() async {
+        var stallAttemptCount = 0
+
+        while hasNextMyFandomPage {
+            guard let currentUserID = myFandomUsers.last?.userId else {
+                hasNextMyFandomPage = false
+                return
+            }
+
+            let previousCount = myFandomUsers.count
+            await loadMoreMyFandomIfNeeded(currentUserId: currentUserID)
+
+            if myFandomUsers.count > previousCount {
+                stallAttemptCount = 0
+                continue
+            }
+
+            stallAttemptCount += 1
+            guard stallAttemptCount < maxAutoPaginationStallAttempts else { return }
         }
     }
 
@@ -301,20 +396,24 @@ final class SocialViewModel: ObservableObject {
         )
     }
 
-    private func appendUsers(to target: inout [SubscribeUserModel], with newUsers: [SubscribeUserModel]) {
+    @discardableResult
+    private func appendUsers(to target: inout [SubscribeUserModel], with newUsers: [SubscribeUserModel]) -> Int {
         let existingIDs = Set(target.map(\.userId))
         let filtered = newUsers.filter { !existingIDs.contains($0.userId) }
         target.append(contentsOf: filtered)
+        return filtered.count
     }
 
-    private func appendUsers(to target: inout [UserModel], with newUsers: [UserModel]) {
+    @discardableResult
+    private func appendUsers(to target: inout [UserModel], with newUsers: [UserModel]) -> Int {
         let existingIDs = Set(target.map(\.userId))
         let filtered = newUsers.filter { !existingIDs.contains($0.userId) }
         target.append(contentsOf: filtered)
+        return filtered.count
     }
 
-    private func updateMyPickPaging(from response: SubscribeListResponse) {
-        myPickNextPage = max(response.page.number, 0) + 1
+    private func updateMyPickPaging(from response: SubscribeListResponse, requestedPage: Int) {
+        myPickNextPage = max(requestedPage, SubscribeService.defaultPage) + 1
         let totalPages = max(response.page.totalPages, 0)
         let hasNextByPage = myPickNextPage < totalPages
         let hasNextByCount = response.content.count >= SubscribeService.defaultSize
@@ -322,8 +421,8 @@ final class SocialViewModel: ObservableObject {
         myPickTotalCount = max(response.page.totalElements, 0)
     }
 
-    private func updateMyFandomPaging(from response: SubscribeListResponse) {
-        myFandomNextPage = max(response.page.number, 0) + 1
+    private func updateMyFandomPaging(from response: SubscribeListResponse, requestedPage: Int) {
+        myFandomNextPage = max(requestedPage, SubscribeService.defaultPage) + 1
         let totalPages = max(response.page.totalPages, 0)
         let hasNextByPage = myFandomNextPage < totalPages
         let hasNextByCount = response.content.count >= SubscribeService.defaultSize
