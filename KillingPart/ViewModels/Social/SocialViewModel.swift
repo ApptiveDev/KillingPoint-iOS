@@ -315,19 +315,28 @@ final class SocialViewModel: ObservableObject {
 
     private func updateMyPickPaging(from response: SubscribeListResponse) {
         myPickNextPage = max(response.page.number, 0) + 1
-        hasNextMyPickPage = myPickNextPage < max(response.page.totalPages, 0)
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = myPickNextPage < totalPages
+        let hasNextByCount = response.content.count >= SubscribeService.defaultSize
+        hasNextMyPickPage = hasNextByPage || hasNextByCount
         myPickTotalCount = max(response.page.totalElements, 0)
     }
 
     private func updateMyFandomPaging(from response: SubscribeListResponse) {
         myFandomNextPage = max(response.page.number, 0) + 1
-        hasNextMyFandomPage = myFandomNextPage < max(response.page.totalPages, 0)
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = myFandomNextPage < totalPages
+        let hasNextByCount = response.content.count >= SubscribeService.defaultSize
+        hasNextMyFandomPage = hasNextByPage || hasNextByCount
         myFandomTotalCount = max(response.page.totalElements, 0)
     }
 
     private func updateSearchPaging(from response: UserSearchResponse) {
         searchedUsersNextPage = max(response.page.number, 0) + 1
-        hasNextSearchedUsersPage = searchedUsersNextPage < max(response.page.totalPages, 0)
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = searchedUsersNextPage < totalPages
+        let hasNextByCount = response.content.count >= UserService.defaultSize
+        hasNextSearchedUsersPage = hasNextByPage || hasNextByCount
         searchedUserTotalCount = max(response.page.totalElements, 0)
     }
 
