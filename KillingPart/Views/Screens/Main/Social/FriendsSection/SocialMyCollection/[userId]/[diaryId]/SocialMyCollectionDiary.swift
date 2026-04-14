@@ -21,6 +21,7 @@ struct SocialMyCollectionDiary: View {
     @State private var pendingNavigationUser: UserModel?
     @State private var selectedNavigationUser: UserModel?
     @State private var isUserCollectionNavigationActive = false
+    @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
 
     private let commentFocusAnchorID = "social-my-collection-diary-comment-focus-anchor"
 
@@ -138,6 +139,9 @@ struct SocialMyCollectionDiary: View {
                     }
                 }
             }
+            .overlay(alignment: .center) {
+                SocialInteractionFeedbackOverlay(feedback: interactionFeedbackPresenter.activeFeedback)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             updateKeyboardHeight(from: notification)
@@ -151,6 +155,9 @@ struct SocialMyCollectionDiary: View {
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             handleFocusActivated()
+        }
+        .onDisappear {
+            interactionFeedbackPresenter.clear()
         }
         .onChange(of: isLikeUsersSheetPresented) { isPresented in
             guard !isPresented else { return }
@@ -217,6 +224,12 @@ struct SocialMyCollectionDiary: View {
             )
         }
         .background(userCollectionNavigationLink)
+        .simultaneousGesture(
+            TapGesture(count: 2)
+                .onEnded {
+                    handleDoubleTapLike()
+                }
+        )
     }
 
     private var videoURL: URL? {
@@ -335,11 +348,7 @@ struct SocialMyCollectionDiary: View {
                 shouldIgnoreNextLikeTap = false
                 return
             }
-            Task {
-                let isSuccess = await viewModel.toggleLike()
-                guard isSuccess else { return }
-                onDiaryUpdated?()
-            }
+            handleLikeTap()
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: viewModel.diary.isLiked ? "heart.fill" : "heart")
@@ -374,11 +383,7 @@ struct SocialMyCollectionDiary: View {
 
     private var storeButton: some View {
         Button {
-            Task {
-                let isSuccess = await viewModel.toggleStore()
-                guard isSuccess else { return }
-                onDiaryUpdated?()
-            }
+            handleStoreTap()
         } label: {
             Image(systemName: viewModel.diary.isStored ? "bookmark.fill" : "bookmark")
                 .font(.system(size: 14, weight: .semibold))
@@ -390,6 +395,43 @@ struct SocialMyCollectionDiary: View {
         .buttonStyle(.plain)
         .disabled(isLikeInteractionDisabled)
         .opacity(isLikeInteractionDisabled ? 0.6 : 1)
+    }
+
+    private func handleLikeTap() {
+        guard !isLikeInteractionDisabled else { return }
+        let feedback: SocialInteractionFeedbackKind = viewModel.diary.isLiked ? .likeRemoved : .likeAdded
+        interactionFeedbackPresenter.show(feedback)
+        Task {
+            let isSuccess = await viewModel.toggleLike()
+            guard isSuccess else { return }
+            onDiaryUpdated?()
+        }
+    }
+
+    private func handleStoreTap() {
+        guard !isLikeInteractionDisabled else { return }
+        let feedback: SocialInteractionFeedbackKind = viewModel.diary.isStored ? .storeRemoved : .storeAdded
+        interactionFeedbackPresenter.show(feedback)
+        Task {
+            let isSuccess = await viewModel.toggleStore()
+            guard isSuccess else { return }
+            onDiaryUpdated?()
+        }
+    }
+
+    private func handleDoubleTapLike() {
+        guard !isLikeInteractionDisabled else { return }
+        guard !viewModel.diary.isLiked else {
+            interactionFeedbackPresenter.show(.alreadyLiked)
+            return
+        }
+
+        interactionFeedbackPresenter.show(.likeAdded)
+        Task {
+            let isSuccess = await viewModel.toggleLike()
+            guard isSuccess else { return }
+            onDiaryUpdated?()
+        }
     }
 
     private func handleFocusActivated() {
