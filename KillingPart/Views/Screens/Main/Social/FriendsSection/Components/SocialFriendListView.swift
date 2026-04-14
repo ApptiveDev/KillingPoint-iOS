@@ -6,6 +6,7 @@ struct SocialFriendListView: View {
     let isLoadingMore: Bool
     let errorMessage: String?
     let selectedFriendSection: SocialFriendSection
+    let bottomContentInset: CGFloat
     let onRetry: () -> Void
     let onUserAppear: (Int) -> Void
     let makeCollectionViewModel: (SocialListUser, Bool?) -> SocialMyCollectionViewModel
@@ -55,6 +56,14 @@ struct SocialFriendListView: View {
                                 onUserAppear(user.userId)
                             }
                         }
+
+                        if let lastUserId = users.last?.userId {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                    onUserAppear(lastUserId)
+                                }
+                        }
                     }
                     .padding(.top, AppSpacing.xs)
 
@@ -66,8 +75,9 @@ struct SocialFriendListView: View {
                     }
                 }
             }
-            .padding(.bottom, AppSpacing.l)
+            .padding(.bottom, max(bottomContentInset, AppSpacing.l))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private func makeCollectionViewModel(for user: SocialListUser) -> SocialMyCollectionViewModel {

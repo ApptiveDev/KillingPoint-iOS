@@ -40,16 +40,81 @@ struct ITunesService: ITunesServicing {
         let safeLimit = max(limit, 1)
         let safeOffset = max(offset, 0)
         let requestLimit = min(safeOffset + safeLimit, maxResultCount)
+        let searchVariants = makeSearchVariants(from: trimmedQuery)
+        var mergedTracks: [SpotifySimpleTrack] = []
+        var dedupeKeys = Set<String>()
+        var firstFailure: ITunesServiceError?
+        var hasSuccessfulRequest = false
 
-        var components = URLComponents(string: "https://itunes.apple.com/search")
-        components?.queryItems = [
-            URLQueryItem(name: "term", value: trimmedQuery),
+        for variant in searchVariants {
+            do {
+                let rawItems = try await requestTracks(
+                    term: variant.term,
+                    limit: requestLimit,
+                    country: variant.country,
+                    language: variant.language,
+                    attribute: variant.attribute
+                )
+                hasSuccessfulRequest = true
+
+                for item in rawItems {
+                    guard let track = mapToSimpleTrack(item) else { continue }
+                    let dedupeKey = normalizedTrackIdentity(for: track)
+                    guard dedupeKeys.insert(dedupeKey).inserted else { continue }
+                    mergedTracks.append(track)
+                }
+
+                if mergedTracks.count >= requestLimit {
+                    break
+                }
+            } catch let serviceError as ITunesServiceError {
+                if firstFailure == nil {
+                    firstFailure = serviceError
+                }
+            } catch {
+                if firstFailure == nil {
+                    firstFailure = .networkFailure(message: "iTunes 요청 중 네트워크 오류가 발생했어요.")
+                }
+            }
+        }
+
+        if !hasSuccessfulRequest, let firstFailure {
+            throw firstFailure
+        }
+
+        guard safeOffset < mergedTracks.count else {
+            return []
+        }
+
+        return Array(mergedTracks.dropFirst(safeOffset).prefix(safeLimit))
+    }
+
+    private func requestTracks(
+        term: String,
+        limit: Int,
+        country: String?,
+        language: String?,
+        attribute: String?
+    ) async throws -> [ITunesTrackItem] {
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "term", value: term),
             URLQueryItem(name: "media", value: "music"),
             URLQueryItem(name: "entity", value: "song"),
-            URLQueryItem(name: "country", value: "KR"),
-            URLQueryItem(name: "lang", value: "ko_kr"),
-            URLQueryItem(name: "limit", value: String(requestLimit))
+            URLQueryItem(name: "limit", value: String(limit))
         ]
+
+        if let country, !country.isEmpty {
+            queryItems.append(URLQueryItem(name: "country", value: country))
+        }
+        if let language, !language.isEmpty {
+            queryItems.append(URLQueryItem(name: "lang", value: language))
+        }
+        if let attribute, !attribute.isEmpty {
+            queryItems.append(URLQueryItem(name: "attribute", value: attribute))
+        }
+
+        var components = URLComponents(string: "https://itunes.apple.com/search")
+        components?.queryItems = queryItems
 
         guard let url = components?.url else {
             throw ITunesServiceError.invalidResponse
@@ -58,6 +123,7 @@ struct ITunesService: ITunesServicing {
         var request = URLRequest(url: url)
         request.httpMethod = HTTPMethod.get.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("ko-KR,ko;q=0.9,en-US;q=0.8", forHTTPHeaderField: "Accept-Language")
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -79,17 +145,79 @@ struct ITunesService: ITunesServicing {
                 throw ITunesServiceError.decodingFailed
             }
 
-            let mappedTracks = decoded.results.compactMap(mapToSimpleTrack)
-            guard safeOffset < mappedTracks.count else {
-                return []
-            }
-
-            return Array(mappedTracks.dropFirst(safeOffset).prefix(safeLimit))
+            return decoded.results
         } catch let error as ITunesServiceError {
             throw error
         } catch {
             throw ITunesServiceError.networkFailure(message: "iTunes 요청 중 네트워크 오류가 발생했어요.")
         }
+    }
+
+    private func makeSearchVariants(from query: String) -> [SearchVariant] {
+        let normalized = query
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let compact = normalized.replacingOccurrences(of: " ", with: "")
+
+        let candidateTerms: [String] = compact == normalized
+            ? [normalized]
+            : [normalized, compact]
+
+        var variants: [SearchVariant] = []
+        var seenKeys = Set<String>()
+
+        func appendVariant(
+            term: String,
+            country: String?,
+            language: String?,
+            attribute: String?
+        ) {
+            let key = [
+                term.lowercased(),
+                country?.lowercased() ?? "",
+                language?.lowercased() ?? "",
+                attribute?.lowercased() ?? ""
+            ].joined(separator: "|")
+            guard seenKeys.insert(key).inserted else { return }
+            variants.append(
+                SearchVariant(
+                    term: term,
+                    country: country,
+                    language: language,
+                    attribute: attribute
+                )
+            )
+        }
+
+        for term in candidateTerms {
+            appendVariant(term: term, country: "KR", language: "ko_kr", attribute: "songTerm")
+            appendVariant(term: term, country: "KR", language: "ko_kr", attribute: nil)
+        }
+
+        if let primaryTerm = candidateTerms.first {
+            appendVariant(term: primaryTerm, country: nil, language: nil, attribute: nil)
+        }
+
+        return variants
+    }
+
+    private func normalizedTrackIdentity(for track: SpotifySimpleTrack) -> String {
+        "\(normalizedIdentityComponent(track.title))|\(normalizedIdentityComponent(track.artist))"
+    }
+
+    private func normalizedIdentityComponent(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+    }
+
+    private struct SearchVariant {
+        let term: String
+        let country: String?
+        let language: String?
+        let attribute: String?
     }
 
     private func mapToSimpleTrack(_ item: ITunesTrackItem) -> SpotifySimpleTrack? {
