@@ -6,19 +6,29 @@ struct AddSearchDetailView: View {
     @StateObject private var viewModel: AddSearchDetailViewModel
     @State private var isForwardStepTransition = true
     @State private var playerReloadToken = UUID()
+    @State private var isTutorialTrimFocusActive = false
     private let onSaved: (() -> Void)?
     private let shouldNavigateToPlayKillingPartOnSave: Bool
     private let onSaveCompletedAfterDismiss: (() -> Void)?
+    private let skipButtonTitle: String?
+    private let onSkip: (() -> Void)?
+    private let isTutorialTrimFocusEnabled: Bool
 
     init(
         track: SpotifySimpleTrack,
         prefill: AddSearchDetailPrefill? = nil,
         shouldNavigateToPlayKillingPartOnSave: Bool = true,
+        skipButtonTitle: String? = nil,
+        onSkip: (() -> Void)? = nil,
+        isTutorialTrimFocusEnabled: Bool = false,
         onSaveCompletedAfterDismiss: (() -> Void)? = nil,
         onSaved: (() -> Void)? = nil
     ) {
         self.onSaved = onSaved
         self.shouldNavigateToPlayKillingPartOnSave = shouldNavigateToPlayKillingPartOnSave
+        self.skipButtonTitle = skipButtonTitle
+        self.onSkip = onSkip
+        self.isTutorialTrimFocusEnabled = isTutorialTrimFocusEnabled
         self.onSaveCompletedAfterDismiss = onSaveCompletedAfterDismiss
         _viewModel = StateObject(
             wrappedValue: AddSearchDetailViewModel(
@@ -29,21 +39,32 @@ struct AddSearchDetailView: View {
     }
 
     var body: some View {
+        let isTrimFocusActive = isTutorialTrimFocusEnabled
+            && isTutorialTrimFocusActive
+            && viewModel.currentStep == .trim
+
         ZStack {
             Color.black.ignoresSafeArea()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: AppSpacing.m) {
-                    AddSearchDetailVideoSection(
-                        viewModel: viewModel,
-                        playerReloadToken: playerReloadToken
-                    )
+                    if viewModel.currentStep == .comment && isTutorialTrimFocusEnabled {
+                        commentVideoPlaceholder
+                    } else {
+                        AddSearchDetailVideoSection(
+                            viewModel: viewModel,
+                            playerReloadToken: playerReloadToken
+                        )
+                        .opacity(isTrimFocusActive ? 0.35 : 1)
+                    }
                     AddSearchDetailTrackInfoSection(track: viewModel.track)
+                        .opacity(isTrimFocusActive ? 0.35 : 1)
                     detailInputSection
                         .clipped()
 
                     if viewModel.videos.count > 1 {
                         AddSearchDetailVideoCandidateSection(viewModel: viewModel)
+                            .opacity(isTrimFocusActive ? 0.35 : 1)
                     }
                 }
                 .padding(.horizontal, AppSpacing.l)
@@ -54,13 +75,43 @@ struct AddSearchDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             actionBar
+                .opacity(isTrimFocusActive ? 0.35 : 1)
+        }
+        .safeAreaInset(edge: .top, spacing: AppSpacing.s) {
+            if isTrimFocusActive {
+                Text("킬링파트로 사용할 구간을 정해보세요!")
+                    .font(AppFont.paperlogy7Bold(size: 32))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, AppSpacing.l)
+                    .padding(.top, AppSpacing.s)
+                    .padding(.bottom, AppSpacing.xs)
+                    .transition(.opacity)
+            }
         }
         .task {
             await viewModel.loadIfNeeded()
         }
+        .onAppear {
+            if isTutorialTrimFocusEnabled {
+                isTutorialTrimFocusActive = true
+            }
+        }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             playerReloadToken = UUID()
+        }
+        .onChange(of: viewModel.currentStep) { step in
+            if step != .trim {
+                isTutorialTrimFocusActive = false
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isTrimFocusActive {
+                isTutorialTrimFocusActive = false
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -72,6 +123,16 @@ struct AddSearchDetailView: View {
                     .scaledToFit()
                     .frame(height: 30)
                     .accessibilityLabel("KillingPart")
+            }
+
+            if let skipButtonTitle, let onSkip {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(skipButtonTitle) {
+                        onSkip()
+                    }
+                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .foregroundStyle(.white)
+                }
             }
         }
     }
@@ -140,6 +201,15 @@ struct AddSearchDetailView: View {
         .padding(.top, AppSpacing.s)
         .padding(.bottom, AppSpacing.s)
         .background(Color.black.opacity(0.94))
+    }
+
+    private var commentVideoPlaceholder: some View {
+        Text("선택한 구간에서 느낀\n감정과 생각을 적어보세요.")
+            .font(AppFont.paperlogy6SemiBold(size: 20))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, AppSpacing.xl)
     }
 
     private var stepTransition: AnyTransition {

@@ -10,6 +10,7 @@ struct MyCollectionProfileCard: View {
     let onFanStatTap: () -> Void
     let onPickStatTap: () -> Void
     let onEditProfileTap: () -> Void
+    var showEditButton: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
@@ -49,7 +50,9 @@ struct MyCollectionProfileCard: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    MyCollectionEditProfileButton(action: onEditProfileTap)
+                    if showEditButton {
+                        MyCollectionEditProfileButton(action: onEditProfileTap)
+                    }
                 }
             }
 
