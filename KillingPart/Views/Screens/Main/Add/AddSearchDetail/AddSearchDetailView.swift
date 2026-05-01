@@ -6,19 +6,29 @@ struct AddSearchDetailView: View {
     @StateObject private var viewModel: AddSearchDetailViewModel
     @State private var isForwardStepTransition = true
     @State private var playerReloadToken = UUID()
+    @State private var isTutorialTrimFocusActive = false
     private let onSaved: (() -> Void)?
     private let shouldNavigateToPlayKillingPartOnSave: Bool
     private let onSaveCompletedAfterDismiss: (() -> Void)?
+    private let skipButtonTitle: String?
+    private let onSkip: (() -> Void)?
+    private let isTutorialTrimFocusEnabled: Bool
 
     init(
         track: SpotifySimpleTrack,
         prefill: AddSearchDetailPrefill? = nil,
         shouldNavigateToPlayKillingPartOnSave: Bool = true,
+        skipButtonTitle: String? = nil,
+        onSkip: (() -> Void)? = nil,
+        isTutorialTrimFocusEnabled: Bool = false,
         onSaveCompletedAfterDismiss: (() -> Void)? = nil,
         onSaved: (() -> Void)? = nil
     ) {
         self.onSaved = onSaved
         self.shouldNavigateToPlayKillingPartOnSave = shouldNavigateToPlayKillingPartOnSave
+        self.skipButtonTitle = skipButtonTitle
+        self.onSkip = onSkip
+        self.isTutorialTrimFocusEnabled = isTutorialTrimFocusEnabled
         self.onSaveCompletedAfterDismiss = onSaveCompletedAfterDismiss
         _viewModel = StateObject(
             wrappedValue: AddSearchDetailViewModel(
@@ -29,6 +39,10 @@ struct AddSearchDetailView: View {
     }
 
     var body: some View {
+        let isTrimFocusActive = isTutorialTrimFocusEnabled
+            && isTutorialTrimFocusActive
+            && viewModel.currentStep == .trim
+
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -38,12 +52,15 @@ struct AddSearchDetailView: View {
                         viewModel: viewModel,
                         playerReloadToken: playerReloadToken
                     )
+                    .opacity(isTrimFocusActive ? 0.35 : 1)
                     AddSearchDetailTrackInfoSection(track: viewModel.track)
+                        .opacity(isTrimFocusActive ? 0.35 : 1)
                     detailInputSection
                         .clipped()
 
                     if viewModel.videos.count > 1 {
                         AddSearchDetailVideoCandidateSection(viewModel: viewModel)
+                            .opacity(isTrimFocusActive ? 0.35 : 1)
                     }
                 }
                 .padding(.horizontal, AppSpacing.l)
@@ -54,13 +71,30 @@ struct AddSearchDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             actionBar
+                .opacity(isTrimFocusActive ? 0.35 : 1)
         }
         .task {
             await viewModel.loadIfNeeded()
         }
+        .onAppear {
+            if isTutorialTrimFocusEnabled {
+                isTutorialTrimFocusActive = true
+            }
+        }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             playerReloadToken = UUID()
+        }
+        .onChange(of: viewModel.currentStep) { step in
+            if step != .trim {
+                isTutorialTrimFocusActive = false
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isTrimFocusActive {
+                isTutorialTrimFocusActive = false
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -72,6 +106,16 @@ struct AddSearchDetailView: View {
                     .scaledToFit()
                     .frame(height: 30)
                     .accessibilityLabel("KillingPart")
+            }
+
+            if let skipButtonTitle, let onSkip {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(skipButtonTitle) {
+                        onSkip()
+                    }
+                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .foregroundStyle(.white)
+                }
             }
         }
     }

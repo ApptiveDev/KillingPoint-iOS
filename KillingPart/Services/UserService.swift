@@ -2,12 +2,15 @@ import Foundation
 
 protocol UserServicing {
     func fetchMyUser() async throws -> UserModel
+    func fetchInitSettings() async throws -> UserInitSettingsResponse
+    func submitPolicyAgreement(agreements: [PolicyAgreementItem]) async throws
     func fetchUserStatics(userId: Int) async throws -> UserStaticsModel
     func searchUsers(searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse
     func deleteMyProfileImage() async throws -> UserModel
     func issuePresignedURL() async throws -> PresignedURLResponse
     func uploadImageToPresignedURL(imageData: Data, presignedURL: URL) async throws
     func updateMyProfileImage(request: UpdateMyProfileImageRequest) async throws -> UserModel
+    func updateMyUsername(username: String) async throws -> UserModel
     func updateMyTag(tag: String) async throws -> UserModel
 }
 
@@ -66,6 +69,47 @@ struct UserService: UserServicing {
             let response = try await apiClient.request(request, responseType: UserResponseDTO.self)
             return response.toModel()
         } catch {
+            throw mapError(error)
+        }
+    }
+
+    func fetchInitSettings() async throws -> UserInitSettingsResponse {
+        do {
+            let request = APIRequest(
+                path: "/users/init-settings",
+                method: .get,
+                queryItems: [
+                    URLQueryItem(name: "clientVersion", value: Self.clientVersion),
+                    URLQueryItem(name: "clientType", value: Self.clientType)
+                ],
+                requiresAuthorization: true
+            )
+            return try await apiClient.request(request, responseType: UserInitSettingsResponse.self)
+        } catch {
+            throw mapError(error)
+        }
+    }
+
+    func submitPolicyAgreement(agreements: [PolicyAgreementItem]) async throws {
+        let requestBody: Data
+        do {
+            requestBody = try JSONEncoder().encode(PolicyAgreementRequest(agreements: agreements))
+        } catch {
+            throw UserServiceError.requestEncodingFailed
+        }
+
+        do {
+            var request = APIRequest(
+                path: "/users/policy-agreement",
+                method: .post,
+                requiresAuthorization: true,
+                body: requestBody
+            )
+            request.headers["Accept"] = "application/json"
+            request.headers["Content-Type"] = "application/json"
+            try await apiClient.request(request)
+        } catch {
+            if isRequestCancelled(error) { throw error }
             throw mapError(error)
         }
     }
@@ -221,6 +265,31 @@ struct UserService: UserServicing {
         }
     }
 
+    func updateMyUsername(username: String) async throws -> UserModel {
+        let requestBody: Data
+        do {
+            requestBody = try JSONEncoder().encode(UpdateMyUsernameRequest(username: username))
+        } catch {
+            throw UserServiceError.requestEncodingFailed
+        }
+
+        do {
+            var request = APIRequest(
+                path: "/users/my/names",
+                method: .patch,
+                requiresAuthorization: true,
+                body: requestBody
+            )
+            request.headers["Accept"] = "application/json"
+            request.headers["Content-Type"] = "application/json"
+            let response = try await apiClient.request(request, responseType: UserResponseDTO.self)
+            return response.toModel()
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
     private func mapError(_ error: Error) -> UserServiceError {
         if let userServiceError = error as? UserServiceError {
             return userServiceError
@@ -299,6 +368,17 @@ struct UserService: UserServicing {
         let nsError = error as NSError
         return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
+
+    private static var clientVersion: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        let resolved = (shortVersion?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? shortVersion
+            : buildVersion) ?? "0.0.0"
+        return resolved
+    }
+
+    private static let clientType = "IOS"
 }
 
 private struct UserServiceErrorResponse: Decodable {

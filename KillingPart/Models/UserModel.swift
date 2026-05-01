@@ -153,6 +153,55 @@ struct UpdateMyTagRequest: Encodable {
     let tag: String
 }
 
+struct UpdateMyUsernameRequest: Encodable {
+    let username: String
+}
+
+struct UserInitSettingsResponse: Decodable {
+    let app: UserAppUpdateStatus
+    let needsPolicyAgreement: Bool
+    let needsTagSetup: Bool
+    let policies: [UserPolicyStatus]
+}
+
+struct UserAppUpdateStatus: Decodable {
+    let needsForceUpdate: Bool
+    let needsOptionalUpdate: Bool
+}
+
+struct UserPolicyStatus: Decodable, Identifiable {
+    let policyType: UserPolicyType
+    let required: Bool
+    let agreed: Bool
+    let currentRevision: Int
+    let latestRevision: Int
+
+    var id: UserPolicyType { policyType }
+}
+
+enum UserPolicyType: String, Codable, CaseIterable {
+    case serviceTerms = "SERVICE_TERMS"
+    case privacy = "PRIVACY"
+
+    var displayTitle: String {
+        switch self {
+        case .serviceTerms:
+            return "서비스 이용약관"
+        case .privacy:
+            return "개인정보 처리방침"
+        }
+    }
+}
+
+struct PolicyAgreementRequest: Encodable {
+    let agreements: [PolicyAgreementItem]
+}
+
+struct PolicyAgreementItem: Encodable {
+    let policyType: UserPolicyType
+    let agreed: Bool
+}
+
 private extension KeyedDecodingContainer {
     func decodeFlexibleBoolIfPresent(forKey key: K) -> Bool? {
         if let boolValue = try? decodeIfPresent(Bool.self, forKey: key) {
