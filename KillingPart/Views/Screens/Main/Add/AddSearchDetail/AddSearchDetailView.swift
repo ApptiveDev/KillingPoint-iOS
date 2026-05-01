@@ -140,7 +140,14 @@ struct AddSearchDetailView: View {
     private var detailInputSection: some View {
         ZStack {
             if viewModel.currentStep == .trim {
-                AddSearchDetailTrimSection(viewModel: viewModel)
+                AddSearchDetailTrimSection(
+                    viewModel: viewModel,
+                    onTrimInteracted: {
+                        if isTutorialTrimFocusActive {
+                            isTutorialTrimFocusActive = false
+                        }
+                    }
+                )
                     .transition(stepTransition)
             } else {
                 AddSearchDetailCommentSection(viewModel: viewModel)
