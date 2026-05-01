@@ -198,14 +198,42 @@ private struct PolicyDocumentSheet: View {
 
     let documentType: PolicyDocumentType
 
+    private enum LineStyle {
+        case article
+        case numbered
+        case numberedContinuation
+        case subNumbered
+        case subNumberedContinuation
+        case body
+        case blank
+    }
+
+    private struct StyledLine: Identifiable {
+        let id: Int
+        let text: String
+        let style: LineStyle
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                Text(documentType.fullText)
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(AppSpacing.l)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(styledLines) { line in
+                        if line.style == .blank {
+                            Color.clear
+                                .frame(height: 10)
+                        } else {
+                            Text(line.text)
+                                .font(font(for: line.style))
+                                .foregroundStyle(.white.opacity(0.92))
+                                .lineSpacing(4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, leadingInset(for: line.style))
+                                .padding(.top, topInset(for: line.style))
+                        }
+                    }
+                }
+                .padding(AppSpacing.l)
             }
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(documentType.title)
@@ -218,6 +246,129 @@ private struct PolicyDocumentSheet: View {
                     .foregroundStyle(.white)
                 }
             }
+        }
+    }
+
+    private var styledLines: [StyledLine] {
+        let lines = normalizedDocumentText.components(separatedBy: .newlines)
+        var result: [StyledLine] = []
+        var previousStyle: LineStyle = .blank
+
+        for (index, rawLine) in lines.enumerated() {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            let baseStyle = style(for: trimmed)
+
+            let resolvedStyle: LineStyle
+            if baseStyle == .body {
+                switch previousStyle {
+                case .numbered, .numberedContinuation:
+                    resolvedStyle = .numberedContinuation
+                case .subNumbered, .subNumberedContinuation:
+                    resolvedStyle = .subNumberedContinuation
+                default:
+                    resolvedStyle = .body
+                }
+            } else {
+                resolvedStyle = baseStyle
+            }
+
+            result.append(
+                StyledLine(
+                    id: index,
+                    text: trimmed,
+                    style: resolvedStyle
+                )
+            )
+            previousStyle = resolvedStyle
+        }
+        return result
+    }
+
+    private var normalizedDocumentText: String {
+        var text = documentType.fullText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "## ", with: "")
+        text = text.replacingOccurrences(
+            of: #"\)(\d+\.)"#,
+            with: ")\n$1",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"(\d+년)(\d+\.)"#,
+            with: "$1\n$2",
+            options: .regularExpression
+        )
+        return text
+    }
+
+    private func style(for line: String) -> LineStyle {
+        if line.isEmpty {
+            return .blank
+        }
+        if line.range(of: #"^제\d+조"#, options: .regularExpression) != nil || line == "부칙" {
+            return .article
+        }
+        if line.range(of: #"^\d+[.)]"#, options: .regularExpression) != nil {
+            return .numbered
+        }
+        if line.range(of: #"^[가-하][.)]"#, options: .regularExpression) != nil {
+            return .subNumbered
+        }
+        return .body
+    }
+
+    private func font(for style: LineStyle) -> Font {
+        switch style {
+        case .article:
+            return AppFont.paperlogy7Bold(size: 18)
+        case .numbered:
+            return AppFont.paperlogy5Medium(size: 14)
+        case .numberedContinuation:
+            return AppFont.paperlogy5Medium(size: 14)
+        case .subNumbered:
+            return AppFont.paperlogy5Medium(size: 13)
+        case .subNumberedContinuation:
+            return AppFont.paperlogy5Medium(size: 13)
+        case .body:
+            return AppFont.paperlogy4Regular(size: 13)
+        case .blank:
+            return AppFont.paperlogy4Regular(size: 13)
+        }
+    }
+
+    private func leadingInset(for style: LineStyle) -> CGFloat {
+        switch style {
+        case .article:
+            return 0
+        case .numbered:
+            return 10
+        case .numberedContinuation:
+            return 30
+        case .subNumbered:
+            return 20
+        case .subNumberedContinuation:
+            return 40
+        case .body, .blank:
+            return 0
+        }
+    }
+
+    private func topInset(for style: LineStyle) -> CGFloat {
+        switch style {
+        case .article:
+            return 12
+        case .numbered:
+            return 6
+        case .numberedContinuation:
+            return 2
+        case .subNumbered:
+            return 4
+        case .subNumberedContinuation:
+            return 2
+        case .body:
+            return 3
+        case .blank:
+            return 0
         }
     }
 }
@@ -1244,8 +1395,6 @@ private struct TutorialFinalScreen: View {
 
 private enum PolicyDocumentContent {
     static let privacyPolicy = """
-개인정보 처리방침
-
 제1조(목적)
 킬링파트(이하 ‘회사'라고 함)는 회사가 제공하고자 하는 서비스(이하 ‘회사 서비스’)를 이용하는 개인(이하 ‘이용자’ 또는 ‘개인’)의 정보(이하 ‘개인정보’)를 보호하기 위해, 개인정보보호법, 정보통신망 이용촉진 및 정보보호 등에 관한 법률(이하 '정보통신망법') 등 관련 법령을 준수하고, 서비스 이용자의 개인정보 보호 관련한 고충을 신속하고 원활하게 처리할 수 있도록 하기 위하여 다음과 같이 개인정보처리방침(이하 ‘본 방침’)을 수립합니다.
 
@@ -1503,24 +1652,6 @@ private enum PolicyDocumentContent {
 """
 
     static let serviceTerms = """
-서비스 이용 약관
-- 시행일자 : 2026.03.18
-    
-    서비스 공급자 : 킬링파트
-    
-    무료 서비스만 제공 중
-    
-    회원가입 승낙 및 제약조건 : 없음
-    
-    제공하는 서비스 내역 : 음악 콘텐츠의 특정 구간 기록 및 저장 기능 / 킬링파트 관련 게시물 작성, 편집, 공개, 공유 기능 / 다른 이용자가 작성한 킬링파트 및 관련 콘텐츠의 탐색, 조회 기능 / 모바일 애플리케이션 및 기타 전자적 방식으로 제공되는 관련 제반 서비스 → 별도 첨부 X
-    
-    광고성 정보 수신 여부 : 예 → 추후 영리 목적으로 광고성 정보 수신 여부 목적, 이용약관과 별개로 따로 받아야 함.
-    
-    게시물의 관리 및 지식 재산권 여부 : 예 (콘텐츠 작성 여부 / 당사가 이용자가 만든 컨텐츠를 자유롭게 사용 가능 → 2차적 저작물 또는 편집 저작물 작성, 서비스 개선 및 새로운 서비스 개발, 미디어, 통신사 등을 통한 홍보 목적)
-    
-    민사소송법에 따른 관할법원에 따름ㅅ
-    
-
 ## 제1조(목적)
 
 이 약관은 킬링파트 (이하 '회사' 라고 합니다)가 제공하는 제반 서비스의 이용과 관련하여 회사와 회원과의
