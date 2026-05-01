@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AddSearchDetailVideoCandidateSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
-    @State private var isExpanded = true
+    @State private var isExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
@@ -16,16 +16,13 @@ struct AddSearchDetailVideoCandidateSection: View {
                         isExpanded.toggle()
                     }
                 } label: {
-                    HStack(spacing: 4) {
-
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.78))
-                    }
-                    .padding(.horizontal, AppSpacing.xs)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .padding(.horizontal, AppSpacing.xs)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
 

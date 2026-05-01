@@ -6,20 +6,17 @@ struct MusicCalendarCalendarSection: View {
     let onDayTap: (Date) -> Void
 
     var body: some View {
-        Rectangle()
-            .fill(Color.black.opacity(0.28))
-            .overlay {
-                VStack(spacing: AppSpacing.s) {
-                    weekdayHeaderRow
+        VStack(spacing: AppSpacing.s) {
+            weekdayHeaderRow
 
-                    LazyVGrid(columns: calendarGridColumns, spacing: 0) {
-                        ForEach(dayCells) { cell in
-                            dayCell(cell)
-                        }
-                    }
+            LazyVGrid(columns: calendarGridColumns, spacing: 0) {
+                ForEach(dayCells) { cell in
+                    dayCell(cell)
                 }
-                .padding(AppSpacing.m)
             }
+        }
+        .padding(AppSpacing.m)
+        .background(Color.black.opacity(0.28))
     }
 
     private var weekdayHeaderRow: some View {
