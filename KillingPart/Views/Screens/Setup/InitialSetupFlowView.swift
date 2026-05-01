@@ -60,6 +60,7 @@ private struct PolicyAgreementScreen: View {
             let horizontalPadding = max(AppSpacing.m, geometry.size.width * 0.08)
             let topPadding = geometry.safeAreaInsets.top + AppSpacing.l
             let bottomPadding = geometry.safeAreaInsets.bottom + AppSpacing.l
+            let titleTopOffset = max(topPadding + AppSpacing.xl, geometry.size.height * 0.18)
 
             ZStack {
                 LoginBackgroundVideoView()
@@ -73,13 +74,17 @@ private struct PolicyAgreementScreen: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                    Image("loginTitle")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: min(geometry.size.width * 0.62, 280))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, horizontalPadding)
+                        .padding(.top, titleTopOffset)
+
                     Spacer(minLength: 0)
 
                     VStack(alignment: .leading, spacing: AppSpacing.m) {
-                        Text("짧게 들어도, 길게 남는 순간")
-                            .font(AppFont.paperlogy5Medium(size: 24))
-                            .foregroundStyle(.white)
-
                         policyRow(
                             title: "서비스 이용약관",
                             isChecked: viewModel.isServiceTermsAgreed,
@@ -124,7 +129,6 @@ private struct PolicyAgreementScreen: View {
                     .padding(.horizontal, horizontalPadding)
                     .padding(.bottom, bottomPadding)
                 }
-                .padding(.top, topPadding)
             }
         }
         .sheet(item: $activeDocument) { documentType in
