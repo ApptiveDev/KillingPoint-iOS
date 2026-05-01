@@ -543,6 +543,25 @@ private struct TagSetupScreen: View {
     }
 }
 
+private struct InitialSetupSkipButtonRow: View {
+    let onSkip: () -> Void
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button("건너뛰기") {
+                onSkip()
+            }
+            .font(AppFont.paperlogy5Medium(size: 14))
+            .foregroundStyle(.white.opacity(0.92))
+        }
+        .padding(.horizontal, AppSpacing.l)
+        .padding(.top, AppSpacing.s)
+        .padding(.bottom, AppSpacing.xs)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
 private struct TutorialChoiceScreen: View {
     @ObservedObject var viewModel: InitialSetupFlowViewModel
 
@@ -563,20 +582,6 @@ private struct TutorialChoiceScreen: View {
                     viewModel.startTutorialTrackSelection()
                 }
                 .padding(.horizontal, AppSpacing.l)
-
-                Button {
-                    viewModel.skipAllTutorialAndFinish()
-                } label: {
-                    Text("건너뛰기")
-                        .font(AppFont.paperlogy6SemiBold(size: 16))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, AppSpacing.m)
-                        .background(Color.white.opacity(0.65))
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, AppSpacing.l)
             }
             .padding(.bottom, AppSpacing.xl)
         }
@@ -588,6 +593,9 @@ private struct TutorialChoiceScreen: View {
             )
             .ignoresSafeArea()
         )
+        .safeAreaInset(edge: .top, spacing: 0) {
+            InitialSetupSkipButtonRow(onSkip: viewModel.skipAllTutorialAndFinish)
+        }
     }
 }
 
@@ -611,16 +619,6 @@ private struct TutorialTrackSearchScreen: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: AppSpacing.m) {
-                    HStack {
-                        Spacer()
-                        Button("건너뛰기") {
-                            onSkip()
-                        }
-                        .font(AppFont.paperlogy5Medium(size: 15))
-                        .foregroundStyle(.white.opacity(0.92))
-                    }
-                    .padding(.top, geometry.safeAreaInsets.top + AppSpacing.s)
-
                     VStack(spacing: 4) {
                         Text("어떤 곡으로 시작할까요?")
                             .font(AppFont.paperlogy8ExtraBold(size: 34))
@@ -649,6 +647,9 @@ private struct TutorialTrackSearchScreen: View {
                 }
                 .padding(.horizontal, AppSpacing.l)
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            InitialSetupSkipButtonRow(onSkip: onSkip)
         }
     }
 
@@ -872,24 +873,17 @@ private struct TutorialHomeScreen: View {
         .onAppear {
             configureSegmentedControlFontIfNeeded()
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            InitialSetupSkipButtonRow(onSkip: viewModel.skipAllTutorialAndFinish)
+        }
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            Text("추가한 킬링파트는\n여기서 다시 볼 수 있어요.")
-                .font(AppFont.paperlogy7Bold(size: 30))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.leading)
-
-            Spacer(minLength: AppSpacing.s)
-
-            Button("건너뛰기") {
-                viewModel.skipAllTutorialAndFinish()
-            }
-            .buttonStyle(.plain)
-            .font(AppFont.paperlogy5Medium(size: 14))
-            .foregroundStyle(.white.opacity(0.9))
-        }
+        Text("추가한 킬링파트는\n여기서 다시 볼 수 있어요.")
+            .font(AppFont.paperlogy7Bold(size: 30))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var topToggleTabs: some View {
@@ -1267,23 +1261,15 @@ private struct TutorialDiaryDetailScreen: View {
     )
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            NavigationStack {
-                SocialMyCollectionDiary(
-                    diaryId: mockDiary.diaryId,
-                    displayTag: "@KILLINGPART",
-                    diary: mockDiary
-                )
-            }
-
-            Button("건너뛰기") {
-                viewModel.skipAllTutorialAndFinish()
-            }
-            .buttonStyle(.plain)
-            .font(AppFont.paperlogy5Medium(size: 14))
-            .foregroundStyle(.white.opacity(0.9))
-            .padding(.top, AppSpacing.l)
-            .padding(.trailing, AppSpacing.l)
+        NavigationStack {
+            SocialMyCollectionDiary(
+                diaryId: mockDiary.diaryId,
+                displayTag: "@KILLINGPART",
+                diary: mockDiary
+            )
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            InitialSetupSkipButtonRow(onSkip: viewModel.skipAllTutorialAndFinish)
         }
         .safeAreaInset(edge: .bottom) {
             PrimaryButton(title: "다음으로") {
@@ -1311,16 +1297,6 @@ private struct TutorialNotificationScreen: View {
 
     var body: some View {
         VStack(spacing: AppSpacing.m) {
-            HStack {
-                Spacer(minLength: 0)
-                Button("건너뛰기") {
-                    viewModel.skipAllTutorialAndFinish()
-                }
-            }
-            .buttonStyle(.plain)
-            .font(AppFont.paperlogy5Medium(size: 14))
-            .foregroundStyle(.white.opacity(0.9))
-
             Text("알림을 통해\n내 픽과 팬덤의 활동을 확인하세요!")
                 .font(AppFont.paperlogy7Bold(size: 30))
                 .foregroundStyle(.white)
@@ -1384,6 +1360,9 @@ private struct TutorialNotificationScreen: View {
             )
             .ignoresSafeArea()
         )
+        .safeAreaInset(edge: .top, spacing: 0) {
+            InitialSetupSkipButtonRow(onSkip: viewModel.skipAllTutorialAndFinish)
+        }
     }
 }
 
