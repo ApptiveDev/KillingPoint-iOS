@@ -9,6 +9,7 @@ struct LoginView: View {
             let horizontalPadding = max(AppSpacing.m, geometry.size.width * 0.06)
             let topPadding = geometry.safeAreaInsets.top + AppSpacing.l
             let bottomPadding = geometry.safeAreaInsets.bottom + AppSpacing.l
+            let titleTopOffset = max(topPadding + AppSpacing.xl, geometry.size.height * 0.18)
 
             ZStack {
                 LoginBackgroundVideoView()
@@ -25,10 +26,10 @@ struct LoginView: View {
                     Image("loginTitle")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: logoWidth)
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .padding(.top, topPadding)
+                        .frame(width: min(geometry.size.width * 0.62, 280))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, horizontalPadding)
+                        .padding(.top, titleTopOffset)
 
                     Spacer(minLength: AppSpacing.l)
 

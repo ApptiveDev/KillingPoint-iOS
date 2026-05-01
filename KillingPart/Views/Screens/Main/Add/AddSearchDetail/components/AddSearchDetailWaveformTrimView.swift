@@ -7,6 +7,7 @@ struct AddSearchDetailWaveformTrimView: View {
     let duration: Double
     let startTimeText: String
     let endTimeText: String
+    let onTrimInteracted: () -> Void
     let onUpdateRange: (_ start: Double, _ end: Double) -> Void
 
     private let horizontalPadding: CGFloat = 18
@@ -256,6 +257,7 @@ struct AddSearchDetailWaveformTrimView: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
+                    onTrimInteracted()
                     let target = timeForOverviewX(value.location.x, width: width)
                     moveSelectionCenter(to: target)
                 }
@@ -325,6 +327,7 @@ struct AddSearchDetailWaveformTrimView: View {
 
     private func followScrollButton(direction: HandleDirection) -> some View {
         Button {
+            onTrimInteracted()
             switch direction {
             case .left:
                 scrollTimelineToStart(startSeconds, animated: true)
@@ -387,6 +390,7 @@ struct AddSearchDetailWaveformTrimView: View {
             .onChanged { value in
                 if startDragBase == nil {
                     startDragBase = startSeconds
+                    onTrimInteracted()
                 }
                 activateDrag(direction: .left, contentWidth: contentWidth)
                 activeHandleDragTranslation = value.translation.width
@@ -404,6 +408,7 @@ struct AddSearchDetailWaveformTrimView: View {
             .onChanged { value in
                 if endDragBase == nil {
                     endDragBase = endSeconds
+                    onTrimInteracted()
                 }
                 activateDrag(direction: .right, contentWidth: contentWidth)
                 activeHandleDragTranslation = value.translation.width
