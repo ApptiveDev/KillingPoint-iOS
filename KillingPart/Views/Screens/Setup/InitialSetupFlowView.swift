@@ -582,6 +582,20 @@ private struct TutorialChoiceScreen: View {
                     viewModel.startTutorialTrackSelection()
                 }
                 .padding(.horizontal, AppSpacing.l)
+
+                Button {
+                    viewModel.skipAllTutorialAndFinish()
+                } label: {
+                    Text("건너뛰기")
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
+                        .foregroundStyle(.black.opacity(0.9))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, AppSpacing.m)
+                        .background(Color.white.opacity(0.65))
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, AppSpacing.l)
             }
             .padding(.bottom, AppSpacing.xl)
         }
@@ -593,9 +607,6 @@ private struct TutorialChoiceScreen: View {
             )
             .ignoresSafeArea()
         )
-        .safeAreaInset(edge: .top, spacing: 0) {
-            InitialSetupSkipButtonRow(onSkip: viewModel.skipAllTutorialAndFinish)
-        }
     }
 }
 
@@ -621,7 +632,7 @@ private struct TutorialTrackSearchScreen: View {
                 VStack(spacing: AppSpacing.m) {
                     VStack(spacing: 4) {
                         Text("어떤 곡으로 시작할까요?")
-                            .font(AppFont.paperlogy8ExtraBold(size: 34))
+                            .font(AppFont.paperlogy8ExtraBold(size: 30))
                             .foregroundStyle(.white)
                         Text("킬링파트 제작하기")
                             .font(AppFont.paperlogy4Regular(size: 15))
@@ -646,6 +657,7 @@ private struct TutorialTrackSearchScreen: View {
                         )
                 }
                 .padding(.horizontal, AppSpacing.l)
+                .padding(.top, AppSpacing.l)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -880,10 +892,10 @@ private struct TutorialHomeScreen: View {
 
     private var header: some View {
         Text("추가한 킬링파트는\n여기서 다시 볼 수 있어요.")
-            .font(AppFont.paperlogy7Bold(size: 30))
+            .font(AppFont.paperlogy7Bold(size: 24))
             .foregroundStyle(.white)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var topToggleTabs: some View {
@@ -930,7 +942,7 @@ private struct TutorialHomeScreen: View {
     @ViewBuilder
     private var collectionContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.m) {
+            VStack(alignment: .leading, spacing: AppSpacing.s) {
                 MyCollectionProfileCard(
                     displayName: viewModel.displayName,
                     displayTag: viewModel.displayTag,
@@ -940,7 +952,8 @@ private struct TutorialHomeScreen: View {
                     pickStatText: "0",
                     onFanStatTap: {},
                     onPickStatTap: {},
-                    onEditProfileTap: {}
+                    onEditProfileTap: {},
+                    showEditButton: false
                 )
                 .background(Color.black.opacity(0.74))
                 .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -997,61 +1010,61 @@ private struct TutorialHomeScreen: View {
     }
 
     private var calendarContent: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.m) {
-            MusicCalendarHeaderSection(
-                yearText: "\(year(from: displayedMonth))년",
-                monthText: "\(month(from: displayedMonth))월",
-                onMonthTap: {},
-                onPreviousMonthTap: {
-                    guard let movedMonth = Calendar.current.date(byAdding: .month, value: -1, to: displayedMonth) else { return }
-                    displayedMonth = Self.startOfMonth(for: movedMonth)
-                    selectedDate = displayedMonth
-                },
-                onNextMonthTap: {
-                    guard let movedMonth = Calendar.current.date(byAdding: .month, value: 1, to: displayedMonth) else { return }
-                    displayedMonth = Self.startOfMonth(for: movedMonth)
-                    selectedDate = displayedMonth
-                }
-            )
-
-            MusicCalendarCalendarSection(
-                weekdayTitles: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"],
-                dayCells: calendarDayCells,
-                onDayTap: { date in
-                    withAnimation(.easeInOut(duration: 0.24)) {
-                        selectedDate = date
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.m) {
+                MusicCalendarHeaderSection(
+                    yearText: "\(year(from: displayedMonth))년",
+                    monthText: "\(month(from: displayedMonth))월",
+                    onMonthTap: {},
+                    onPreviousMonthTap: {
+                        guard let movedMonth = Calendar.current.date(byAdding: .month, value: -1, to: displayedMonth) else { return }
+                        displayedMonth = Self.startOfMonth(for: movedMonth)
+                        selectedDate = displayedMonth
+                    },
+                    onNextMonthTap: {
+                        guard let movedMonth = Calendar.current.date(byAdding: .month, value: 1, to: displayedMonth) else { return }
+                        displayedMonth = Self.startOfMonth(for: movedMonth)
+                        selectedDate = displayedMonth
                     }
+                )
+
+                MusicCalendarCalendarSection(
+                    weekdayTitles: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"],
+                    dayCells: calendarDayCells,
+                    onDayTap: { date in
+                        withAnimation(.easeInOut(duration: 0.24)) {
+                            selectedDate = date
+                        }
+                    }
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            }
 
-            VStack(alignment: .leading, spacing: AppSpacing.s) {
-                Text(selectedDateTitle)
-                    .font(AppFont.paperlogy6SemiBold(size: 16))
-                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: AppSpacing.s) {
+                    Text(selectedDateTitle)
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
+                        .foregroundStyle(.white)
 
-                if diariesForSelectedDate.isEmpty {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.06))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 74)
-                        .overlay {
-                            Text("선택한 날짜의 킬링파트가 없어요.")
-                                .font(AppFont.paperlogy4Regular(size: 13))
-                                .foregroundStyle(.white.opacity(0.72))
-                        }
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                        }
-                } else {
-                    ScrollView {
+                    if diariesForSelectedDate.isEmpty {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 74)
+                            .overlay {
+                                Text("선택한 날짜의 킬링파트가 없어요.")
+                                    .font(AppFont.paperlogy4Regular(size: 13))
+                                    .foregroundStyle(.white.opacity(0.72))
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            }
+                    } else {
                         LazyVStack(spacing: AppSpacing.xs) {
-                            ForEach(diariesForSelectedDate.prefix(4)) { diary in
+                            ForEach(diariesForSelectedDate) { diary in
                                 MusicCalendarDiaryRow(diary: diary)
                                     .background(Color.black.opacity(0.62))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -1061,12 +1074,12 @@ private struct TutorialHomeScreen: View {
                                     }
                             }
                         }
-                        .padding(.bottom, AppSpacing.xs)
                     }
-                    .scrollIndicators(.hidden)
                 }
             }
+            .padding(.bottom, AppSpacing.s)
         }
+        .scrollIndicators(.hidden)
     }
 
     private var profileImageURL: URL? {
@@ -1237,39 +1250,162 @@ private enum TutorialHomeTab: CaseIterable {
 private struct TutorialDiaryDetailScreen: View {
     @ObservedObject var viewModel: InitialSetupFlowViewModel
 
-    private let mockDiary = DiaryFeedModel(
-        diaryId: 999_001,
-        artist: "Davinci Leo",
-        musicTitle: "Death Sonnet von Dat",
-        albumImageUrl: "https://i.imgur.com/8T0h6Zx.png",
-        content: "오늘 하루는 유난히 공허하게 흘러간 것 같다. 해야 할 일은 분명 있었지만 마음은 잘 따라주지 않았고, 생각들은 제자리를 맴돌았다. 그러다 문득, 특별한 이유 없이 음악을 들어야겠다는 충동이 찾아왔다.",
-        videoUrl: "https://www.youtube.com/embed/J---aiyznGQ?playsinline=1",
-        scope: .public,
-        duration: "00:30",
-        totalDuration: "03:24",
-        start: "00:20",
-        end: "00:50",
-        createDate: "2026-05-01T00:00:00",
-        updateDate: "2026-05-01T00:00:00",
-        isLiked: true,
-        isStored: false,
-        likeCount: 26,
-        userId: 9_999,
-        username: "킬링파트",
-        tag: "KILLINGPART",
-        profileImageUrl: nil
-    )
+    private let mockDiaryContent = "오늘 하루는 유난히 공허하게 흘러간 것 같다. 해야 할 일은 분명 있었지만 마음은 잘 따라주지 않았고, 생각들은 제자리를 맴돌았다. 그러다 문득, 특별한 이유 없이 음악을 들어야겠다는 충동이 찾아왔다. 그래서 큰 고민도 없이 ‘아무 노래’를 골랐다..."
 
     var body: some View {
-        NavigationStack {
-            SocialMyCollectionDiary(
-                diaryId: mockDiary.diaryId,
-                displayTag: "@KILLINGPART",
-                diary: mockDiary
-            )
+        ScrollView {
+            VStack(spacing: AppSpacing.m) {
+                Text("피드에서 친구의 킬링파트를,\n탐색에서 다양한 킬링파트를 감상해보세요")
+                    .font(AppFont.paperlogy7Bold(size: 20))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(6)
+                    .padding(.top, AppSpacing.s)
+
+                VStack(spacing: AppSpacing.m) {
+                    HStack(alignment: .center, spacing: AppSpacing.m) {
+                        tutorialProfileImage
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("킬링파트")
+                                .font(AppFont.paperlogy7Bold(size: 15))
+                                .foregroundStyle(AppColors.primary600)
+                            Text("@KILLINGPART")
+                                .font(AppFont.paperlogy4Regular(size: 13))
+                                .foregroundStyle(AppColors.primary600)
+                        }
+                        Spacer(minLength: 0)
+                        Text("프로필 방문")
+                            .font(AppFont.paperlogy5Medium(size: 13))
+                            .foregroundStyle(AppColors.primary600)
+                            .padding(.horizontal, AppSpacing.s)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.14))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+
+                    VStack(spacing: AppSpacing.s) {
+                        tutorialVideoPreview
+
+                        Text("Death Sonnet von Dat")
+                            .font(AppFont.paperlogy7Bold(size: 18))
+                            .foregroundStyle(.white.opacity(0.88))
+                            .frame(maxWidth: .infinity, alignment: .center)
+
+                        Text("Davinci Leo")
+                            .font(AppFont.paperlogy4Regular(size: 15))
+                            .foregroundStyle(.white.opacity(0.56))
+                            .frame(maxWidth: .infinity, alignment: .center)
+
+                        HStack {
+                            Text("킬링파트 일기")
+                                .font(AppFont.paperlogy7Bold(size: 14))
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.white.opacity(0.45))
+                                
+                            Spacer(minLength: 0)
+                            HStack(spacing: 5) {
+                                Image(systemName: "heart.fill")
+                                Text("26")
+                            }
+                            .font(AppFont.paperlogy6SemiBold(size: 14))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, AppSpacing.s)
+                            .padding(.vertical, 6)
+                            .background(AppColors.primary600.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+
+                        Text(mockDiaryContent)
+                            .font(AppFont.paperlogy4Regular(size: 14))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .lineSpacing(5)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                            Text("킬링파트")
+                                .font(AppFont.paperlogy5Medium(size: 13))
+                                .foregroundStyle(.white.opacity(0.36))
+                            // 전체 곡: 2:00 (120s), 킬링파트: 1:40 (100s) ~ 2:00 (120s)
+                            // 시작 오프셋 = 100/120 ≈ 83.3%, 구간 폭 = 20/120 ≈ 16.7%
+                            GeometryReader { geo in
+                                let totalWidth = geo.size.width
+                                let startFrac: CGFloat = 100.0 / 120.0
+                                let segmentFrac: CGFloat = 20.0 / 120.0
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.18))
+                                        .frame(height: 3)
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [AppColors.primary600.opacity(0.7), AppColors.primary600],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .frame(width: totalWidth * segmentFrac, height: 8)
+                                        .offset(x: totalWidth * startFrac)
+                                }
+                            }
+                            .frame(height: 8)
+                            HStack(spacing: 2) {
+                                Text("0:00")
+                                    .foregroundStyle(.white.opacity(0.26))
+                                Spacer(minLength: 0)
+                                Text("1:40")
+                                    .foregroundStyle(AppColors.primary600.opacity(0.9))
+                                Text("~")
+                                    .foregroundStyle(AppColors.primary600.opacity(0.6))
+                                Text("2:00")
+                                    .foregroundStyle(AppColors.primary600.opacity(0.9))
+                            }
+                            .font(AppFont.paperlogy4Regular(size: 12))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(AppSpacing.m)
+                        .background(Color.black.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        }
+                    }
+                }
+                .padding(AppSpacing.m)
+                .background(Color.black.opacity(0.78))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, AppSpacing.l)
+            .padding(.bottom, AppSpacing.xl)
         }
+        .scrollIndicators(.hidden)
+        .background(
+            Image("my_background")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+        )
         .safeAreaInset(edge: .top, spacing: 0) {
-            InitialSetupSkipButtonRow(onSkip: viewModel.skipAllTutorialAndFinish)
+            HStack {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+                Button("건너뛰기") {
+                    viewModel.skipAllTutorialAndFinish()
+                }
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white.opacity(0.92))
+            }
+            .padding(.horizontal, AppSpacing.l)
+            .padding(.top, AppSpacing.s)
+            .padding(.bottom, AppSpacing.xs)
+            .background(Color.clear)
         }
         .safeAreaInset(edge: .bottom) {
             PrimaryButton(title: "다음으로") {
@@ -1281,77 +1417,163 @@ private struct TutorialDiaryDetailScreen: View {
             .background(Color.black.opacity(0.92))
         }
     }
+
+    private var tutorialProfileImage: some View {
+        Circle()
+            .fill(Color.white.opacity(0.2))
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .frame(width: 52, height: 52)
+            .overlay {
+                Circle()
+                    .stroke(AppColors.primary600, lineWidth: 3)
+            }
+    }
+
+    private var tutorialVideoPreview: some View {
+        Color.clear
+            .aspectRatio(16 / 9, contentMode: .fit)
+            .overlay {
+                ZStack {
+                    AsyncImage(url: URL(string: "https://picsum.photos/seed/mountain/800/450")) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .empty, .failure:
+                            Rectangle()
+                                .fill(Color.white.opacity(0.1))
+                        @unknown default:
+                            Rectangle()
+                                .fill(Color.white.opacity(0.1))
+                        }
+                    }
+
+                    Color.black.opacity(0.3)
+
+                    VStack {
+                        HStack(alignment: .top) {
+                            Text("Death Sonnet von\nDat - Davinci")
+                                .font(AppFont.paperlogy4Regular(size: 16))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 28, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.92))
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "play.rectangle.fill")
+                            .font(.system(size: 52, weight: .regular))
+                            .foregroundStyle(.red.opacity(0.92))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, AppSpacing.m)
+                    .padding(.vertical, AppSpacing.m)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
 }
 
 private struct TutorialNotificationScreen: View {
     @ObservedObject var viewModel: InitialSetupFlowViewModel
 
+    private let noticeText = "[공지] 신규 업데이트 3.1 예정입니다!"
     private let mockNotifications: [(String, String)] = [
-        ("[공지] 신규 업데이트 3.1 예정입니다!", ""),
         ("OOO님이 회원님을 픽했어요", "04.15"),
         ("OOO의 새로운 업데이트가 배포되었어요", "04.16"),
         ("OOO님이 최근 활동을 공유했어요", "04.16"),
         ("OOO의 이벤트에 초대받았어요", "04.17"),
-        ("OOO님과의 대화가 시작되었어요", "04.17")
+        ("OOO님과의 대화가 시작되었어요", "04.17"),
+        ("OOO의 추천을 받았어요", "04.18"),
+        ("OOO님이 나를 태그했어요", "04.18"),
+        ("OOO의 팬이 되었어요", "04.19"),
+        ("OOO의 킬링파트가 좋아요를 받았어요", "04.15"),
+        ("OOO님이 회원님을 픽했어요", "04.15"),
+        ("OOO의 새로운 업데이트가 배포되었어요", "04.16"),
+        ("OOO의 이벤트에 초대받았어요", "04.17")
     ]
 
     var body: some View {
-        VStack(spacing: AppSpacing.m) {
-            Text("알림을 통해\n내 픽과 팬덤의 활동을 확인하세요!")
-                .font(AppFont.paperlogy7Bold(size: 30))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
+        GeometryReader { geometry in
+            VStack(spacing: AppSpacing.m) {
+                Text("알림을 통해\n내 픽과 팬덤의 활동을 확인하세요!")
+                    .font(AppFont.paperlogy7Bold(size: 24))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
 
-            VStack(alignment: .leading, spacing: AppSpacing.s) {
-                HStack(spacing: AppSpacing.s) {
-                    Image(systemName: "bell")
-                        .font(.system(size: 22, weight: .semibold))
-                    Text("알림 목록")
-                        .font(AppFont.paperlogy7Bold(size: 24))
-                }
-                .foregroundStyle(AppColors.primary600)
-
-                ForEach(Array(mockNotifications.enumerated()), id: \.offset) { index, row in
-                    if index == 0 {
-                        Text(row.0)
-                            .font(AppFont.paperlogy6SemiBold(size: 17))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, AppSpacing.m)
-                            .padding(.vertical, AppSpacing.m)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppColors.primary600)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    } else {
-                        HStack {
-                            Text(row.0)
-                                .font(AppFont.paperlogy4Regular(size: 15))
-                                .foregroundStyle(.white.opacity(0.85))
-                            Spacer(minLength: AppSpacing.s)
-                            Text(row.1)
-                                .font(AppFont.paperlogy4Regular(size: 14))
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                        .padding(.vertical, AppSpacing.xs)
+                VStack(alignment: .leading, spacing: AppSpacing.m) {
+                    HStack(spacing: AppSpacing.xs) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("알림 목록")
+                            .font(AppFont.paperlogy7Bold(size: 18))
                     }
+                    .foregroundStyle(AppColors.primary600)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                    Text(noticeText)
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
+                        .foregroundStyle(.black)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, AppSpacing.m)
+                        .padding(.vertical, AppSpacing.m)
+                        .frame(maxWidth: .infinity)
+                        .background(AppColors.primary600)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    ZStack(alignment: .bottom) {
+                        ScrollView {
+                            LazyVStack(spacing: AppSpacing.xs) {
+                                ForEach(Array(mockNotifications.enumerated()), id: \.offset) { _, row in
+                                    HStack {
+                                        Text(row.0)
+                                            .font(AppFont.paperlogy4Regular(size: 15))
+                                            .foregroundStyle(.white.opacity(0.85))
+                                        Spacer(minLength: AppSpacing.s)
+                                        Text(row.1)
+                                            .font(AppFont.paperlogy4Regular(size: 14))
+                                            .foregroundStyle(.white.opacity(0.7))
+                                    }
+                                    .padding(.vertical, AppSpacing.xs)
+                                }
+                            }
+                            .padding(.bottom, AppSpacing.xl * 2)
+                        }
+                        .scrollIndicators(.hidden)
+
+                        LinearGradient(
+                            colors: [Color.clear, Color.black.opacity(0.95)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 110)
+                        .allowsHitTesting(false)
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+                .padding(AppSpacing.m)
+                .frame(maxHeight: max(geometry.size.height * 0.58, 460))
+                .background(Color.black.opacity(0.72))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                }
+
+                PrimaryButton(title: "다음으로") {
+                    viewModel.goToFinalTutorial()
                 }
             }
-            .padding(AppSpacing.m)
-            .background(Color.black.opacity(0.72))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            }
-
-            Spacer(minLength: 0)
-
-            PrimaryButton(title: "다음으로") {
-                viewModel.goToFinalTutorial()
-            }
+            .padding(.horizontal, AppSpacing.l)
+            .padding(.top, AppSpacing.l)
+            .padding(.bottom, AppSpacing.l)
         }
-        .padding(.horizontal, AppSpacing.l)
-        .padding(.top, AppSpacing.l)
-        .padding(.bottom, AppSpacing.l)
         .background(
             LinearGradient(
                 colors: [Color.black, Color(hex: "#171A24")],
@@ -1374,7 +1596,7 @@ private struct TutorialFinalScreen: View {
             Spacer(minLength: 0)
 
             Text("이제 킬링파트를\n시작해보세요.")
-                .font(AppFont.paperlogy7Bold(size: 38))
+                .font(AppFont.paperlogy7Bold(size: 32))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 

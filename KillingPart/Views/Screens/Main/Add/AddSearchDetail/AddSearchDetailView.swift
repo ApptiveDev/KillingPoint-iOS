@@ -48,11 +48,15 @@ struct AddSearchDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: AppSpacing.m) {
-                    AddSearchDetailVideoSection(
-                        viewModel: viewModel,
-                        playerReloadToken: playerReloadToken
-                    )
-                    .opacity(isTrimFocusActive ? 0.35 : 1)
+                    if viewModel.currentStep == .comment && isTutorialTrimFocusEnabled {
+                        commentVideoPlaceholder
+                    } else {
+                        AddSearchDetailVideoSection(
+                            viewModel: viewModel,
+                            playerReloadToken: playerReloadToken
+                        )
+                        .opacity(isTrimFocusActive ? 0.35 : 1)
+                    }
                     AddSearchDetailTrackInfoSection(track: viewModel.track)
                         .opacity(isTrimFocusActive ? 0.35 : 1)
                     detailInputSection
@@ -72,6 +76,19 @@ struct AddSearchDetailView: View {
         .safeAreaInset(edge: .bottom) {
             actionBar
                 .opacity(isTrimFocusActive ? 0.35 : 1)
+        }
+        .safeAreaInset(edge: .top, spacing: AppSpacing.s) {
+            if isTrimFocusActive {
+                Text("킬링파트로 사용할 구간을 정해보세요!")
+                    .font(AppFont.paperlogy7Bold(size: 32))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, AppSpacing.l)
+                    .padding(.top, AppSpacing.s)
+                    .padding(.bottom, AppSpacing.xs)
+                    .transition(.opacity)
+            }
         }
         .task {
             await viewModel.loadIfNeeded()
@@ -184,6 +201,15 @@ struct AddSearchDetailView: View {
         .padding(.top, AppSpacing.s)
         .padding(.bottom, AppSpacing.s)
         .background(Color.black.opacity(0.94))
+    }
+
+    private var commentVideoPlaceholder: some View {
+        Text("선택한 구간에서 느낀\n감정과 생각을 적어보세요.")
+            .font(AppFont.paperlogy6SemiBold(size: 20))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, AppSpacing.xl)
     }
 
     private var stepTransition: AnyTransition {
