@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1224698B2FA765FE00A6EF76 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1224698A2FA765FE00A6EF76 /* FirebaseCore */; };
+		1224698D2FA765FE00A6EF76 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 1224698C2FA765FE00A6EF76 /* FirebaseMessaging */; };
 		12CE25AA2F3DC9BE0057A858 /* Development.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25A92F3DC9BE0057A858 /* Development.xcconfig */; };
 		12CE25AC2F3DCA940057A858 /* Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25AB2F3DCA940057A858 /* Release.xcconfig */; };
 		12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0112F3F010000A00001 /* KakaoSDKCommon */; };
@@ -77,6 +79,8 @@
 			files = (
 				12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */,
 				12F7A0022F3F010000A00001 /* KakaoSDKAuth in Frameworks */,
+				1224698D2FA765FE00A6EF76 /* FirebaseMessaging in Frameworks */,
+				1224698B2FA765FE00A6EF76 /* FirebaseCore in Frameworks */,
 				12F7A0032F3F010000A00001 /* KakaoSDKUser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -143,6 +147,8 @@
 				12F7A0112F3F010000A00001 /* KakaoSDKCommon */,
 				12F7A0122F3F010000A00001 /* KakaoSDKAuth */,
 				12F7A0132F3F010000A00001 /* KakaoSDKUser */,
+				1224698A2FA765FE00A6EF76 /* FirebaseCore */,
+				1224698C2FA765FE00A6EF76 /* FirebaseMessaging */,
 			);
 			productName = KillingPart;
 			productReference = 1231F11D2F372E5B00CFA51D /* KillingPart.app */;
@@ -228,6 +234,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+				122469892FA765FE00A6EF76 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1231F11E2F372E5B00CFA51D /* Products */;
@@ -653,6 +660,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		122469892FA765FE00A6EF76 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.1;
+			};
+		};
 		12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kakao/kakao-ios-sdk";
@@ -664,6 +679,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1224698A2FA765FE00A6EF76 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 122469892FA765FE00A6EF76 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		1224698C2FA765FE00A6EF76 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 122469892FA765FE00A6EF76 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
 		12F7A0112F3F010000A00001 /* KakaoSDKCommon */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;

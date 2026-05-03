@@ -73,6 +73,7 @@ final class AppViewModel: ObservableObject {
         self.loginViewModel = loginViewModel
         self.loginViewModel.onLoginSuccess = { [weak self] _ in
             Task { @MainActor [weak self] in
+                FCMManager.shared.registerPendingTokenIfNeeded()
                 await self?.resolvePostLoginFlow()
             }
         }

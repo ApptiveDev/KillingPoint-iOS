@@ -155,6 +155,7 @@ struct AuthenticationService: AuthenticationServicing {
 
     func logout() async throws {
         do {
+            try? await FCMManager.shared.deleteToken()
             let request = APIRequest(
                 path: "/users/logout",
                 method: .post,
