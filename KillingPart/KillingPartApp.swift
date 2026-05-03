@@ -11,6 +11,8 @@ import KakaoSDKCommon
 
 @main
 struct KillingPartApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     init() {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
             configureKakaoSDK()

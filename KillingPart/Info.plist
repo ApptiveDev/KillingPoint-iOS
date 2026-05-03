@@ -2,20 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>SPOTIFY_BASIC_AUTH</key>
-	<string>$(SPOTIFY_BASIC_AUTH)</string>
-	<key>BASE_URL</key>
-	<string>$(BASE_URL)</string>
-	<key>KAKAO_NATIVE_APP_KEY</key>
-	<string>$(KAKAO_NATIVE_APP_KEY)</string>
-	<key>MUSIC_BASE_URL</key>
-	<string>$(MUSIC_BASE_URL)</string>
 	<key>APP_STORE_URL</key>
 	<string>$(APP_STORE_URL)</string>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>kakaokompassauth</string>
-	</array>
+	<key>BASE_URL</key>
+	<string>$(BASE_URL)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -27,6 +17,16 @@
 			</array>
 		</dict>
 	</array>
+	<key>KAKAO_NATIVE_APP_KEY</key>
+	<string>$(KAKAO_NATIVE_APP_KEY)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaokompassauth</string>
+	</array>
+	<key>MUSIC_BASE_URL</key>
+	<string>$(MUSIC_BASE_URL)</string>
+	<key>SPOTIFY_BASIC_AUTH</key>
+	<string>$(SPOTIFY_BASIC_AUTH)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Paperlogy-1Thin.ttf</string>
@@ -39,5 +39,11 @@
 		<string>Paperlogy-8ExtraBold.ttf</string>
 		<string>Paperlogy-9Black.ttf</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 </dict>
 </plist>
