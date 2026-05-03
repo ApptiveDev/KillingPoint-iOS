@@ -17,6 +17,13 @@ final class FCMManager {
     }
 
     func didReceiveToken(_ token: String) {
+        guard Messaging.messaging().apnsToken != nil else {
+            print("[FCM] APNs 미연결 — 토큰 무시 (APNs 연결 후 재발급됨)")
+            return
+        }
+
+        print("[FCM] APNs 연결 확인 — 토큰 처리 시작")
+
         if tokenStore.hasSessionTokens {
             Task {
                 do {
