@@ -4,10 +4,15 @@ import FirebaseMessaging
 final class FCMManager {
     static let shared = FCMManager()
 
+    private let fcmService: FCMServicing
     private let tokenStore: TokenStoring
     private let pendingTokenKey = "fcm.pendingToken"
 
-    private init(tokenStore: TokenStoring = TokenStore.shared) {
+    init(
+        fcmService: FCMServicing = FCMService(),
+        tokenStore: TokenStoring = TokenStore.shared
+    ) {
+        self.fcmService = fcmService
         self.tokenStore = tokenStore
     }
 
@@ -15,10 +20,9 @@ final class FCMManager {
         if tokenStore.hasSessionTokens {
             Task {
                 do {
-                    try await FCMTokenAPI.registerToken(token)
+                    try await fcmService.registerToken(token)
                 } catch {
                     print("[FCM] 토큰 서버 등록 실패: \(error.localizedDescription)")
-                    // 다음 로그인 시 재시도하도록 pending 저장
                     UserDefaults.standard.set(token, forKey: pendingTokenKey)
                 }
             }
@@ -43,7 +47,7 @@ final class FCMManager {
             }
 
             do {
-                try await FCMTokenAPI.registerToken(token)
+                try await fcmService.registerToken(token)
                 UserDefaults.standard.removeObject(forKey: pendingTokenKey)
             } catch {
                 print("[FCM] 로그인 후 토큰 서버 등록 실패: \(error.localizedDescription)")
@@ -52,7 +56,7 @@ final class FCMManager {
     }
 
     func deleteToken() async throws {
-        try await FCMTokenAPI.deleteToken()
+        try await fcmService.deleteToken()
         UserDefaults.standard.removeObject(forKey: pendingTokenKey)
     }
 
