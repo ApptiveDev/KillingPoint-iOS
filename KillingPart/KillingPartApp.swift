@@ -8,6 +8,7 @@
 import SwiftUI
 import KakaoSDKAuth
 import KakaoSDKCommon
+import GoogleSignIn
 
 @main
 struct KillingPartApp: App {
@@ -23,6 +24,10 @@ struct KillingPartApp: App {
         WindowGroup {
             RootFlowView()
                 .onOpenURL { url in
+                    if GIDSignIn.sharedInstance.handle(url) {
+                        return
+                    }
+
                     if AuthApi.isKakaoTalkLoginUrl(url) {
                         _ = AuthController.handleOpenUrl(url: url)
                     }

@@ -5,7 +5,6 @@ struct LoginView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let logoWidth = min(max(geometry.size.width * 0.75, 220), 560)
             let horizontalPadding = max(AppSpacing.m, geometry.size.width * 0.06)
             let topPadding = geometry.safeAreaInsets.top + AppSpacing.l
             let bottomPadding = geometry.safeAreaInsets.bottom + AppSpacing.l
@@ -53,6 +52,13 @@ struct LoginView: View {
                                 action: viewModel.loginWithKakao
                             )
 
+                            GoogleLoginButton(
+                                isLoading: viewModel.isLoading
+                                    && viewModel.activeSocialLoginProvider == .google,
+                                isDisabled: viewModel.isLoading,
+                                action: viewModel.loginWithGoogle
+                            )
+
                             AppleLoginButton(
                                 isLoading: viewModel.isLoading
                                     && viewModel.activeSocialLoginProvider == .apple,
@@ -61,34 +67,34 @@ struct LoginView: View {
                             )
                         }
 
-                        Button(action: viewModel.loginWithTester) {
-                            ZStack {
-                                Text("체험하기(Demo)")
-                                    .font(AppFont.paperlogy5Medium(size: 14))
-                                    .opacity(
-                                        viewModel.isLoading
-                                            && viewModel.activeSocialLoginProvider == .tester ? 0 : 1
-                                    )
-
-                                if viewModel.isLoading
-                                    && viewModel.activeSocialLoginProvider == .tester {
-                                    ProgressView()
-                                        .tint(.white)
-                                }
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, AppSpacing.l)
-                            .padding(.vertical, AppSpacing.s)
-                            .background(Color.white.opacity(0.16))
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.28), lineWidth: 1)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.isLoading)
-                        .accessibilityLabel("체험하기")
+//                        Button(action: viewModel.loginWithTester) {
+//                            ZStack {
+//                                Text("체험하기(Demo)")
+//                                    .font(AppFont.paperlogy5Medium(size: 14))
+//                                    .opacity(
+//                                        viewModel.isLoading
+//                                            && viewModel.activeSocialLoginProvider == .tester ? 0 : 1
+//                                    )
+//
+//                                if viewModel.isLoading
+//                                    && viewModel.activeSocialLoginProvider == .tester {
+//                                    ProgressView()
+//                                        .tint(.white)
+//                                }
+//                            }
+//                            .foregroundStyle(.white)
+//                            .padding(.horizontal, AppSpacing.l)
+//                            .padding(.vertical, AppSpacing.s)
+//                            .background(Color.white.opacity(0.16))
+//                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+//                            .overlay {
+//                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+//                                    .stroke(Color.white.opacity(0.28), lineWidth: 1)
+//                            }
+//                        }
+//                        .buttonStyle(.plain)
+//                        .disabled(viewModel.isLoading)
+//                        .accessibilityLabel("체험하기")
                     }
                     .padding(.horizontal, horizontalPadding)
                     .padding(.bottom, bottomPadding)
