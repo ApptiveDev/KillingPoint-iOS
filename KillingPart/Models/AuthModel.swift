@@ -4,6 +4,10 @@ struct KakaoLoginRequest: Encodable {
     let accessToken: String
 }
 
+struct GoogleLoginRequest: Encodable {
+    let idToken: String
+}
+
 struct AppleLoginRequest: Encodable {
     let identityToken: String
     let authorizationCode: String
