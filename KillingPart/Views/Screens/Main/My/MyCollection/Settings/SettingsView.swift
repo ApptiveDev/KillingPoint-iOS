@@ -58,14 +58,14 @@ struct SettingsView: View {
     private var header: some View {
         ZStack {
             Text("설정")
-                .font(AppFont.paperlogy6SemiBold(size: 24))
-                .foregroundStyle(Color.kpPrimary)
+                .font(AppFont.paperlogy6SemiBold(size: 18))
+                .foregroundStyle(Color.white)
 
             HStack {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.kpPrimary)
+                        .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
 
@@ -86,13 +86,13 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(viewModel.displayName)
-                        .font(AppFont.paperlogy6SemiBold(size: 24))
-                        .foregroundStyle(Color.kpPrimary)
+                        .font(AppFont.paperlogy6SemiBold(size: 18))
+                        .foregroundStyle(Color.white)
                         .lineLimit(1)
 
                     Text(viewModel.displayTag)
                         .font(AppFont.paperlogy4Regular(size: 15))
-                        .foregroundStyle(Color.kpPrimary.opacity(0.85))
+                        .foregroundStyle(Color.white.opacity(0.85))
                         .lineLimit(1)
                 }
 
@@ -151,7 +151,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             Button(action: onLogoutTap) {
                 Text("로그아웃")
-                    .font(AppFont.paperlogy5Medium(size: 18))
+                    .font(AppFont.paperlogy5Medium(size: 14))
                     .foregroundStyle(Color(red: 1, green: 0.39, blue: 0.39))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppSpacing.m)
@@ -165,7 +165,7 @@ struct SettingsView: View {
                 isWithdrawalDialogPresented = true
             }) {
                 Text("회원탈퇴")
-                    .font(AppFont.paperlogy5Medium(size: 18))
+                    .font(AppFont.paperlogy5Medium(size: 14))
                     .foregroundStyle(Color.white.opacity(0.4))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppSpacing.m)
@@ -187,8 +187,8 @@ struct SettingsNavigationRowLabel: View {
     var body: some View {
         HStack(spacing: AppSpacing.s) {
             Text(title)
-                .font(AppFont.paperlogy5Medium(size: 17))
-                .foregroundStyle(Color.kpPrimary)
+                .font(AppFont.paperlogy4Regular(size: 14))
+                .foregroundStyle(Color.white)
 
             Spacer()
 
