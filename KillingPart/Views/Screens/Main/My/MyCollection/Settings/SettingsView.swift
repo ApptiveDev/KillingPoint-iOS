@@ -369,7 +369,7 @@ struct SettingsView: View {
                 )
             }
             .padding(.horizontal, AppSpacing.m)
-            .padding(.vertical, 18)
+            .padding(.vertical,12)
             .contentShape(Rectangle())
             .background(Color.white.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
