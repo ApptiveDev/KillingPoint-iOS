@@ -23,7 +23,7 @@ struct TagEdit: View {
             SettingsSubpageHeader(
                 title: "태그 변경",
                 titleColor: .white,
-                titleFontSize: 20,
+                titleFontSize: 18,
                 backButtonColor: .white,
                 trailingTitle: "완료",
                 trailingColor: isCompleteEnabled ? .kpPrimary : .white.opacity(0.45),
@@ -36,17 +36,17 @@ struct TagEdit: View {
 
             VStack(alignment: .leading, spacing: AppSpacing.s) {
                 Text("태그")
-                    .font(AppFont.paperlogy4Regular(size: 18))
+                    .font(AppFont.paperlogy4Regular(size: 15))
                     .foregroundStyle(.white.opacity(0.85))
                 
                 HStack(spacing: AppSpacing.xs) {
                     Text("@")
-                        .font(AppFont.paperlogy5Medium(size: 18))
+                        .font(AppFont.paperlogy5Medium(size: 15))
                         .foregroundStyle(.white.opacity(0.7))
                     
                     TextField("태그 입력", text: $viewModel.tagDraft)
                         .focused($isTagFieldFocused)
-                        .font(AppFont.paperlogy5Medium(size: 16))
+                        .font(AppFont.paperlogy5Medium(size: 15))
                         .foregroundStyle(.white)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -61,20 +61,20 @@ struct TagEdit: View {
                 }
                 
                 Text("영문 소문자 4자 이상, 30자 이내,특수문자 일부[.][_]")
-                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .font(AppFont.paperlogy4Regular(size: 12))
                     .foregroundStyle(.white.opacity(0.55))
 
                 if let validation = viewModel.validateTag(viewModel.tagDraft), !viewModel.tagDraft.isEmpty {
                     Text(validation)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(.red.opacity(0.95))
                 } else if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(.red.opacity(0.95))
                 } else if let successMessage = viewModel.successMessage {
                     Text(successMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(AppColors.primary600.opacity(0.95))
                 }
             }

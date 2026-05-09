@@ -15,7 +15,7 @@ struct ProfileImageEdit: View {
             SettingsSubpageHeader(
                 title: "프로필 이미지",
                 titleColor: .white,
-                titleFontSize: 20,
+                titleFontSize: 18,
                 backButtonColor: .white
             ) {
                 dismiss()
@@ -29,13 +29,13 @@ struct ProfileImageEdit: View {
 
                 if let successMessage = viewModel.successMessage {
                     Text(successMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(AppColors.primary600.opacity(0.95))
                 }
 
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(.red.opacity(0.95))
                 }
             }

@@ -14,7 +14,7 @@ struct BlocklistView: View {
             SettingsSubpageHeader(
                 title: "차단 목록",
                 titleColor: .white,
-                titleFontSize: 20,
+                titleFontSize: 18,
                 backButtonColor: .white
             ) {
                 dismiss()
@@ -23,7 +23,7 @@ struct BlocklistView: View {
 
             VStack(alignment: .leading, spacing: AppSpacing.m) {
                 Text("총 \(viewModel.totalBlockedUsers)명")
-                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .font(AppFont.paperlogy4Regular(size: 12))
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(maxWidth: .infinity, alignment: .center)
 
@@ -35,7 +35,7 @@ struct BlocklistView: View {
                     .background(Color.white.opacity(0.1))
 
                 Text("차단된 사용자는 회원님의 킬링파트 및 컬렉션을 확인할 수 없습니다.")
-                    .font(AppFont.paperlogy4Regular(size: 11))
+                    .font(AppFont.paperlogy4Regular(size: 10))
                     .foregroundStyle(.white.opacity(0.45))
             }
             .padding(.horizontal, horizontalPadding)
@@ -81,7 +81,7 @@ struct BlocklistView: View {
 
             TextField("검색", text: $viewModel.searchText)
                 .focused($isSearchFocused)
-                .font(AppFont.paperlogy4Regular(size: 14))
+                .font(AppFont.paperlogy4Regular(size: 13))
                 .foregroundStyle(.white)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -118,7 +118,7 @@ struct BlocklistView: View {
         } else if let errorMessage = viewModel.errorMessage, viewModel.blockedUsers.isEmpty {
             VStack(spacing: AppSpacing.s) {
                 Text(errorMessage)
-                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .font(AppFont.paperlogy4Regular(size: 12))
                     .foregroundStyle(Color.white.opacity(0.82))
                     .multilineTextAlignment(.center)
 
@@ -127,14 +127,14 @@ struct BlocklistView: View {
                         await viewModel.refresh()
                     }
                 }
-                .font(AppFont.paperlogy5Medium(size: 13))
+                .font(AppFont.paperlogy5Medium(size: 12))
                 .foregroundStyle(AppColors.primary600)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, AppSpacing.m)
         } else if viewModel.filteredBlockedUsers.isEmpty {
             Text(viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "차단한 사용자가 없어요." : "검색 결과가 없어요.")
-                .font(AppFont.paperlogy4Regular(size: 13))
+                .font(AppFont.paperlogy4Regular(size: 12))
                 .foregroundStyle(.white.opacity(0.62))
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, AppSpacing.l)
@@ -166,11 +166,11 @@ struct BlocklistView: View {
         HStack(alignment: .center, spacing: AppSpacing.m) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(user.displayName)
-                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .font(AppFont.paperlogy5Medium(size: 13))
                     .foregroundStyle(.white)
 
                 Text(user.displayTag)
-                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .font(AppFont.paperlogy4Regular(size: 11))
                     .foregroundStyle(.white.opacity(0.62))
             }
 
@@ -181,7 +181,7 @@ struct BlocklistView: View {
                 viewModel.clearUnblockError()
             } label: {
                 Text("차단 해제")
-                    .font(AppFont.paperlogy4Regular(size: 14))
+                    .font(AppFont.paperlogy4Regular(size: 13))
                     .foregroundStyle(Color(hex: "#FF676F"))
                     .padding(.horizontal, AppSpacing.m)
                     .frame(height: 38)
@@ -215,22 +215,22 @@ private struct BlocklistUnblockConfirmSheet: View {
     var body: some View {
         VStack(spacing: AppSpacing.s) {
             Text("!")
-                .font(.system(size: 30, weight: .heavy))
+                .font(.system(size: 26, weight: .heavy))
                 .foregroundStyle(Color(hex: "#FF676F"))
 
             Text("\(user.displayName)님을 차단 해제 할까요?")
-                .font(AppFont.paperlogy6SemiBold(size: 22))
+                .font(AppFont.paperlogy6SemiBold(size: 18))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
             Text("이제 상대방이 검색할 수 있습니다.\n상대방에게 알림이 가지 않습니다.")
-                .font(AppFont.paperlogy4Regular(size: 13))
+                .font(AppFont.paperlogy4Regular(size: 12))
                 .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(AppFont.paperlogy4Regular(size: 11))
+                    .font(AppFont.paperlogy4Regular(size: 10))
                     .foregroundStyle(Color(hex: "#FF676F"))
                     .multilineTextAlignment(.center)
             }
@@ -238,7 +238,7 @@ private struct BlocklistUnblockConfirmSheet: View {
             HStack(spacing: AppSpacing.s) {
                 Button(action: onCancel) {
                     Text("취소")
-                        .font(AppFont.paperlogy6SemiBold(size: 17))
+                        .font(AppFont.paperlogy6SemiBold(size: 15))
                         .foregroundStyle(.white.opacity(0.85))
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
@@ -254,7 +254,7 @@ private struct BlocklistUnblockConfirmSheet: View {
                                 .tint(.white)
                         } else {
                             Text("삭제")
-                                .font(AppFont.paperlogy6SemiBold(size: 17))
+                                .font(AppFont.paperlogy6SemiBold(size: 15))
                         }
                     }
                     .foregroundStyle(.white)

@@ -23,7 +23,7 @@ struct NameEdit: View {
             SettingsSubpageHeader(
                 title: "이름 변경",
                 titleColor: .white,
-                titleFontSize: 20,
+                titleFontSize: 18,
                 backButtonColor: .white,
                 trailingTitle: "완료",
                 trailingColor: isCompleteEnabled ? .kpPrimary : .white.opacity(0.45),
@@ -36,12 +36,12 @@ struct NameEdit: View {
 
             VStack(alignment: .leading, spacing: AppSpacing.s) {
                 Text("이름")
-                    .font(AppFont.paperlogy4Regular(size: 18))
+                    .font(AppFont.paperlogy4Regular(size: 15))
                     .foregroundStyle(.white.opacity(0.85))
 
                 TextField("이름 입력", text: $viewModel.nameDraft)
                     .focused($isNameFieldFocused)
-                    .font(AppFont.paperlogy5Medium(size: 16))
+                    .font(AppFont.paperlogy5Medium(size: 15))
                     .foregroundStyle(.white)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -55,20 +55,20 @@ struct NameEdit: View {
                     }
                 
                 Text("2~16자, 한글/영문/숫자 사용 가능")
-                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .font(AppFont.paperlogy4Regular(size: 12))
                     .foregroundStyle(.white.opacity(0.55))
 
                 if let validation = viewModel.validateName(viewModel.nameDraft), !viewModel.nameDraft.isEmpty {
                     Text(validation)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(.red.opacity(0.95))
                 } else if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(.red.opacity(0.95))
                 } else if let successMessage = viewModel.successMessage {
                     Text(successMessage)
-                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(AppColors.primary600.opacity(0.95))
                 }
             }
@@ -155,7 +155,7 @@ struct SettingsSubpageHeader: View {
                 if let trailingTitle, let onTrailingTap {
                     Button(action: onTrailingTap) {
                         Text(trailingTitle)
-                            .font(AppFont.paperlogy6SemiBold(size: 20))
+                            .font(AppFont.paperlogy6SemiBold(size: 16))
                             .foregroundStyle(trailingColor)
                     }
                     .buttonStyle(.plain)
