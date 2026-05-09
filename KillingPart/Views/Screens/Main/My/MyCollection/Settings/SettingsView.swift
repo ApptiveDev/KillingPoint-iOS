@@ -494,15 +494,9 @@ private struct SettingsExternalLinkRowLabel: View {
 private struct SettingsFeedbackRowLabel: View {
     var body: some View {
         HStack(spacing: AppSpacing.s) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Color.kpPrimary.opacity(0.9), lineWidth: 1)
-                    .frame(width: 24, height: 24)
-
-                Image(systemName: "envelope")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.kpPrimary.opacity(0.95))
-            }
+            Image(systemName: "envelope")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color.kpPrimary.opacity(0.95))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("문의 및 피드백!")
@@ -516,19 +510,23 @@ private struct SettingsFeedbackRowLabel: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, AppSpacing.m)
-        .padding(.vertical, AppSpacing.s)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color.kpPrimary)
-                .frame(width: 3, height: 46)
-                .padding(.leading, 1)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+
+            ZStack(alignment: .leading) {
+                shape
+                    .fill(Color.white.opacity(0.08))
+
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.kpPrimary)
+                    .frame(width: 10)
+                    .frame(maxHeight: .infinity)
+                    .offset(x: -6)
+            }
+            .clipShape(shape)
         }
     }
 }
