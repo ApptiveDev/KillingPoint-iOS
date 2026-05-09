@@ -12,6 +12,8 @@ struct MyCollectionProfileCard: View {
     let onEditProfileTap: () -> Void
     var showEditButton: Bool = true
 
+    private let tagAreaMaxWidth: CGFloat = 120
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.s) {
             HStack(alignment: .top, spacing: AppSpacing.m) {
@@ -31,10 +33,11 @@ struct MyCollectionProfileCard: View {
                             Text(displayTag)
                                 .font(AppFont.paperlogy4Regular(size: 13))
                                 .foregroundStyle(Color.kpPrimary)
-                                .lineLimit(1)
+                                .lineLimit(2)
                                 .truncationMode(.tail)
-                                .minimumScaleFactor(0.85)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+                        .frame(maxWidth: tagAreaMaxWidth, alignment: .leading)
 
                         HStack(alignment: .center, spacing: AppSpacing.m) {
                             MyCollectionProfileStatItemView(value: killingPartStatText, title: "킬링파트")
@@ -48,6 +51,7 @@ struct MyCollectionProfileCard: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        .fixedSize(horizontal: true, vertical: false)
                         .frame(maxWidth: .infinity, alignment: .center)
                     }
                     if showEditButton {

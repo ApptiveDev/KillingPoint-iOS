@@ -11,6 +11,7 @@ struct SocialFeedPageCardView: View {
     let onLikeLongPress: () -> Void
     let onStoreTap: () -> Void
     let onReportTap: () -> Void
+    let onBlockTap: () -> Void
     let onDoubleTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
     @State private var shouldIgnoreNextLikeTap = false
@@ -34,6 +35,17 @@ struct SocialFeedPageCardView: View {
                                 Text("신고하기")
                             } icon: {
                                 Image(systemName: "light.beacon.max")
+                            }
+                            .tint(.red)
+                        }
+                        
+                        Button {
+                            onBlockTap()
+                        } label: {
+                            Label {
+                                Text("차단하기")
+                            } icon: {
+                                Image(systemName: "person.fill.xmark")
                             }
                             .tint(.red)
                         }

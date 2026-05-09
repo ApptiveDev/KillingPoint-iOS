@@ -4,6 +4,7 @@ import Foundation
 final class LoginViewModel: ObservableObject {
     enum SocialLoginProvider {
         case kakao
+        case google
         case apple
         case tester
     }
@@ -83,6 +84,27 @@ final class LoginViewModel: ObservableObject {
                     email: applePayload.email,
                     name: applePayload.name
                 )
+                isNewUser = response.isNew
+                onLoginSuccess?(response.isNew)
+            } catch let authError as AuthenticationServiceError {
+                loginErrorMessage = authError.errorDescription
+            } catch let socialError as AuthServiceError {
+                loginErrorMessage = socialError.errorDescription
+            } catch {
+                loginErrorMessage = "로그인 중 오류가 발생했어요. 다시 시도해 주세요."
+            }
+        }
+    }
+
+    func loginWithGoogle() {
+        guard startSocialLogin(for: .google) else { return }
+
+        Task {
+            defer { finishSocialLogin() }
+
+            do {
+                let googleIDToken = try await authService.loginWithGoogle()
+                let response = try await authenticationService.loginWithGoogle(idToken: googleIDToken)
                 isNewUser = response.isNew
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {

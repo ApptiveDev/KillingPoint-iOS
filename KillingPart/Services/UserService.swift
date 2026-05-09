@@ -6,6 +6,9 @@ protocol UserServicing {
     func submitPolicyAgreement(agreements: [PolicyAgreementItem]) async throws
     func fetchUserStatics(userId: Int) async throws -> UserStaticsModel
     func searchUsers(searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse
+    func blockUser(blockedId: Int) async throws
+    func fetchBlockedUsers(page: Int, size: Int) async throws -> UserSearchResponse
+    func unblockUser(blockedId: Int) async throws
     func deleteMyProfileImage() async throws -> UserModel
     func issuePresignedURL() async throws -> PresignedURLResponse
     func uploadImageToPresignedURL(imageData: Data, presignedURL: URL) async throws
@@ -155,6 +158,56 @@ struct UserService: UserServicing {
             )
             let response = try await apiClient.request(request, responseType: UserSearchResponseDTO.self)
             return response.toModel()
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+    
+    func blockUser(blockedId: Int) async throws {
+        do {
+            let request = APIRequest(
+                path: "/users/\(blockedId)/blocks",
+                method: .post,
+                requiresAuthorization: true
+            )
+            try await apiClient.request(request)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+    
+    func fetchBlockedUsers(page: Int = Self.defaultPage, size: Int = Self.defaultSize) async throws -> UserSearchResponse {
+        let resolvedPage = max(page, Self.defaultPage)
+        let resolvedSize = size > 0 ? size : Self.defaultSize
+
+        do {
+            let request = APIRequest(
+                path: "/users/blocks",
+                method: .get,
+                queryItems: [
+                    URLQueryItem(name: "page", value: String(resolvedPage)),
+                    URLQueryItem(name: "size", value: String(resolvedSize))
+                ],
+                requiresAuthorization: true
+            )
+            let response = try await apiClient.request(request, responseType: UserSearchResponseDTO.self)
+            return response.toModel()
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+    
+    func unblockUser(blockedId: Int) async throws {
+        do {
+            let request = APIRequest(
+                path: "/users/\(blockedId)/blocks",
+                method: .delete,
+                requiresAuthorization: true
+            )
+            try await apiClient.request(request)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

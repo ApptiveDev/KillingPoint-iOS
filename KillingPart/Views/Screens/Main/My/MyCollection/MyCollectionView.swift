@@ -6,9 +6,7 @@ struct MyCollectionView: View {
     @StateObject private var viewModel: MyCollectionViewModel
     @StateObject private var storesViewModel: MyCollectionStoresViewModel
     @StateObject private var profileSettingViewModel: ProfileSettingViewModel
-    @State private var screenMode: MyCollectionScreenMode = .collectionList
-    @State private var navigationDirection: MyCollectionScreenTransitionDirection = .forward
-    @State private var isAccountActionDialogPresented = false
+    @State private var isSettingsNavigationPresented = false
     @State private var collectionListRenderID = UUID()
     @State private var selectedKillingPartSection: MyCollectionKillingPartSection = .myKillingPart
     @State private var activeConnectionSheet: ConnectionSheetType?
@@ -43,26 +41,7 @@ struct MyCollectionView: View {
     }
 
     var body: some View {
-        ZStack {
-            switch screenMode {
-            case .collectionList:
-                myFeedSection
-                    .transition(screenTransition)
-            case .profileSettings:
-                profileSettingsSection
-                    .transition(screenTransition)
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: screenMode)
-        .confirmationDialog("계정", isPresented: $isAccountActionDialogPresented, titleVisibility: .visible) {
-            Button("로그아웃", role: .destructive) {
-                viewModel.logout(onSuccess: onSessionEnded)
-            }
-            Button("회원탈퇴", role: .destructive) {
-                viewModel.deleteMyAccount(onSuccess: onSessionEnded)
-            }
-            Button("취소", role: .cancel) {}
-        }
+        myFeedSection
         .onAppear {
             Task {
                 async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
@@ -71,9 +50,7 @@ struct MyCollectionView: View {
             }
         }
         .onChange(of: viewModel.user?.identifier) { _ in
-            if screenMode == .profileSettings || profileSettingViewModel.user == nil {
-                profileSettingViewModel.syncUser(viewModel.user)
-            }
+            profileSettingViewModel.syncUser(viewModel.user)
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
             collectionListRenderID = UUID()
@@ -116,6 +93,23 @@ struct MyCollectionView: View {
             ) { removedDiaryId in
                 storesViewModel.removeStoredDiaryLocally(diaryId: removedDiaryId)
             }
+        }
+        .navigationDestination(isPresented: $isSettingsNavigationPresented) {
+            SettingsView(
+                viewModel: profileSettingViewModel,
+                onUserUpdated: { updatedUser in
+                    viewModel.applyUpdatedUser(updatedUser)
+                    profileSettingViewModel.syncUser(updatedUser)
+                },
+                onLogoutTap: {
+                    guard !viewModel.isProcessing, !profileSettingViewModel.isProcessing else { return }
+                    viewModel.logout(onSuccess: onSessionEnded)
+                },
+                onWithdrawalTap: {
+                    guard !viewModel.isProcessing, !profileSettingViewModel.isProcessing else { return }
+                    viewModel.deleteMyAccount(onSuccess: onSessionEnded)
+                }
+            )
         }
         .onChange(of: activeConnectionSheet) { sheetType in
             guard sheetType == nil, let pendingNavigationUser else { return }
@@ -206,21 +200,6 @@ struct MyCollectionView: View {
             )
         }
         .background(userCollectionNavigationLink)
-    }
-
-    private var screenTransition: AnyTransition {
-        switch navigationDirection {
-        case .forward:
-            return .asymmetric(
-                insertion: .move(edge: .trailing),
-                removal: .move(edge: .leading)
-            )
-        case .backward:
-            return .asymmetric(
-                insertion: .move(edge: .leading),
-                removal: .move(edge: .trailing)
-            )
-        }
     }
 
     private var myFeedSection: some View {
@@ -333,27 +312,7 @@ struct MyCollectionView: View {
             }
         ) {
             profileSettingViewModel.syncUser(viewModel.user)
-            navigationDirection = .forward
-            withAnimation(.easeInOut(duration: 0.2)) {
-                screenMode = .profileSettings
-            }
-        }
-    }
-
-    private var profileSettingsSection: some View {
-        MyCollectionProfileSettingsSection(
-            viewModel: profileSettingViewModel
-        ) {
-            navigationDirection = .backward
-            withAnimation(.easeInOut(duration: 0.2)) {
-                screenMode = .collectionList
-            }
-        } onAccountActionTap: {
-            guard !viewModel.isProcessing, !profileSettingViewModel.isProcessing else { return }
-            isAccountActionDialogPresented = true
-        } onUserUpdated: { updatedUser in
-            viewModel.applyUpdatedUser(updatedUser)
-            profileSettingViewModel.syncUser(updatedUser)
+            isSettingsNavigationPresented = true
         }
     }
 
@@ -508,16 +467,6 @@ private struct MyCollectionConnectionListSheet: View {
         .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
     }
-}
-
-private enum MyCollectionScreenMode {
-    case collectionList
-    case profileSettings
-}
-
-private enum MyCollectionScreenTransitionDirection {
-    case forward
-    case backward
 }
 
 struct MyCollectionDiaryRoute: Hashable {

@@ -3,6 +3,7 @@ import Foundation
 protocol AuthenticationServicing {
     func login(email: String, password: String) async -> Bool
     func loginWithKakao(accessToken: String) async throws -> AuthLoginResponse
+    func loginWithGoogle(idToken: String) async throws -> AuthLoginResponse
     func loginWithApple(identityToken: String, authorizationCode: String, email: String?, name: String?) async throws -> AuthLoginResponse
     func logout() async throws
     func deleteMyAccount() async throws
@@ -10,6 +11,7 @@ protocol AuthenticationServicing {
 
 enum AuthenticationServiceError: LocalizedError {
     case invalidKakaoAccessToken
+    case invalidGoogleIdToken
     case invalidAppleIdentityToken
     case invalidAppleAuthorizationCode
     case invalidResponse
@@ -23,6 +25,8 @@ enum AuthenticationServiceError: LocalizedError {
         switch self {
         case .invalidKakaoAccessToken:
             return "카카오 액세스 토큰이 유효하지 않아요."
+        case .invalidGoogleIdToken:
+            return "구글 ID token이 유효하지 않아요."
         case .invalidAppleIdentityToken:
             return "애플 identity token이 유효하지 않아요."
         case .invalidAppleAuthorizationCode:
@@ -82,6 +86,24 @@ struct AuthenticationService: AuthenticationServicing {
         }
 
         return try await performSocialLogin(path: "/oauth2/kakao", requestBody: requestBody)
+    }
+
+    func loginWithGoogle(idToken: String) async throws -> AuthLoginResponse {
+        let trimmedToken = idToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty else {
+            throw AuthenticationServiceError.invalidGoogleIdToken
+        }
+
+        let requestBody: Data
+        do {
+            requestBody = try JSONEncoder().encode(
+                GoogleLoginRequest(idToken: trimmedToken)
+            )
+        } catch {
+            throw AuthenticationServiceError.requestEncodingFailed
+        }
+
+        return try await performSocialLogin(path: "/oauth2/google", requestBody: requestBody)
     }
 
     func loginWithApple(identityToken: String, authorizationCode: String, email: String?, name: String?) async throws -> AuthLoginResponse {
@@ -155,6 +177,7 @@ struct AuthenticationService: AuthenticationServicing {
 
     func logout() async throws {
         do {
+            try? await FCMManager.shared.deleteToken()
             let request = APIRequest(
                 path: "/users/logout",
                 method: .post,

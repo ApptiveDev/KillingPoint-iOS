@@ -1,11 +1,15 @@
 import Foundation
 import AuthenticationServices
+import GoogleSignIn
 import KakaoSDKUser
 import UIKit
 
 protocol AuthServicing {
     @MainActor
     func loginWithKakao() async throws -> String
+
+    @MainActor
+    func loginWithGoogle() async throws -> String
 
     @MainActor
     func loginWithApple() async throws -> AppleAuthPayload
@@ -25,6 +29,10 @@ enum AuthServiceError: LocalizedError {
     case missingNativeAppKey
     case kakaoLoginFailed(underlying: Error)
     case missingKakaoAccessToken
+    case googlePresentationAnchorUnavailable
+    case googleLoginCancelled
+    case googleSignInFailed(underlying: Error)
+    case missingGoogleIDToken
     case applePresentationAnchorUnavailable
     case appleAuthorizationFailed(underlying: Error)
     case invalidAppleCredential
@@ -42,6 +50,14 @@ enum AuthServiceError: LocalizedError {
             return "카카오 로그인에 실패했어요. 다시 시도해 주세요."
         case .missingKakaoAccessToken:
             return "카카오 액세스 토큰을 가져오지 못했어요."
+        case .googlePresentationAnchorUnavailable:
+            return "구글 로그인 화면을 표시할 수 없어요. 다시 시도해 주세요."
+        case .googleLoginCancelled:
+            return "구글 로그인이 취소되었어요."
+        case .googleSignInFailed:
+            return "구글 로그인에 실패했어요. 다시 시도해 주세요."
+        case .missingGoogleIDToken:
+            return "구글 ID token을 가져오지 못했어요."
         case .applePresentationAnchorUnavailable:
             return "애플 로그인 화면을 표시할 수 없어요. 다시 시도해 주세요."
         case .appleAuthorizationFailed:
@@ -96,6 +112,32 @@ final class AuthService: NSObject, AuthServicing {
         }
 
         return try await loginWithKakaoAccount()
+    }
+
+    func loginWithGoogle() async throws -> String {
+        guard let presentingViewController = resolveGooglePresentingViewController() else {
+            throw AuthServiceError.googlePresentationAnchorUnavailable
+        }
+
+        do {
+            let signInResult = try await GIDSignIn.sharedInstance.signIn(withPresenting: presentingViewController)
+            let refreshedUser = try await signInResult.user.refreshTokensIfNeeded()
+            let idToken = refreshedUser.idToken?.tokenString
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard let idToken, !idToken.isEmpty else {
+                throw AuthServiceError.missingGoogleIDToken
+            }
+
+            return idToken
+        } catch let serviceError as AuthServiceError {
+            throw serviceError
+        } catch {
+            if isGoogleLoginCancelled(error) {
+                throw AuthServiceError.googleLoginCancelled
+            }
+            throw AuthServiceError.googleSignInFailed(underlying: error)
+        }
     }
 
     func loginWithApple() async throws -> AppleAuthPayload {
@@ -190,6 +232,47 @@ final class AuthService: NSObject, AuthServicing {
         return scenes
             .flatMap(\.windows)
             .first
+    }
+
+    private func resolveGooglePresentingViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+
+        let window = scenes
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+            ?? scenes.flatMap(\.windows).first
+
+        guard let rootViewController = window?.rootViewController else {
+            return nil
+        }
+
+        return topMostViewController(from: rootViewController)
+    }
+
+    private func topMostViewController(from viewController: UIViewController) -> UIViewController {
+        if let navigationController = viewController as? UINavigationController,
+           let visible = navigationController.visibleViewController {
+            return topMostViewController(from: visible)
+        }
+
+        if let tabBarController = viewController as? UITabBarController,
+           let selected = tabBarController.selectedViewController {
+            return topMostViewController(from: selected)
+        }
+
+        if let presented = viewController.presentedViewController {
+            return topMostViewController(from: presented)
+        }
+
+        return viewController
+    }
+
+    private func isGoogleLoginCancelled(_ error: Error) -> Bool {
+        guard let signInError = error as? GIDSignInError else {
+            return false
+        }
+        return signInError.code == .canceled
     }
 
     private func completeAppleLogin(_ result: Result<AppleAuthPayload, Error>) {

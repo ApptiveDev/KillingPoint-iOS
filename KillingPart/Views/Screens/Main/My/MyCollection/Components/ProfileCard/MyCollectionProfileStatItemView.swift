@@ -9,9 +9,12 @@ struct MyCollectionProfileStatItemView: View {
             Text(value)
                 .font(AppFont.paperlogy5Medium(size: 16))
                 .foregroundStyle(Color.kpPrimary)
+                .lineLimit(1)
             Text(title)
                 .font(AppFont.paperlogy5Medium(size: 12))
                 .foregroundStyle(Color.kpPrimary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
     }
 }

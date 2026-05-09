@@ -8,9 +8,12 @@
 import SwiftUI
 import KakaoSDKAuth
 import KakaoSDKCommon
+import GoogleSignIn
 
 @main
 struct KillingPartApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     init() {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1" {
             configureKakaoSDK()
@@ -21,6 +24,10 @@ struct KillingPartApp: App {
         WindowGroup {
             RootFlowView()
                 .onOpenURL { url in
+                    if GIDSignIn.sharedInstance.handle(url) {
+                        return
+                    }
+
                     if AuthApi.isKakaoTalkLoginUrl(url) {
                         _ = AuthController.handleOpenUrl(url: url)
                     }

@@ -82,6 +82,12 @@ struct FeedSectionView: View {
         .onChange(of: viewModel.feeds.count) { newCount in
             let hasAppendedFeed = newCount > previousFeedCount
             previousFeedCount = newCount
+            if newCount == 0 {
+                currentPageIndex = 0
+                elapsedInCurrentRange = 0
+            } else if currentPageIndex >= newCount {
+                currentPageIndex = max(newCount - 1, 0)
+            }
             if hasAppendedFeed && isPlaybackActive {
                 bumpPlaybackFocusToken()
             }
@@ -203,6 +209,12 @@ struct FeedSectionView: View {
                             diaryReportContent = ""
                             viewModel.clearDiaryReportState()
                             activeDiaryReportSheet = DiaryReportSheetContext(diaryId: feed.diaryId)
+                        },
+                        onBlockTap: {
+                            guard feed.userId > 0 else { return }
+                            Task {
+                                _ = await viewModel.blockUser(blockedId: feed.userId)
+                            }
                         },
                         onDoubleTap: {
                             handleDoubleTapLike(diaryId: feed.diaryId)
