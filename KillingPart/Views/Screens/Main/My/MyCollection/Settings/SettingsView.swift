@@ -9,6 +9,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isWithdrawalDialogPresented = false
     @StateObject private var blocklistViewModel = BlocklistViewModel()
+    
+    private let withdrawalDialogAnimation: Animation = .spring(response: 0.32, dampingFraction: 0.9)
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,18 +41,39 @@ struct SettingsView: View {
             .scrollIndicators(.hidden)
             .navigationBarBackButtonHidden()
             .overlay {
-                if isWithdrawalDialogPresented {
-                    SettingsWithdrawalDialog(
-                        onCancel: {
-                            isWithdrawalDialogPresented = false
-                        },
-                        onConfirm: {
-                            isWithdrawalDialogPresented = false
-                            onWithdrawalTap()
-                        }
-                    )
+                ZStack {
+                    if isWithdrawalDialogPresented {
+                        Color.black.opacity(0.58)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation(withdrawalDialogAnimation) {
+                                    isWithdrawalDialogPresented = false
+                                }
+                            }
+                            .transition(.opacity)
+                    }
+                    
+                    if isWithdrawalDialogPresented {
+                        SettingsWithdrawalDialog(
+                            onCancel: {
+                                withAnimation(withdrawalDialogAnimation) {
+                                    isWithdrawalDialogPresented = false
+                                }
+                            },
+                            onConfirm: {
+                                withAnimation(withdrawalDialogAnimation) {
+                                    isWithdrawalDialogPresented = false
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    onWithdrawalTap()
+                                }
+                            }
+                        )
+                        .transition(.offset(y: 18).combined(with: .opacity))
+                    }
                 }
             }
+            .animation(withdrawalDialogAnimation, value: isWithdrawalDialogPresented)
         }
         .onAppear {
             viewModel.errorMessage = nil
@@ -168,7 +191,9 @@ struct SettingsView: View {
                 .background(Color.white.opacity(0.08))
 
             Button(action: {
-                isWithdrawalDialogPresented = true
+                withAnimation(withdrawalDialogAnimation) {
+                    isWithdrawalDialogPresented = true
+                }
             }) {
                 Text("회원탈퇴")
                     .font(AppFont.paperlogy5Medium(size: 14))
@@ -257,61 +282,51 @@ private struct SettingsWithdrawalDialog: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.58)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    onCancel()
+        VStack(spacing: AppSpacing.s) {
+            Text("!")
+                .font(.system(size: 22, weight: .heavy))
+                .foregroundStyle(Color(hex: "#FF676F"))
+
+            Text("정말 탈퇴하시겠어요?")
+                .font(AppFont.paperlogy6SemiBold(size: 18))
+                .foregroundStyle(.white)
+
+            Text("기존 데이터는 즉시 삭제되며 복구할 수 없습니다.")
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: AppSpacing.s) {
+                Button(action: onCancel) {
+                    Label("돌아가기", systemImage: "arrow.left")
+                        .font(AppFont.paperlogy6SemiBold(size: 14))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
+                .buttonStyle(.plain)
 
-            VStack(spacing: AppSpacing.s) {
-                Text("!")
-                    .font(.system(size: 32, weight: .heavy))
-                    .foregroundStyle(Color(red: 1, green: 0.39, blue: 0.39))
-
-                Text("정말 탈퇴하시겠어요?")
-                    .font(AppFont.paperlogy6SemiBold(size: 26))
-                    .foregroundStyle(.white)
-
-                Text("기존 데이터는 즉시 삭제되며 복구할 수 없습니다.")
-                    .font(AppFont.paperlogy5Medium(size: 16))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-
-                HStack(spacing: AppSpacing.s) {
-                    Button(action: onCancel) {
-                        Text("취소")
-                            .font(AppFont.paperlogy6SemiBold(size: 20))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color(red: 1, green: 0.39, blue: 0.39))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: onConfirm) {
-                        Text("탈퇴하기")
-                            .font(AppFont.paperlogy6SemiBold(size: 20))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
+                Button(action: onConfirm) {
+                    Text("탈퇴하기")
+                        .font(AppFont.paperlogy6SemiBold(size: 14))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color(hex: "#FF676F"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .padding(.top, AppSpacing.s)
+                .buttonStyle(.plain)
             }
-            .padding(AppSpacing.l)
-            .frame(maxWidth: 560)
-            .background(Color(hex: "#242527"))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            }
-            .padding(.horizontal, AppSpacing.m)
+            .padding(.top, AppSpacing.s)
         }
+        .padding(AppSpacing.l)
+        .frame(maxWidth: 560)
+        .background(Color(hex: "#242527"))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        }
+        .padding(.horizontal, AppSpacing.m)
     }
 }
