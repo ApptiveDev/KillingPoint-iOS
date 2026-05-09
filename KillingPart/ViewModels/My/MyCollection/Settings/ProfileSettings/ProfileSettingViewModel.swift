@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 final class ProfileSettingViewModel: ObservableObject {
     @Published private(set) var user: UserModel?
+    @Published var nameDraft: String = ""
     @Published var tagDraft: String = ""
     @Published private(set) var isProcessing = false
     @Published var errorMessage: String?
@@ -33,24 +34,73 @@ final class ProfileSettingViewModel: ObservableObject {
         user?.profileImageURL
     }
 
+    var canSubmitNameUpdate: Bool {
+        guard !isProcessing else { return false }
+        guard let user else { return false }
+        let newName = normalizedName(nameDraft)
+        guard !newName.isEmpty else { return false }
+        guard validateName(newName) == nil else { return false }
+        return newName != normalizedName(user.username)
+    }
+
     var canSubmitTagUpdate: Bool {
         guard !isProcessing else { return false }
         guard let user else { return false }
-        let newTag = normalizedTag(from: tagDraft)
+        let newTag = normalizedTag(tagDraft)
         guard !newTag.isEmpty else { return false }
         guard validateTag(newTag) == nil else { return false }
-        return newTag != normalizedTag(from: user.tag)
+        return newTag != normalizedTag(user.tag)
     }
 
     func syncUser(_ user: UserModel?) {
         self.user = user
+        nameDraft = user?.username ?? ""
         tagDraft = user?.tag ?? ""
+    }
+
+    func updateName() async -> UserModel? {
+        guard !isProcessing else { return nil }
+
+        let newName = normalizedName(nameDraft)
+        guard !newName.isEmpty else {
+            errorMessage = "변경할 이름을 입력해 주세요."
+            successMessage = nil
+            return nil
+        }
+
+        if let validationMessage = validateName(newName) {
+            errorMessage = validationMessage
+            successMessage = nil
+            return nil
+        }
+
+        if let currentName = user?.username, normalizedName(currentName) == newName {
+            errorMessage = "현재와 다른 이름을 입력해 주세요."
+            successMessage = nil
+            return nil
+        }
+
+        isProcessing = true
+        errorMessage = nil
+        successMessage = nil
+        defer { isProcessing = false }
+
+        do {
+            let updatedUser = try await userService.updateMyUsername(username: newName)
+            applyUpdatedUser(updatedUser)
+            successMessage = "이름을 변경했어요."
+            return updatedUser
+        } catch {
+            if isRequestCancelled(error) { return nil }
+            errorMessage = resolveErrorMessage(from: error)
+            return nil
+        }
     }
 
     func updateTag() async -> UserModel? {
         guard !isProcessing else { return nil }
 
-        let newTag = normalizedTag(from: tagDraft)
+        let newTag = normalizedTag(tagDraft)
         guard !newTag.isEmpty else {
             errorMessage = "변경할 태그를 입력해 주세요."
             successMessage = nil
@@ -63,7 +113,7 @@ final class ProfileSettingViewModel: ObservableObject {
             return nil
         }
 
-        if let currentTag = user?.tag, normalizedTag(from: currentTag) == newTag {
+        if let currentTag = user?.tag, normalizedTag(currentTag) == newTag {
             errorMessage = "현재와 다른 태그를 입력해 주세요."
             successMessage = nil
             return nil
@@ -152,21 +202,28 @@ final class ProfileSettingViewModel: ObservableObject {
         }
     }
 
-    private func applyUpdatedUser(_ user: UserModel) {
-        self.user = user
-        tagDraft = user.tag
-    }
+    func validateName(_ rawName: String) -> String? {
+        let name = normalizedName(rawName)
 
-    private func normalizedTag(from rawTag: String) -> String {
-        let trimmed = rawTag.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
-        if trimmed.hasPrefix("@") {
-            return String(trimmed.dropFirst())
+        guard !name.isEmpty else {
+            return "이름을 입력해 주세요."
         }
-        return trimmed
+
+        guard (1...20).contains(name.count) else {
+            return "이름은 1자 이상 20자 이하로 입력해 주세요."
+        }
+
+        let pattern = "^[A-Za-z0-9가-힣\\s]+$"
+        if name.range(of: pattern, options: .regularExpression) == nil {
+            return "이름은 영어, 한글, 숫자, 공백만 사용할 수 있어요."
+        }
+
+        return nil
     }
 
-    private func validateTag(_ tag: String) -> String? {
+    func validateTag(_ rawTag: String) -> String? {
+        let tag = normalizedTag(rawTag)
+
         guard (4...30).contains(tag.count) else {
             return "tag는 4자 이상 30자 이하이어야 합니다."
         }
@@ -181,6 +238,25 @@ final class ProfileSettingViewModel: ObservableObject {
         }
 
         return nil
+    }
+
+    func normalizedName(_ rawName: String) -> String {
+        rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func normalizedTag(_ rawTag: String) -> String {
+        let trimmed = rawTag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        if trimmed.hasPrefix("@") {
+            return String(trimmed.dropFirst())
+        }
+        return trimmed
+    }
+
+    private func applyUpdatedUser(_ user: UserModel) {
+        self.user = user
+        nameDraft = user.username
+        tagDraft = user.tag
     }
 
     private func publicURLString(from presignedURLString: String) -> String? {

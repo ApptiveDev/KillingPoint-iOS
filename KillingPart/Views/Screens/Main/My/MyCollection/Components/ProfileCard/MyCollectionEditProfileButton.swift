@@ -6,11 +6,11 @@ struct MyCollectionEditProfileButton: View {
     var body: some View {
         Button(action: action) {
             HStack(alignment:.center,spacing: 6) {
-                Image(systemName: "square.and.pencil")
+                Image(systemName: "gearshape")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.kpPrimary)
 
-                Text("프로필 편집")
+                Text("설정")
                     .font(AppFont.paperlogy5Medium(size: 14))
                     .foregroundStyle(Color.kpPrimary)
             }
