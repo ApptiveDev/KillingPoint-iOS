@@ -10,7 +10,9 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @State private var isWithdrawalDialogPresented = false
     @State private var isWebsiteDialogPresented = false
+    @State private var isFeedbackSheetPresented = false
     @StateObject private var blocklistViewModel = BlocklistViewModel()
+    @StateObject private var settingsViewModel = SettingsViewModel()
     
     private let withdrawalDialogAnimation: Animation = .spring(response: 0.32, dampingFraction: 0.9)
     private let websiteURLString = "https://sites.google.com/view/killingpart/"
@@ -58,6 +60,7 @@ struct SettingsView: View {
                     blockManagementSection
                     appInfoSection
                     accountSection
+                    feedbackSection
 
                     if let successMessage = viewModel.successMessage {
                         Text(successMessage)
@@ -135,6 +138,22 @@ struct SettingsView: View {
             }
             .animation(withdrawalDialogAnimation, value: isWithdrawalDialogPresented)
             .animation(withdrawalDialogAnimation, value: isWebsiteDialogPresented)
+            .sheet(isPresented: $isFeedbackSheetPresented) {
+                SettingsFeedbackSheet(
+                    viewModel: settingsViewModel,
+                    onCancel: {
+                        isFeedbackSheetPresented = false
+                    },
+                    onSubmit: {
+                        Task {
+                            let isSuccess = await settingsViewModel.submitFeedback()
+                            if isSuccess {
+                                isFeedbackSheetPresented = false
+                            }
+                        }
+                    }
+                )
+            }
         }
         .onAppear {
             viewModel.errorMessage = nil
@@ -387,6 +406,24 @@ struct SettingsView: View {
             }
         }
     }
+
+    private var feedbackSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Button {
+                settingsViewModel.prepareFeedbackSheet()
+                isFeedbackSheetPresented = true
+            } label: {
+                SettingsFeedbackRowLabel()
+            }
+            .buttonStyle(.plain)
+
+            if let successMessage = settingsViewModel.feedbackSuccessMessage {
+                Text(successMessage)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(AppColors.primary600.opacity(0.95))
+            }
+        }
+    }
 }
 
 struct SettingsNavigationRowLabel: View {
@@ -451,6 +488,147 @@ private struct SettingsExternalLinkRowLabel: View {
         .padding(.horizontal, AppSpacing.m)
         .padding(.vertical, 18)
         .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsFeedbackRowLabel: View {
+    var body: some View {
+        HStack(spacing: AppSpacing.s) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(Color.kpPrimary.opacity(0.9), lineWidth: 1)
+                    .frame(width: 24, height: 24)
+
+                Image(systemName: "envelope")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.kpPrimary.opacity(0.95))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("문의 및 피드백!")
+                    .font(AppFont.paperlogy5Medium(size: 14))
+                    .foregroundStyle(.white)
+
+                Text("의견을 보내주세요!")
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, AppSpacing.m)
+        .padding(.vertical, AppSpacing.s)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.kpPrimary)
+                .frame(width: 3, height: 46)
+                .padding(.leading, 1)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        }
+    }
+}
+
+private struct SettingsFeedbackSheet: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    let onCancel: () -> Void
+    let onSubmit: () -> Void
+
+    @FocusState private var isEditorFocused: Bool
+
+    var body: some View {
+        VStack(spacing: AppSpacing.m) {
+            Text("킬링파트 팀에게 문의사항이나\n개선할 점을 알려주세요!")
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white.opacity(0.95))
+                .multilineTextAlignment(.center)
+
+            ZStack(alignment: .topLeading) {
+                TextEditor(
+                    text: Binding(
+                        get: { viewModel.feedbackContent },
+                        set: { viewModel.updateFeedbackContent($0) }
+                    )
+                )
+                .focused($isEditorFocused)
+                .font(AppFont.paperlogy4Regular(size: 14))
+                .foregroundStyle(.white)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.clear)
+
+                if viewModel.feedbackContent.isEmpty {
+                    Text("문의사항 및 피드백...")
+                        .font(AppFont.paperlogy4Regular(size: 14))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(.top, 15)
+                        .padding(.leading, 15)
+                }
+            }
+            .frame(height: 170)
+            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            }
+
+            if let errorMessage = viewModel.feedbackErrorMessage {
+                Text(errorMessage)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(Color(hex: "#FF676F"))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: AppSpacing.s) {
+                Button(action: onCancel) {
+                    Text("돌아가기")
+                        .font(AppFont.paperlogy6SemiBold(size: 14))
+                        .foregroundStyle(.black.opacity(0.9))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSubmittingFeedback)
+
+                Button(action: onSubmit) {
+                    Group {
+                        if viewModel.isSubmittingFeedback {
+                            ProgressView()
+                                .tint(.black.opacity(0.8))
+                        } else {
+                            Text("보내기")
+                                .font(AppFont.paperlogy6SemiBold(size: 14))
+                        }
+                    }
+                    .foregroundStyle(.black.opacity(0.9))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        viewModel.canSubmitFeedback ? Color.kpPrimary : Color.kpPrimary.opacity(0.45),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.canSubmitFeedback)
+            }
+        }
+        .padding(.horizontal, AppSpacing.m)
+        .padding(.top, AppSpacing.m)
+        .padding(.bottom, AppSpacing.m)
+        .presentationDetents([.height(420)])
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(viewModel.isSubmittingFeedback)
+        .presentationBackground(Color(hex: "#242527"))
+        .preferredColorScheme(.dark)
+        .onAppear {
+            isEditorFocused = true
+        }
     }
 }
 
