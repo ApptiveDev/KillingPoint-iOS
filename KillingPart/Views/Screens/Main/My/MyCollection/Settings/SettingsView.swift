@@ -303,7 +303,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color.white.opacity(0.28))
                 }
                 .padding(.horizontal, AppSpacing.m)
-                .padding(.vertical, AppSpacing.s)
+                .padding(.vertical, 18)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -428,7 +428,7 @@ private struct SettingsValueRowLabel: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, AppSpacing.m)
-        .padding(.vertical, AppSpacing.s)
+        .padding(.vertical, 18)
         .contentShape(Rectangle())
     }
 }
