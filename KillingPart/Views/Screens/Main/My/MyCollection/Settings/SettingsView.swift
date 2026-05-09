@@ -30,6 +30,7 @@ struct SettingsView: View {
 
                     accountActionCard
                 }
+                .padding(.horizontal, AppSpacing.m)
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom + AppSpacing.l, AppSpacing.l))
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
