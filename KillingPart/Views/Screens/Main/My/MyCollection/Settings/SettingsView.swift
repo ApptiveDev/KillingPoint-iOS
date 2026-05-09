@@ -7,10 +7,47 @@ struct SettingsView: View {
     let onWithdrawalTap: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var isWithdrawalDialogPresented = false
+    @State private var isWebsiteDialogPresented = false
     @StateObject private var blocklistViewModel = BlocklistViewModel()
     
     private let withdrawalDialogAnimation: Animation = .spring(response: 0.32, dampingFraction: 0.9)
+    private let websiteURLString = "https://sites.google.com/view/killingpart/"
+
+    private var isAnyDialogPresented: Bool {
+        isWithdrawalDialogPresented || isWebsiteDialogPresented
+    }
+
+    private var appVersionText: String {
+        let shortVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let buildVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedVersion: String
+        if let shortVersion, !shortVersion.isEmpty {
+            resolvedVersion = shortVersion
+        } else if let buildVersion, !buildVersion.isEmpty {
+            resolvedVersion = buildVersion
+        } else {
+            resolvedVersion = "0.0.0"
+        }
+        return "v\(resolvedVersion)"
+    }
+
+    private var loginProviderText: String {
+        let socialType = viewModel.user?.socialType.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        switch socialType.uppercased() {
+        case "KAKAO":
+            return "Kakao"
+        case "GOOGLE":
+            return "Google"
+        case "APPLE":
+            return "Apple"
+        default:
+            return socialType.isEmpty ? "-" : socialType.capitalized
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -19,6 +56,8 @@ struct SettingsView: View {
                     header
                     profileSettingsCard
                     blockManagementSection
+                    appInfoSection
+                    accountSection
 
                     if let successMessage = viewModel.successMessage {
                         Text(successMessage)
@@ -42,12 +81,13 @@ struct SettingsView: View {
             .navigationBarBackButtonHidden()
             .overlay {
                 ZStack {
-                    if isWithdrawalDialogPresented {
+                    if isAnyDialogPresented {
                         Color.black.opacity(0.58)
                             .ignoresSafeArea()
                             .onTapGesture {
                                 withAnimation(withdrawalDialogAnimation) {
                                     isWithdrawalDialogPresented = false
+                                    isWebsiteDialogPresented = false
                                 }
                             }
                             .transition(.opacity)
@@ -71,9 +111,30 @@ struct SettingsView: View {
                         )
                         .transition(.offset(y: 18).combined(with: .opacity))
                     }
+
+                    if isWebsiteDialogPresented {
+                        SettingsWebsiteRedirectDialog(
+                            onCancel: {
+                                withAnimation(withdrawalDialogAnimation) {
+                                    isWebsiteDialogPresented = false
+                                }
+                            },
+                            onConfirm: {
+                                withAnimation(withdrawalDialogAnimation) {
+                                    isWebsiteDialogPresented = false
+                                }
+                                guard let url = URL(string: websiteURLString) else { return }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    openURL(url)
+                                }
+                            }
+                        )
+                        .transition(.offset(y: 18).combined(with: .opacity))
+                    }
                 }
             }
             .animation(withdrawalDialogAnimation, value: isWithdrawalDialogPresented)
+            .animation(withdrawalDialogAnimation, value: isWebsiteDialogPresented)
         }
         .onAppear {
             viewModel.errorMessage = nil
@@ -254,6 +315,78 @@ struct SettingsView: View {
             }
         }
     }
+
+    private var appInfoSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text("앱 정보")
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(Color.white.opacity(0.62))
+
+            VStack(spacing: 0) {
+                SettingsValueRowLabel(
+                    title: "앱 버전",
+                    value: appVersionText
+                )
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+
+                NavigationLink {
+                    ServiceTermView()
+                } label: {
+                    SettingsNavigationRowLabel(title: "이용약관")
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+
+                NavigationLink {
+                    PrivacyPolicyView()
+                } label: {
+                    SettingsNavigationRowLabel(title: "개인정보처리방침")
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .background(Color.white.opacity(0.08))
+
+                Button(action: {
+                    withAnimation(withdrawalDialogAnimation) {
+                        isWebsiteDialogPresented = true
+                    }
+                }) {
+                    SettingsExternalLinkRowLabel(title: "웹사이트")
+                }
+                .buttonStyle(.plain)
+            }
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
+        }
+    }
+
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text("계정")
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(Color.white.opacity(0.62))
+
+            SettingsValueRowLabel(
+                title: "로그인 정보",
+                value: loginProviderText
+            )
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
+        }
+    }
 }
 
 struct SettingsNavigationRowLabel: View {
@@ -268,6 +401,50 @@ struct SettingsNavigationRowLabel: View {
             Spacer()
 
             Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.35))
+        }
+        .padding(.horizontal, AppSpacing.m)
+        .padding(.vertical, 18)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsValueRowLabel: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: AppSpacing.s) {
+            Text(title)
+                .font(AppFont.paperlogy4Regular(size: 14))
+                .foregroundStyle(Color.white)
+
+            Spacer(minLength: AppSpacing.s)
+
+            Text(value)
+                .font(AppFont.paperlogy4Regular(size: 13))
+                .foregroundStyle(Color.white.opacity(0.3))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, AppSpacing.m)
+        .padding(.vertical, AppSpacing.s)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsExternalLinkRowLabel: View {
+    let title: String
+
+    var body: some View {
+        HStack(spacing: AppSpacing.s) {
+            Text(title)
+                .font(AppFont.paperlogy4Regular(size: 14))
+                .foregroundStyle(Color.white)
+
+            Spacer(minLength: AppSpacing.s)
+
+            Image(systemName: "arrow.up.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.35))
         }
@@ -318,6 +495,54 @@ private struct SettingsWithdrawalDialog: View {
                 .buttonStyle(.plain)
             }
             .padding(.top, AppSpacing.s)
+        }
+        .padding(AppSpacing.l)
+        .frame(maxWidth: 560)
+        .background(Color(hex: "#242527"))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        }
+        .padding(.horizontal, AppSpacing.m)
+    }
+}
+
+private struct SettingsWebsiteRedirectDialog: View {
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        VStack(spacing: AppSpacing.m) {
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(Color.kpPrimary)
+
+            Text("외부 웹사이트로 이동합니다.")
+                .font(AppFont.paperlogy5Medium(size: 14))
+                .foregroundStyle(.white.opacity(0.95))
+
+            HStack(spacing: AppSpacing.s) {
+                Button(action: onCancel) {
+                    Text("취소")
+                        .font(AppFont.paperlogy6SemiBold(size: 14))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onConfirm) {
+                    Text("이동하기")
+                        .font(AppFont.paperlogy6SemiBold(size: 14))
+                        .foregroundStyle(.black.opacity(0.9))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color.kpPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(AppSpacing.l)
         .frame(maxWidth: 560)
