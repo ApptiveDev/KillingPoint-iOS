@@ -6,12 +6,22 @@ final class SettingsViewModel: ObservableObject {
     @Published private(set) var isSubmittingFeedback = false
     @Published var feedbackErrorMessage: String?
     @Published var feedbackSuccessMessage: String?
+    @Published private(set) var isNotificationEnabled = false
+    @Published private(set) var isLoadingNotificationSetting = false
+    @Published private(set) var isUpdatingNotificationSetting = false
+    @Published var notificationSettingErrorMessage: String?
 
     private let surveyService: SurveyServicing
+    private let notificationService: NotificationServicing
     private let maxFeedbackLength = 1000
+    private var hasLoadedNotificationSetting = false
 
-    init(surveyService: SurveyServicing = SurveyService()) {
+    init(
+        surveyService: SurveyServicing = SurveyService(),
+        notificationService: NotificationServicing = NotificationService()
+    ) {
         self.surveyService = surveyService
+        self.notificationService = notificationService
     }
 
     var canSubmitFeedback: Bool {
@@ -24,6 +34,34 @@ final class SettingsViewModel: ObservableObject {
     func prepareFeedbackSheet() {
         feedbackErrorMessage = nil
         feedbackSuccessMessage = nil
+    }
+
+    func loadNotificationSettingIfNeeded() async {
+        guard !hasLoadedNotificationSetting else { return }
+        await loadNotificationSetting()
+    }
+
+    func updateNotificationSetting(_ isEnabled: Bool) async {
+        guard !isUpdatingNotificationSetting else { return }
+
+        let previousValue = isNotificationEnabled
+        isNotificationEnabled = isEnabled
+        isUpdatingNotificationSetting = true
+        notificationSettingErrorMessage = nil
+        defer { isUpdatingNotificationSetting = false }
+
+        do {
+            let response = try await notificationService.updateMyNotificationSetting(alarmEnabled: isEnabled)
+            isNotificationEnabled = response.alarmEnabled
+            hasLoadedNotificationSetting = true
+        } catch {
+            if isRequestCancelled(error) {
+                isNotificationEnabled = previousValue
+                return
+            }
+            isNotificationEnabled = previousValue
+            notificationSettingErrorMessage = resolveErrorMessage(from: error, defaultMessage: "알림 설정 변경에 실패했어요.")
+        }
     }
 
     func updateFeedbackContent(_ content: String) {
@@ -64,26 +102,47 @@ final class SettingsViewModel: ObservableObject {
             return true
         } catch {
             if isRequestCancelled(error) { return false }
-            feedbackErrorMessage = resolveErrorMessage(from: error)
+            feedbackErrorMessage = resolveErrorMessage(from: error, defaultMessage: "문의 전송에 실패했어요.")
             feedbackSuccessMessage = nil
             return false
         }
     }
 
-    private func resolveErrorMessage(from error: Error) -> String {
+    private func loadNotificationSetting() async {
+        guard !isLoadingNotificationSetting else { return }
+
+        isLoadingNotificationSetting = true
+        notificationSettingErrorMessage = nil
+        defer { isLoadingNotificationSetting = false }
+
+        do {
+            let response = try await notificationService.fetchMyNotificationSetting()
+            isNotificationEnabled = response.alarmEnabled
+            hasLoadedNotificationSetting = true
+        } catch {
+            if isRequestCancelled(error) { return }
+            notificationSettingErrorMessage = resolveErrorMessage(from: error, defaultMessage: "알림 설정을 불러오지 못했어요.")
+        }
+    }
+
+    private func resolveErrorMessage(from error: Error, defaultMessage: String) -> String {
         if let surveyError = error as? SurveyServiceError {
-            return surveyError.errorDescription ?? "문의 전송에 실패했어요."
+            return surveyError.errorDescription ?? defaultMessage
+        }
+
+        if let notificationError = error as? NotificationServiceError {
+            return notificationError.errorDescription ?? defaultMessage
         }
 
         if let apiError = error as? APIClientError {
-            return apiError.errorDescription ?? "문의 전송에 실패했어요."
+            return apiError.errorDescription ?? defaultMessage
         }
 
         if let localizedError = error as? LocalizedError {
-            return localizedError.errorDescription ?? "문의 전송에 실패했어요."
+            return localizedError.errorDescription ?? defaultMessage
         }
 
-        return "문의 전송에 실패했어요."
+        return defaultMessage
     }
 
     private func isRequestCancelled(_ error: Error) -> Bool {

@@ -58,6 +58,7 @@ struct SettingsView: View {
                     header
                     profileSettingsCard
                     blockManagementSection
+                    notificationSection
                     appInfoSection
                     accountSection
                     feedbackSection
@@ -160,6 +161,7 @@ struct SettingsView: View {
             viewModel.successMessage = nil
             Task {
                 await blocklistViewModel.loadInitialDataIfNeeded()
+                await settingsViewModel.loadNotificationSettingIfNeeded()
             }
         }
     }
@@ -193,14 +195,14 @@ struct SettingsView: View {
                     iconSize: 28
                 )
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(viewModel.displayName)
-                        .font(AppFont.paperlogy6SemiBold(size: 18))
+                        .font(AppFont.paperlogy6SemiBold(size: 16))
                         .foregroundStyle(Color.white)
                         .lineLimit(1)
 
                     Text(viewModel.displayTag)
-                        .font(AppFont.paperlogy4Regular(size: 15))
+                        .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(Color.white.opacity(0.85))
                         .lineLimit(1)
                 }
@@ -331,6 +333,55 @@ struct SettingsView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
+        }
+    }
+
+    private var notificationSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text("알림설정")
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(Color.white.opacity(0.62))
+
+            HStack(spacing: AppSpacing.s) {
+                Text("알림")
+                    .font(AppFont.paperlogy4Regular(size: 14))
+                    .foregroundStyle(.white)
+
+                Spacer(minLength: AppSpacing.s)
+
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { settingsViewModel.isNotificationEnabled },
+                        set: { newValue in
+                            Task {
+                                await settingsViewModel.updateNotificationSetting(newValue)
+                            }
+                        }
+                    )
+                )
+                .labelsHidden()
+                .tint(Color.kpPrimary)
+                .disabled(
+                    settingsViewModel.isLoadingNotificationSetting ||
+                    settingsViewModel.isUpdatingNotificationSetting
+                )
+            }
+            .padding(.horizontal, AppSpacing.m)
+            .padding(.vertical, 18)
+            .contentShape(Rectangle())
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
+
+            if let errorMessage = settingsViewModel.notificationSettingErrorMessage {
+                Text(errorMessage)
+                    .font(AppFont.paperlogy4Regular(size: 12))
+                    .foregroundStyle(Color(hex: "#FF676F"))
             }
         }
     }
