@@ -9,38 +9,44 @@ struct ProfileImageEdit: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.l) {
-            SettingsSubpageHeader(title: "프로필 이미지") {
+        let horizontalPadding = AppSpacing.l
+        
+        VStack(spacing: 0) {
+            SettingsSubpageHeader(
+                title: "프로필 이미지",
+                titleColor: .white,
+                titleFontSize: 20,
+                backButtonColor: .white
+            ) {
                 dismiss()
             }
+            .padding(.horizontal, horizontalPadding)
 
-            profileImageSection
+            VStack(alignment: .leading, spacing: AppSpacing.l) {
+                profileImageSection
 
-            imageActionCard
+                imageActionCard
 
-            if let successMessage = viewModel.successMessage {
-                Text(successMessage)
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(AppColors.primary600.opacity(0.95))
+                if let successMessage = viewModel.successMessage {
+                    Text(successMessage)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(AppColors.primary600.opacity(0.95))
+                }
+
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(.red.opacity(0.95))
+                }
             }
-
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(.red.opacity(0.95))
-            }
-
+            .padding(.horizontal, horizontalPadding)
+            .padding(.top, AppSpacing.s)
+            
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, AppSpacing.m)
-        .padding(.top, AppSpacing.s)
         .background(
-            LinearGradient(
-                colors: [Color.black, Color(hex: "#10131B")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            Color.black
+                .ignoresSafeArea()
         )
         .onAppear {
             viewModel.errorMessage = nil

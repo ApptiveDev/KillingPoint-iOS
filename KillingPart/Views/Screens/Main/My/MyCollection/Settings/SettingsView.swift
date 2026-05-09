@@ -8,6 +8,7 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isWithdrawalDialogPresented = false
+    @StateObject private var blocklistViewModel = BlocklistViewModel()
 
     var body: some View {
         GeometryReader { geometry in
@@ -15,6 +16,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: AppSpacing.m) {
                     header
                     profileSettingsCard
+                    blockManagementSection
 
                     if let successMessage = viewModel.successMessage {
                         Text(successMessage)
@@ -53,6 +55,9 @@ struct SettingsView: View {
         .onAppear {
             viewModel.errorMessage = nil
             viewModel.successMessage = nil
+            Task {
+                await blocklistViewModel.loadInitialDataIfNeeded()
+            }
         }
     }
 
@@ -178,6 +183,50 @@ struct SettingsView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+    
+    private var blockManagementSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text("차단 관리")
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(Color.white.opacity(0.62))
+            
+            NavigationLink {
+                BlocklistView(viewModel: blocklistViewModel)
+            } label: {
+                HStack(spacing: AppSpacing.s) {
+                    Text("차단 목록")
+                        .font(AppFont.paperlogy4Regular(size: 14))
+                        .foregroundStyle(.white)
+                    
+                    Spacer(minLength: 0)
+                    
+                    if blocklistViewModel.isLoadingInitial && blocklistViewModel.totalBlockedUsers == 0 {
+                        ProgressView()
+                            .tint(Color.white.opacity(0.6))
+                            .scaleEffect(0.8)
+                    } else {
+                        Text(blocklistViewModel.blockedUsersCountText)
+                            .font(AppFont.paperlogy4Regular(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.28))
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.28))
+                }
+                .padding(.horizontal, AppSpacing.m)
+                .padding(.vertical, AppSpacing.s)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
         }
     }
 }
