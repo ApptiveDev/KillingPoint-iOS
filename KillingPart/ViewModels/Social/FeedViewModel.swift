@@ -14,11 +14,13 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var isLoadingLikeUsers = false
     @Published private(set) var isLoadingMoreLikeUsers = false
     @Published private(set) var isReportingDiary = false
+    @Published private(set) var isBlockingUser = false
     @Published var errorMessage: String?
     @Published var likeUsersErrorMessage: String?
     @Published var reportErrorMessage: String?
 
     private let diaryService: DiaryServicing
+    private let userService: UserServicing
     private let feedSource: FeedSource
     private var hasLoadedInitialData = false
     private var nextPage = DiaryService.defaultPage
@@ -35,9 +37,11 @@ final class FeedViewModel: ObservableObject {
 
     init(
         diaryService: DiaryServicing = DiaryService(),
+        userService: UserServicing = UserService(),
         feedSource: FeedSource = .myFeeds
     ) {
         self.diaryService = diaryService
+        self.userService = userService
         self.feedSource = feedSource
     }
 
@@ -311,6 +315,25 @@ final class FeedViewModel: ObservableObject {
             return false
         }
     }
+    
+    func blockUser(blockedId: Int) async -> Bool {
+        guard blockedId > 0 else { return false }
+        guard !isBlockingUser else { return false }
+
+        errorMessage = nil
+        isBlockingUser = true
+        defer { isBlockingUser = false }
+
+        do {
+            try await userService.blockUser(blockedId: blockedId)
+            feeds.removeAll { $0.userId == blockedId }
+            return true
+        } catch {
+            if isRequestCancelled(error) { return false }
+            errorMessage = resolveErrorMessage(from: error)
+            return false
+        }
+    }
 
     private func appendFeeds(with newFeeds: [DiaryFeedModel]) {
         let existingIDs = Set(feeds.map(\.id))
@@ -363,6 +386,10 @@ final class FeedViewModel: ObservableObject {
     private func resolveErrorMessage(from error: Error) -> String {
         if let diaryError = error as? DiaryServiceError {
             return diaryError.errorDescription ?? "피드 목록을 불러오지 못했어요."
+        }
+        
+        if let userError = error as? UserServiceError {
+            return userError.errorDescription ?? "요청 처리에 실패했어요."
         }
 
         if let apiError = error as? APIClientError {

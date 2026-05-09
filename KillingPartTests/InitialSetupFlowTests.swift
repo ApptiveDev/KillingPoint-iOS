@@ -120,6 +120,8 @@ private final class MockUserService: UserServicing {
     func searchUsers(searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse {
         .init(content: [], page: .init(size: 0, number: 0, totalElements: 0, totalPages: 0))
     }
+    
+    func blockUser(blockedId: Int) async throws {}
 
     func deleteMyProfileImage() async throws -> UserModel {
         try await fetchMyUser()
