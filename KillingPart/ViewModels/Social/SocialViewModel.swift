@@ -14,33 +14,52 @@ final class SocialViewModel: ObservableObject {
     @Published private(set) var isLoadingMoreMyPick = false
     @Published private(set) var isLoadingMoreMyFandom = false
     @Published private(set) var isLoadingMoreSearchedUsers = false
+    @Published private(set) var alarms: [AlarmHistoryItem] = []
+    @Published private(set) var isLoadingAlarms = false
+    @Published private(set) var isLoadingMoreAlarms = false
+    @Published private(set) var alarmsErrorMessage: String?
+    @Published private(set) var hasUnreadAlarms = false
+    @Published private(set) var selectedAlarmIDs: Set<Int> = []
+    @Published var isAlarmSelectionMode = false
     @Published var errorMessage: String?
     @Published var currentSearchQuery = ""
 
     private let userService: UserServicing
     private let subscribeService: SubscribeServicing
     private let diaryService: DiaryServicing
+    private let notificationService: NotificationServicing
+    private let userDefaults: UserDefaults
     private var myUserID: Int?
     private var hasLoadedInitialData = false
+    private var hasLoadedInitialAlarms = false
 
     private var myPickNextPage = SubscribeService.defaultPage
     private var myFandomNextPage = SubscribeService.defaultPage
     private var searchedUsersNextPage = UserService.defaultPage
+    private var alarmsNextPage = 0
     private var hasNextMyPickPage = true
     private var hasNextMyFandomPage = true
     private var hasNextSearchedUsersPage = true
+    private var hasNextAlarmsPage = true
     private var isRefreshing = false
+    private var readAlarmIDs: Set<Int> = []
     private let maxPaginationRecoveryAttempts = 3
     private let maxAutoPaginationStallAttempts = 6
+    private let alarmPageSize = 20
+    private let alarmReadIDStorageKeyPrefix = "social.readAlarmIDs.user"
 
     init(
         userService: UserServicing = UserService(),
         subscribeService: SubscribeServicing = SubscribeService(),
-        diaryService: DiaryServicing = DiaryService()
+        diaryService: DiaryServicing = DiaryService(),
+        notificationService: NotificationServicing = NotificationService(),
+        userDefaults: UserDefaults = .standard
     ) {
         self.userService = userService
         self.subscribeService = subscribeService
         self.diaryService = diaryService
+        self.notificationService = notificationService
+        self.userDefaults = userDefaults
     }
 
     var isSearching: Bool {
@@ -164,6 +183,118 @@ final class SocialViewModel: ObservableObject {
             return searchedUserTotalCount
         }
         return isMyPickSection ? myPickTotalCount : myFandomTotalCount
+    }
+
+    func refreshAlarms() async {
+        guard !isLoadingAlarms else { return }
+        isLoadingAlarms = true
+        defer { isLoadingAlarms = false }
+
+        alarmsErrorMessage = nil
+        resetAlarmPagingState()
+
+        do {
+            try await ensureMyUserID()
+            loadReadAlarmIDsFromStorage()
+
+            let response = try await notificationService.fetchAlarmHistory(
+                page: 0,
+                size: alarmPageSize
+            )
+            alarms = response.content.filter { $0.alarmId > 0 }
+            updateAlarmsPaging(from: response)
+            hasLoadedInitialAlarms = true
+            reconcileReadAlarmIDs()
+        } catch {
+            if isRequestCancelled(error) { return }
+            alarmsErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func loadAlarmHistoryIfNeeded() async {
+        guard !hasLoadedInitialAlarms else { return }
+        await refreshAlarms()
+    }
+
+    func loadMoreAlarmHistoryIfNeeded(currentAlarmId: Int) async {
+        guard alarms.last?.alarmId == currentAlarmId else { return }
+        guard hasNextAlarmsPage else { return }
+        guard !isLoadingAlarms, !isLoadingMoreAlarms else { return }
+
+        isLoadingMoreAlarms = true
+        defer { isLoadingMoreAlarms = false }
+
+        do {
+            let response = try await notificationService.fetchAlarmHistory(
+                page: alarmsNextPage,
+                size: alarmPageSize
+            )
+            appendAlarms(with: response.content)
+            updateAlarmsPaging(from: response)
+            reconcileReadAlarmIDs()
+        } catch {
+            if isRequestCancelled(error) { return }
+            alarmsErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func isAlarmRead(_ alarmId: Int) -> Bool {
+        readAlarmIDs.contains(alarmId)
+    }
+
+    func markAlarmAsRead(_ alarmId: Int) {
+        guard !readAlarmIDs.contains(alarmId) else { return }
+        readAlarmIDs.insert(alarmId)
+        persistReadAlarmIDs()
+        updateUnreadAlarmIndicator()
+    }
+
+    func setAlarmSelectionMode(_ isEnabled: Bool) {
+        isAlarmSelectionMode = isEnabled
+        if !isEnabled {
+            selectedAlarmIDs.removeAll()
+        }
+    }
+
+    func toggleAlarmSelection(_ alarmId: Int) {
+        if selectedAlarmIDs.contains(alarmId) {
+            selectedAlarmIDs.remove(alarmId)
+        } else {
+            selectedAlarmIDs.insert(alarmId)
+        }
+    }
+
+    func toggleSelectAllAlarms() {
+        let allIDs = Set(alarms.map(\.alarmId))
+        if allIDs.isEmpty {
+            selectedAlarmIDs.removeAll()
+            return
+        }
+
+        if selectedAlarmIDs.count == allIDs.count {
+            selectedAlarmIDs.removeAll()
+        } else {
+            selectedAlarmIDs = allIDs
+        }
+    }
+
+    func markSelectedAlarmsAsRead() {
+        guard !selectedAlarmIDs.isEmpty else { return }
+        readAlarmIDs.formUnion(selectedAlarmIDs)
+        persistReadAlarmIDs()
+        updateUnreadAlarmIndicator()
+        selectedAlarmIDs.removeAll()
+        isAlarmSelectionMode = false
+    }
+
+    func markAllAlarmsAsRead() {
+        let allIDs = Set(alarms.map(\.alarmId))
+        guard !allIDs.isEmpty else { return }
+        readAlarmIDs.formUnion(allIDs)
+        persistReadAlarmIDs()
+        updateUnreadAlarmIndicator()
+        selectedAlarmIDs.removeAll()
+        isAlarmSelectionMode = false
     }
 
     func makeSocialMyCollectionViewModel(for user: SocialListUser, fallbackIsMyPick: Bool?) -> SocialMyCollectionViewModel {
@@ -412,6 +543,12 @@ final class SocialViewModel: ObservableObject {
         return filtered.count
     }
 
+    private func appendAlarms(with newAlarms: [AlarmHistoryItem]) {
+        let existingIDs = Set(alarms.map(\.alarmId))
+        let filtered = newAlarms.filter { $0.alarmId > 0 && !existingIDs.contains($0.alarmId) }
+        alarms.append(contentsOf: filtered)
+    }
+
     private func updateMyPickPaging(from response: SubscribeListResponse, requestedPage: Int) {
         myPickNextPage = max(requestedPage, SubscribeService.defaultPage) + 1
         let totalPages = max(response.page.totalPages, 0)
@@ -439,6 +576,14 @@ final class SocialViewModel: ObservableObject {
         searchedUserTotalCount = max(response.page.totalElements, 0)
     }
 
+    private func updateAlarmsPaging(from response: AlarmHistoryResponse) {
+        alarmsNextPage = max(response.page.number, 0) + 1
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = alarmsNextPage < totalPages
+        let hasNextByCount = response.content.count >= alarmPageSize
+        hasNextAlarmsPage = hasNextByPage || hasNextByCount
+    }
+
     private func resetDefaultPagingState() {
         myPickUsers = []
         myFandomUsers = []
@@ -457,12 +602,62 @@ final class SocialViewModel: ObservableObject {
         hasNextSearchedUsersPage = true
     }
 
+    private func resetAlarmPagingState() {
+        alarms = []
+        alarmsNextPage = 0
+        hasNextAlarmsPage = true
+        selectedAlarmIDs.removeAll()
+        isAlarmSelectionMode = false
+    }
+
     private func clearSearchState() {
         currentSearchQuery = ""
         searchedUsers = []
         searchedUserTotalCount = 0
         searchedUsersNextPage = UserService.defaultPage
         hasNextSearchedUsersPage = true
+    }
+
+    private func ensureMyUserID() async throws {
+        if myUserID != nil { return }
+        let myUser = try await userService.fetchMyUser()
+        myUserID = myUser.userId
+    }
+
+    private func loadReadAlarmIDsFromStorage() {
+        guard let key = resolvedReadAlarmIDStorageKey() else { return }
+
+        if let storedIDs = userDefaults.array(forKey: key) as? [Int] {
+            readAlarmIDs = Set(storedIDs)
+            return
+        }
+
+        if let storedStrings = userDefaults.array(forKey: key) as? [String] {
+            readAlarmIDs = Set(storedStrings.compactMap { Int($0) })
+            return
+        }
+
+        readAlarmIDs = []
+    }
+
+    private func persistReadAlarmIDs() {
+        guard let key = resolvedReadAlarmIDStorageKey() else { return }
+        userDefaults.set(Array(readAlarmIDs), forKey: key)
+    }
+
+    private func reconcileReadAlarmIDs() {
+        // Keep local read history across paged fetches so previously read items
+        // do not revert to unread when they are not in the current page.
+        updateUnreadAlarmIndicator()
+    }
+
+    private func updateUnreadAlarmIndicator() {
+        hasUnreadAlarms = alarms.contains { !readAlarmIDs.contains($0.alarmId) }
+    }
+
+    private func resolvedReadAlarmIDStorageKey() -> String? {
+        guard let myUserID else { return nil }
+        return "\(alarmReadIDStorageKeyPrefix).\(myUserID)"
     }
 
     private func setLoadingState(for section: SocialSection, mode: LoadingMode, isLoading: Bool) {
@@ -504,6 +699,10 @@ final class SocialViewModel: ObservableObject {
 
         if let diaryError = error as? DiaryServiceError {
             return diaryError.errorDescription ?? "피드 목록을 불러오지 못했어요."
+        }
+
+        if let notificationError = error as? NotificationServiceError {
+            return notificationError.errorDescription ?? "알림 목록을 불러오지 못했어요."
         }
 
         if let apiError = error as? APIClientError {

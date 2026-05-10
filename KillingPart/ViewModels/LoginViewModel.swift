@@ -13,6 +13,7 @@ final class LoginViewModel: ObservableObject {
     @Published var loginErrorMessage: String?
     @Published private(set) var isNewUser = false
     @Published private(set) var activeSocialLoginProvider: SocialLoginProvider?
+    @Published private(set) var lastSuccessfulLoginProvider: SocialLoginProvider?
 
     var onLoginSuccess: ((Bool) -> Void)?
 
@@ -35,6 +36,7 @@ final class LoginViewModel: ObservableObject {
         isLoading = true
         loginErrorMessage = nil
         activeSocialLoginProvider = nil
+        lastSuccessfulLoginProvider = nil
 
         Task {
             let isSuccess = await authenticationService.login(email: email, password: password)
@@ -42,6 +44,7 @@ final class LoginViewModel: ObservableObject {
 
             if isSuccess {
                 isNewUser = false
+                lastSuccessfulLoginProvider = nil
                 onLoginSuccess?(false)
             } else {
                 loginErrorMessage = "이메일과 비밀번호를 입력해주세요."
@@ -59,6 +62,7 @@ final class LoginViewModel: ObservableObject {
                 let kakaoAccessToken = try await authService.loginWithKakao()
                 let response = try await authenticationService.loginWithKakao(accessToken: kakaoAccessToken)
                 isNewUser = response.isNew
+                lastSuccessfulLoginProvider = .kakao
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
@@ -85,6 +89,7 @@ final class LoginViewModel: ObservableObject {
                     name: applePayload.name
                 )
                 isNewUser = response.isNew
+                lastSuccessfulLoginProvider = .apple
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
@@ -106,6 +111,7 @@ final class LoginViewModel: ObservableObject {
                 let googleIDToken = try await authService.loginWithGoogle()
                 let response = try await authenticationService.loginWithGoogle(idToken: googleIDToken)
                 isNewUser = response.isNew
+                lastSuccessfulLoginProvider = .google
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
@@ -126,6 +132,7 @@ final class LoginViewModel: ObservableObject {
             do {
                 _ = try await authService.loginWithTester()
                 isNewUser = true
+                lastSuccessfulLoginProvider = .tester
                 onLoginSuccess?(true)
             } catch let socialError as AuthServiceError {
                 loginErrorMessage = socialError.errorDescription
@@ -140,6 +147,7 @@ final class LoginViewModel: ObservableObject {
         loginErrorMessage = nil
         isNewUser = false
         activeSocialLoginProvider = nil
+        lastSuccessfulLoginProvider = nil
     }
 
     private func startSocialLogin(for provider: SocialLoginProvider) -> Bool {
