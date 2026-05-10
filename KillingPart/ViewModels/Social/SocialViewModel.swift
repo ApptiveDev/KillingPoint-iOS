@@ -201,7 +201,7 @@ final class SocialViewModel: ObservableObject {
                 page: 0,
                 size: alarmPageSize
             )
-            alarms = response.content
+            alarms = response.content.filter { $0.alarmId > 0 }
             updateAlarmsPaging(from: response)
             hasLoadedInitialAlarms = true
             reconcileReadAlarmIDs()
@@ -545,7 +545,7 @@ final class SocialViewModel: ObservableObject {
 
     private func appendAlarms(with newAlarms: [AlarmHistoryItem]) {
         let existingIDs = Set(alarms.map(\.alarmId))
-        let filtered = newAlarms.filter { !existingIDs.contains($0.alarmId) }
+        let filtered = newAlarms.filter { $0.alarmId > 0 && !existingIDs.contains($0.alarmId) }
         alarms.append(contentsOf: filtered)
     }
 
@@ -646,9 +646,8 @@ final class SocialViewModel: ObservableObject {
     }
 
     private func reconcileReadAlarmIDs() {
-        let visibleAlarmIDs = Set(alarms.map(\.alarmId))
-        readAlarmIDs = readAlarmIDs.intersection(visibleAlarmIDs)
-        persistReadAlarmIDs()
+        // Keep local read history across paged fetches so previously read items
+        // do not revert to unread when they are not in the current page.
         updateUnreadAlarmIndicator()
     }
 

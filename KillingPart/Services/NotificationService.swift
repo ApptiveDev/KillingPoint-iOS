@@ -18,6 +18,45 @@ struct AlarmHistoryItem: Decodable, Identifiable, Hashable {
     let createDate: String?
 
     var id: Int { alarmId }
+
+    private enum CodingKeys: String, CodingKey {
+        case alarmId
+        case title
+        case content
+        case deepLink
+        case createDate
+        case createdDate
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if let intValue = try? container.decode(Int.self, forKey: .alarmId) {
+            alarmId = intValue
+        } else if
+            let stringValue = try? container.decode(String.self, forKey: .alarmId),
+            let intValue = Int(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        {
+            alarmId = intValue
+        } else {
+            alarmId = 0
+        }
+
+        title = (try? container.decode(String.self, forKey: .title)) ?? ""
+        content = (try? container.decode(String.self, forKey: .content)) ?? ""
+        deepLink = (try? container.decode(String.self, forKey: .deepLink)) ?? ""
+
+        if let createDateValue = try? container.decodeIfPresent(String.self, forKey: .createDate), !createDateValue.isEmpty {
+            createDate = createDateValue
+        } else if let createdDateValue = try? container.decodeIfPresent(String.self, forKey: .createdDate), !createdDateValue.isEmpty {
+            createDate = createdDateValue
+        } else if let createdAtValue = try? container.decodeIfPresent(String.self, forKey: .createdAt), !createdAtValue.isEmpty {
+            createDate = createdAtValue
+        } else {
+            createDate = nil
+        }
+    }
 }
 
 struct AlarmHistoryPage: Decodable {

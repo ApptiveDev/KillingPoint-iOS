@@ -4,12 +4,10 @@ struct NotificationListView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: SocialViewModel
 
-    @State private var selectedAlarmForDetail: AlarmHistoryItem?
-    @State private var isDetailCardFloating = false
-
     var body: some View {
         GeometryReader { geometry in
             let bottomInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m)
+            let listBottomInset = bottomInset + 56
 
             ZStack {
                 Image("my_background")
@@ -20,7 +18,7 @@ struct NotificationListView: View {
                 VStack(spacing: 0) {
                     header
                         .padding(.horizontal, AppSpacing.m)
-                        .padding(.top, AppSpacing.s)
+                        .padding(.top, 0)
                         .padding(.bottom, AppSpacing.s)
 
                     if viewModel.isAlarmSelectionMode {
@@ -29,16 +27,10 @@ struct NotificationListView: View {
                             .padding(.bottom, AppSpacing.s)
                     }
 
-                    content
+                    content(listBottomInset: listBottomInset)
                         .padding(.horizontal, AppSpacing.m)
                 }
                 .padding(.bottom, bottomInset)
-
-                if let selectedAlarmForDetail {
-                    alarmDetailOverlay(for: selectedAlarmForDetail)
-                        .transition(.opacity)
-                        .zIndex(10)
-                }
             }
         }
         .navigationBarBackButtonHidden()
@@ -71,10 +63,11 @@ struct NotificationListView: View {
 
             HStack(spacing: AppSpacing.xs) {
                 Image(systemName: "bell")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.kpPrimary)
+
                 Text("알림 목록")
-                    .font(AppFont.paperlogy7Bold(size: 20))
+                    .font(AppFont.paperlogy6SemiBold(size: 18))
                     .foregroundStyle(Color.kpPrimary)
             }
 
@@ -145,7 +138,7 @@ struct NotificationListView: View {
     }
 
     @ViewBuilder
-    private var content: some View {
+    private func content(listBottomInset: CGFloat) -> some View {
         if viewModel.isLoadingAlarms {
             ProgressView()
                 .tint(AppColors.primary600)
@@ -192,171 +185,80 @@ struct NotificationListView: View {
                             .padding(.vertical, AppSpacing.s)
                     }
                 }
-                .padding(.bottom, AppSpacing.xl)
+                .padding(.bottom, listBottomInset)
             }
+            .scrollIndicators(.hidden)
         }
     }
 
+    @ViewBuilder
     private func alarmRow(for alarm: AlarmHistoryItem) -> some View {
-        let isRead = viewModel.isAlarmRead(alarm.alarmId)
         let isSelected = viewModel.selectedAlarmIDs.contains(alarm.alarmId)
-        let rowOpacity = isRead ? 0.36 : 1
 
-        return Button {
-            if viewModel.isAlarmSelectionMode {
+        if viewModel.isAlarmSelectionMode {
+            Button {
                 viewModel.toggleAlarmSelection(alarm.alarmId)
-                return
+            } label: {
+                alarmRowContent(for: alarm, isSelected: isSelected)
             }
-
-            viewModel.markAlarmAsRead(alarm.alarmId)
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                selectedAlarmForDetail = alarm
-            }
-            startFloatingAnimation()
-        } label: {
-            HStack(spacing: AppSpacing.s) {
-                if viewModel.isAlarmSelectionMode {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.kpPrimary : Color.white.opacity(0.45))
-                }
-
-                Text(alarm.displayContent)
-                    .font(AppFont.paperlogy4Regular(size: 15))
-                    .foregroundStyle(Color.white.opacity(0.92))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(alarm.displayDate)
-                    .font(AppFont.paperlogy4Regular(size: 13))
-                    .foregroundStyle(Color.white.opacity(0.74))
-                    .frame(minWidth: 48, alignment: .trailing)
-            }
-            .padding(.vertical, AppSpacing.m)
-            .padding(.horizontal, AppSpacing.xs)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.kpPrimary.opacity(0.12) : .clear)
-            )
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 1)
-            }
-            .opacity(rowOpacity)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func alarmDetailOverlay(for alarm: AlarmHistoryItem) -> some View {
-        ZStack {
-            Color.black.opacity(0.55)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    closeDetailCard()
-                }
-
-            VStack(spacing: AppSpacing.s) {
-                HStack {
-                    Text(alarm.displayTitle)
-                        .font(AppFont.paperlogy6SemiBold(size: 18))
-                        .foregroundStyle(Color.kpPrimary)
-                    Spacer()
-                }
-
-                HStack {
-                    Text(alarm.displayDetailDate)
-                        .font(AppFont.paperlogy4Regular(size: 12))
-                        .foregroundStyle(Color.white.opacity(0.62))
-                    Spacer()
-                }
-
-                Text(alarm.displayContent)
-                    .font(AppFont.paperlogy5Medium(size: 15))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, AppSpacing.xs)
-
-                if !alarm.displayDeepLink.isEmpty {
-                    Text("연결: \(alarm.displayDeepLink)")
-                        .font(AppFont.paperlogy4Regular(size: 12))
-                        .foregroundStyle(Color.white.opacity(0.55))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, AppSpacing.xs)
-                }
-
-                Button {
-                    closeDetailCard()
-                } label: {
-                    Text("닫기")
-                        .font(AppFont.paperlogy5Medium(size: 14))
-                        .foregroundStyle(Color.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.kpPrimary)
-                        )
-                }
-                .buttonStyle(.plain)
-                .padding(.top, AppSpacing.s)
-            }
-            .padding(AppSpacing.m)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.black.opacity(0.94))
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.38), radius: 16, y: 10)
-            .padding(.horizontal, AppSpacing.l)
-            .offset(y: isDetailCardFloating ? -8 : 8)
-            .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: isDetailCardFloating)
-            .onAppear {
-                startFloatingAnimation()
-            }
+            .buttonStyle(.plain)
+        } else {
+            alarmRowContent(for: alarm, isSelected: false)
         }
     }
 
-    private func closeDetailCard() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            selectedAlarmForDetail = nil
-        }
-        isDetailCardFloating = false
-    }
+    private func alarmRowContent(for alarm: AlarmHistoryItem, isSelected: Bool) -> some View {
+        let isRead = viewModel.isAlarmRead(alarm.alarmId)
+        let rowOpacity = isRead ? 0.36 : 1
+        let rowSpacing = viewModel.isAlarmSelectionMode ? 6.0 : 10.0
+        let horizontalPadding: CGFloat = viewModel.isAlarmSelectionMode ? 0 : AppSpacing.xs
 
-    private func startFloatingAnimation() {
-        isDetailCardFloating = false
-        DispatchQueue.main.async {
-            isDetailCardFloating = true
+        return HStack(spacing: rowSpacing) {
+            if viewModel.isAlarmSelectionMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.kpPrimary : Color.white.opacity(0.45))
+                    .frame(width: 18)
+            }
+
+            Text(alarm.displayContent)
+                .font(AppFont.paperlogy4Regular(size: 15))
+                .foregroundStyle(Color.white.opacity(0.92))
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(alarm.displayDate)
+                .font(AppFont.paperlogy4Regular(size: 13))
+                .foregroundStyle(Color.white.opacity(0.74))
+                .lineLimit(1)
+                .frame(minWidth: 40, alignment: .trailing)
         }
+        .padding(.vertical, AppSpacing.m)
+        .padding(.horizontal, horizontalPadding)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isSelected ? Color.kpPrimary.opacity(0.12) : .clear)
+        )
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+        }
+        .opacity(rowOpacity)
     }
 }
 
 private extension AlarmHistoryItem {
-    var displayTitle: String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "알림" : trimmed
-    }
-
     var displayContent: String {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "내용이 없는 알림입니다." : trimmed
     }
 
-    var displayDeepLink: String {
-        deepLink.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     var displayDate: String {
         AlarmDateFormatter.shortDate(from: createDate ?? "")
-    }
-
-    var displayDetailDate: String {
-        AlarmDateFormatter.detailDate(from: createDate ?? "")
     }
 }
 
@@ -376,25 +278,13 @@ private enum AlarmDateFormatter {
     private static let shortOutput: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "MM.dd"
-        return formatter
-    }()
-
-    private static let detailOutput: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "yyyy.MM.dd HH:mm"
+        formatter.dateFormat = "yy.MM"
         return formatter
     }()
 
     static func shortDate(from rawDate: String) -> String {
-        guard let date = parse(rawDate) else { return "--.--" }
+        guard let date = parse(rawDate) else { return shortOutput.string(from: Date()) }
         return shortOutput.string(from: date)
-    }
-
-    static func detailDate(from rawDate: String) -> String {
-        guard let date = parse(rawDate) else { return "날짜 정보 없음" }
-        return detailOutput.string(from: date)
     }
 
     private static func parse(_ rawDate: String) -> Date? {
@@ -405,8 +295,29 @@ private enum AlarmDateFormatter {
             return date
         }
 
-        return inputWithoutFractionalSeconds.date(from: trimmed)
+        if let date = inputWithoutFractionalSeconds.date(from: trimmed) {
+            return date
+        }
+
+        for format in serverDateFormats {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = format
+            if let date = formatter.date(from: trimmed) {
+                return date
+            }
+        }
+
+        return nil
     }
+
+    private static let serverDateFormats: [String] = [
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss"
+    ]
 }
 
 #Preview {
