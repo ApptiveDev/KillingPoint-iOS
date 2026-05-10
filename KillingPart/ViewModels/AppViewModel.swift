@@ -204,6 +204,9 @@ final class AppViewModel: ObservableObject {
     private func enterMainFlow() {
         setupFlowViewModel = nil
         currentStep = .main
+        DispatchQueue.main.async {
+            PushNotificationPermissionManager.handleAuthorizationAfterEnteringMain()
+        }
     }
 
     private func resolveErrorMessage(from error: Error) -> String {
