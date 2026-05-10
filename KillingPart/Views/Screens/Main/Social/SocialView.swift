@@ -5,6 +5,7 @@ struct SocialView: View {
     @ObservedObject var viewModel: SocialViewModel
     @ObservedObject var feedViewModel: FeedViewModel
     @State private var selectedTopTab: SocialTopTab = .feed
+    @State private var isNotificationListActive = false
 
     var body: some View {
         NavigationStack {
@@ -21,7 +22,33 @@ struct SocialView: View {
                         .ignoresSafeArea()
 
                     VStack(spacing: AppSpacing.m) {
-                        SocialTopToggleTabsView(selectedTopTab: $selectedTopTab)
+                        HStack(spacing: AppSpacing.s) {
+                            SocialTopToggleTabsView(selectedTopTab: $selectedTopTab)
+                                .frame(maxWidth: .infinity)
+
+                            Button {
+                                isNotificationListActive = true
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "bell")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundStyle(Color.kpPrimary)
+                                        .frame(width: 40, height: 40)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(Color.white.opacity(0.1))
+                                        )
+
+                                    if viewModel.hasUnreadAlarms {
+                                        Circle()
+                                            .fill(Color.red)
+                                            .frame(width: 9, height: 9)
+                                            .offset(x: -4, y: 4)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
 
                         if selectedTopTab == .friend {
                             FriendsSectionView(
@@ -41,6 +68,7 @@ struct SocialView: View {
                     .padding(.horizontal, AppSpacing.m)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.bottom, bottomInset)
+                    .background(notificationNavigationLink)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .toolbar(.hidden, for: .navigationBar)
@@ -57,8 +85,23 @@ struct SocialView: View {
         }
         .task(id: isRootTabSelected) {
             guard isRootTabSelected else { return }
-            await viewModel.refreshDefaultLists()
+            async let refreshSocialList: Void = viewModel.refreshDefaultLists()
+            async let refreshAlarmList: Void = viewModel.refreshAlarms()
+            _ = await (refreshSocialList, refreshAlarmList)
         }
+    }
+
+    private var notificationNavigationLink: some View {
+        NavigationLink(
+            isActive: $isNotificationListActive,
+            destination: {
+                NotificationListView(viewModel: viewModel)
+            },
+            label: {
+                EmptyView()
+            }
+        )
+        .hidden()
     }
 }
 

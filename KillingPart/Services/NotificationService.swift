@@ -3,10 +3,33 @@ import Foundation
 protocol NotificationServicing {
     func fetchMyNotificationSetting() async throws -> NotificationSettingModel
     func updateMyNotificationSetting(alarmEnabled: Bool) async throws -> NotificationSettingModel
+    func fetchAlarmHistory(page: Int, size: Int) async throws -> AlarmHistoryResponse
 }
 
 struct NotificationSettingModel {
     let alarmEnabled: Bool
+}
+
+struct AlarmHistoryItem: Decodable, Identifiable, Hashable {
+    let alarmId: Int
+    let title: String
+    let content: String
+    let deepLink: String
+    let createDate: String?
+
+    var id: Int { alarmId }
+}
+
+struct AlarmHistoryPage: Decodable {
+    let size: Int
+    let number: Int
+    let totalElements: Int
+    let totalPages: Int
+}
+
+struct AlarmHistoryResponse: Decodable {
+    let content: [AlarmHistoryItem]
+    let page: AlarmHistoryPage
 }
 
 enum NotificationServiceError: LocalizedError {
@@ -37,6 +60,24 @@ struct NotificationService: NotificationServicing {
 
     init(apiClient: APIClienting = APIClient.shared) {
         self.apiClient = apiClient
+    }
+
+    func fetchAlarmHistory(page: Int, size: Int) async throws -> AlarmHistoryResponse {
+        do {
+            let request = APIRequest(
+                path: "/alarms",
+                method: .get,
+                queryItems: [
+                    URLQueryItem(name: "page", value: "\(max(page, 0))"),
+                    URLQueryItem(name: "size", value: "\(max(size, 1))")
+                ],
+                requiresAuthorization: true
+            )
+            return try await apiClient.request(request, responseType: AlarmHistoryResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
     }
 
     func fetchMyNotificationSetting() async throws -> NotificationSettingModel {
