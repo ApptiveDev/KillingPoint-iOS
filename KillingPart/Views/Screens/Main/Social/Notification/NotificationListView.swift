@@ -3,6 +3,7 @@ import SwiftUI
 struct NotificationListView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: NotificationListViewModel
+    var onRouteToFriendsSection: (() -> Void)?
 
     var body: some View {
         GeometryReader { geometry in
@@ -44,6 +45,21 @@ struct NotificationListView: View {
         }
         .onDisappear {
             viewModel.setAlarmSelectionMode(false)
+        }
+        .onChange(of: viewModel.pendingExternalRoute) { pendingRoute in
+            guard let pendingRoute else { return }
+
+            switch pendingRoute {
+            case .socialFriends:
+                print("[NotificationRoute] external route -> Social Friends Section")
+                if let onRouteToFriendsSection {
+                    onRouteToFriendsSection()
+                } else {
+                    dismiss()
+                }
+            }
+
+            viewModel.clearPendingExternalRoute()
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isAlarmSelectionMode)
         .alert(

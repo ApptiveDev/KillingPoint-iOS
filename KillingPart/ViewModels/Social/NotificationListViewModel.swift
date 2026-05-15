@@ -16,6 +16,10 @@ struct AlarmSocialCollectionDestination {
     let initialUserFeedsResponse: UserDiaryFeedsResponse?
 }
 
+enum NotificationListExternalRoute: Equatable {
+    case socialFriends
+}
+
 @MainActor
 final class NotificationListViewModel: ObservableObject {
     @Published private(set) var alarms: [AlarmHistoryItem] = []
@@ -28,6 +32,7 @@ final class NotificationListViewModel: ObservableObject {
     @Published private(set) var activeMyDiaryDestination: AlarmMyDiaryDestination?
     @Published private(set) var activeSocialDiaryDestination: AlarmSocialDiaryDestination?
     @Published private(set) var activeSocialCollectionDestination: AlarmSocialCollectionDestination?
+    @Published private(set) var pendingExternalRoute: NotificationListExternalRoute?
     @Published private(set) var routingErrorMessage: String?
 
     private let userService: UserServicing
@@ -174,6 +179,7 @@ final class NotificationListViewModel: ObservableObject {
     func handleAlarmTap(_ alarm: AlarmHistoryItem) async {
         guard !isAlarmSelectionMode else { return }
         routingErrorMessage = nil
+        pendingExternalRoute = nil
         print(
             "[NotificationRoute] tap alarmId=\(alarm.alarmId) type=\(alarm.type.rawValue) deepLink=\(alarm.deepLink)"
         )
@@ -192,13 +198,10 @@ final class NotificationListViewModel: ObservableObject {
             case .subscribe:
                 let subscribedUserID = try resolveSubscribedUserID(from: alarm.deepLink)
                 print(
-                    "[NotificationRoute] SUBSCRIBE_ALARM subscribedId=\(subscribedUserID) -> SocialMyCollectionView"
+                    "[NotificationRoute] SUBSCRIBE_ALARM subscribedId=\(subscribedUserID) -> Social Friends Section"
                 )
                 clearNavigationDestinations()
-                activeSocialCollectionDestination = AlarmSocialCollectionDestination(
-                    user: makePlaceholderUser(userId: subscribedUserID),
-                    initialUserFeedsResponse: nil
-                )
+                pendingExternalRoute = .socialFriends
             case .diary:
                 if let diaryId = resolveDiaryIDIfPresent(from: alarm.deepLink) {
                     let diary = try await diaryService.fetchDiary(diaryId: diaryId)
@@ -254,6 +257,10 @@ final class NotificationListViewModel: ObservableObject {
 
     func clearActiveSocialCollectionDestination() {
         activeSocialCollectionDestination = nil
+    }
+
+    func clearPendingExternalRoute() {
+        pendingExternalRoute = nil
     }
 
     func makeSocialMyCollectionViewModel(

@@ -95,7 +95,13 @@ struct SocialView: View {
         NavigationLink(
             isActive: $isNotificationListActive,
             destination: {
-                NotificationListView(viewModel: viewModel.notificationListViewModel)
+                NotificationListView(
+                    viewModel: viewModel.notificationListViewModel,
+                    onRouteToFriendsSection: {
+                        selectedTopTab = .friend
+                        isNotificationListActive = false
+                    }
+                )
             },
             label: {
                 EmptyView()
