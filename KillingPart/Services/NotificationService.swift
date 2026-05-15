@@ -6,6 +6,30 @@ protocol NotificationServicing {
     func fetchAlarmHistory(page: Int, size: Int) async throws -> AlarmHistoryResponse
 }
 
+struct AlarmType: RawRepresentable, Hashable, Codable {
+    let rawValue: String
+
+    init(rawValue: String) {
+        self.rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
+    static let like = AlarmType(rawValue: "LIKE_ALARM")
+    static let subscribe = AlarmType(rawValue: "SUBSCRIBE_ALARM")
+    static let diary = AlarmType(rawValue: "DIARY_ALARM")
+    static let unknown = AlarmType(rawValue: "UNKNOWN")
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let decoded = (try? container.decode(String.self)) ?? ""
+        self.init(rawValue: decoded)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
 struct NotificationSettingModel {
     let alarmEnabled: Bool
 }
@@ -15,6 +39,7 @@ struct AlarmHistoryItem: Decodable, Identifiable, Hashable {
     let title: String
     let content: String
     let deepLink: String
+    let type: AlarmType
     let createDate: String?
 
     var id: Int { alarmId }
@@ -24,6 +49,7 @@ struct AlarmHistoryItem: Decodable, Identifiable, Hashable {
         case title
         case content
         case deepLink
+        case type
         case createDate
         case createdDate
         case createdAt
@@ -46,6 +72,7 @@ struct AlarmHistoryItem: Decodable, Identifiable, Hashable {
         title = (try? container.decode(String.self, forKey: .title)) ?? ""
         content = (try? container.decode(String.self, forKey: .content)) ?? ""
         deepLink = (try? container.decode(String.self, forKey: .deepLink)) ?? ""
+        type = (try? container.decode(AlarmType.self, forKey: .type)) ?? .unknown
 
         if let createDateValue = try? container.decodeIfPresent(String.self, forKey: .createDate), !createDateValue.isEmpty {
             createDate = createDateValue

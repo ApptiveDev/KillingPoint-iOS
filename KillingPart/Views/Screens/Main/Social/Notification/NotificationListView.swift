@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NotificationListView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var viewModel: SocialViewModel
+    @ObservedObject var viewModel: NotificationListViewModel
 
     var body: some View {
         GeometryReader { geometry in
@@ -31,6 +31,7 @@ struct NotificationListView: View {
                         .padding(.horizontal, AppSpacing.m)
                 }
                 .padding(.bottom, bottomInset)
+                .background(alarmNavigationLinks)
             }
         }
         .navigationBarBackButtonHidden()
@@ -45,6 +46,16 @@ struct NotificationListView: View {
             viewModel.setAlarmSelectionMode(false)
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isAlarmSelectionMode)
+        .alert(
+            "알림 이동 실패",
+            isPresented: routingErrorPresentedBinding
+        ) {
+            Button("확인", role: .cancel) {
+                viewModel.clearRoutingError()
+            }
+        } message: {
+            Text(viewModel.routingErrorMessage ?? "알림을 열 수 없어요.")
+        }
     }
 
     private var header: some View {
@@ -197,13 +208,24 @@ struct NotificationListView: View {
 
         if viewModel.isAlarmSelectionMode {
             Button {
+                print("[NotificationRoute] selection tap alarmId=\(alarm.alarmId)")
                 viewModel.toggleAlarmSelection(alarm.alarmId)
             } label: {
                 alarmRowContent(for: alarm, isSelected: isSelected)
             }
             .buttonStyle(.plain)
         } else {
-            alarmRowContent(for: alarm, isSelected: false)
+            Button {
+                print(
+                    "[NotificationRoute] row tap alarmId=\(alarm.alarmId) type=\(alarm.type.rawValue) deepLink=\(alarm.deepLink)"
+                )
+                Task {
+                    await viewModel.handleAlarmTap(alarm)
+                }
+            } label: {
+                alarmRowContent(for: alarm, isSelected: false)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -248,6 +270,120 @@ struct NotificationListView: View {
                 .frame(height: 1)
         }
         .opacity(rowOpacity)
+    }
+
+    private var alarmNavigationLinks: some View {
+        ZStack {
+            NavigationLink(
+                isActive: myDiaryNavigationBinding,
+                destination: {
+                    if let destination = viewModel.activeMyDiaryDestination {
+                        MyCollectionDiary(
+                            diaryId: destination.diary.diaryId,
+                            displayTag: destination.displayTag,
+                            diary: destination.diary
+                        )
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+
+            NavigationLink(
+                isActive: socialDiaryNavigationBinding,
+                destination: {
+                    if let destination = viewModel.activeSocialDiaryDestination {
+                        SocialMyCollectionDiary(
+                            diaryId: destination.diary.diaryId,
+                            displayTag: destination.displayTag,
+                            diary: destination.diary,
+                            makeCollectionViewModel: { user in
+                                viewModel.makeSocialMyCollectionViewModel(for: user)
+                            }
+                        )
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+
+            NavigationLink(
+                isActive: socialCollectionNavigationBinding,
+                destination: {
+                    if let destination = viewModel.activeSocialCollectionDestination {
+                        SocialMyCollectionView(
+                            viewModel: viewModel.makeSocialMyCollectionViewModel(
+                                for: destination.user,
+                                initialUserFeedsResponse: destination.initialUserFeedsResponse
+                            )
+                        )
+                        .id(destination.user.userId)
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+        }
+    }
+
+    private var myDiaryNavigationBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.activeMyDiaryDestination != nil
+            },
+            set: { isActive in
+                guard !isActive else { return }
+                viewModel.clearActiveMyDiaryDestination()
+            }
+        )
+    }
+
+    private var socialDiaryNavigationBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.activeSocialDiaryDestination != nil
+            },
+            set: { isActive in
+                guard !isActive else { return }
+                viewModel.clearActiveSocialDiaryDestination()
+            }
+        )
+    }
+
+    private var socialCollectionNavigationBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.activeSocialCollectionDestination != nil
+            },
+            set: { isActive in
+                guard !isActive else { return }
+                viewModel.clearActiveSocialCollectionDestination()
+            }
+        )
+    }
+
+    private var routingErrorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.routingErrorMessage != nil
+            },
+            set: { isPresented in
+                guard !isPresented else { return }
+                viewModel.clearRoutingError()
+            }
+        )
     }
 }
 
@@ -322,6 +458,6 @@ private enum AlarmDateFormatter {
 
 #Preview {
     NavigationStack {
-        NotificationListView(viewModel: SocialViewModel())
+        NotificationListView(viewModel: NotificationListViewModel())
     }
 }

@@ -39,7 +39,7 @@ struct SocialView: View {
                                                 .fill(Color.white.opacity(0.1))
                                         )
 
-                                    if viewModel.hasUnreadAlarms {
+                                    if viewModel.notificationListViewModel.hasUnreadAlarms {
                                         Circle()
                                             .fill(Color.red)
                                             .frame(width: 9, height: 9)
@@ -86,7 +86,7 @@ struct SocialView: View {
         .task(id: isRootTabSelected) {
             guard isRootTabSelected else { return }
             async let refreshSocialList: Void = viewModel.refreshDefaultLists()
-            async let refreshAlarmList: Void = viewModel.refreshAlarms()
+            async let refreshAlarmList: Void = viewModel.notificationListViewModel.refreshAlarms()
             _ = await (refreshSocialList, refreshAlarmList)
         }
     }
@@ -95,7 +95,7 @@ struct SocialView: View {
         NavigationLink(
             isActive: $isNotificationListActive,
             destination: {
-                NotificationListView(viewModel: viewModel)
+                NotificationListView(viewModel: viewModel.notificationListViewModel)
             },
             label: {
                 EmptyView()
