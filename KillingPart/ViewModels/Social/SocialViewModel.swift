@@ -23,6 +23,7 @@ final class SocialViewModel: ObservableObject {
     @Published var isAlarmSelectionMode = false
     @Published var errorMessage: String?
     @Published var currentSearchQuery = ""
+    let notificationListViewModel: NotificationListViewModel
 
     private let userService: UserServicing
     private let subscribeService: SubscribeServicing
@@ -60,6 +61,13 @@ final class SocialViewModel: ObservableObject {
         self.diaryService = diaryService
         self.notificationService = notificationService
         self.userDefaults = userDefaults
+        self.notificationListViewModel = NotificationListViewModel(
+            userService: userService,
+            diaryService: diaryService,
+            subscribeService: subscribeService,
+            notificationService: notificationService,
+            userDefaults: userDefaults
+        )
     }
 
     var isSearching: Bool {

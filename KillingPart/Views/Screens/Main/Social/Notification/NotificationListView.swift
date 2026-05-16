@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NotificationListView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var viewModel: SocialViewModel
+    @ObservedObject var viewModel: NotificationListViewModel
 
     var body: some View {
         GeometryReader { geometry in
@@ -31,6 +31,7 @@ struct NotificationListView: View {
                         .padding(.horizontal, AppSpacing.m)
                 }
                 .padding(.bottom, bottomInset)
+                .background(alarmNavigationLinks)
             }
         }
         .navigationBarBackButtonHidden()
@@ -45,6 +46,34 @@ struct NotificationListView: View {
             viewModel.setAlarmSelectionMode(false)
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isAlarmSelectionMode)
+        .alert(
+            "알림 이동 실패",
+            isPresented: routingErrorPresentedBinding
+        ) {
+            Button("확인", role: .cancel) {
+                viewModel.clearRoutingError()
+            }
+        } message: {
+            Text(viewModel.routingErrorMessage ?? "알림을 열 수 없어요.")
+        }
+        .sheet(isPresented: subscribeFansSheetPresentedBinding) {
+            NotificationSubscribeFansSheet(
+                users: viewModel.subscribeFans,
+                isLoading: viewModel.isLoadingSubscribeFans,
+                isLoadingMore: viewModel.isLoadingMoreSubscribeFans,
+                errorMessage: viewModel.subscribeFansErrorMessage,
+                onRetry: {
+                    Task {
+                        await viewModel.refreshSubscribeFans()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreSubscribeFansIfNeeded(currentUserId: userId)
+                    }
+                }
+            )
+        }
     }
 
     private var header: some View {
@@ -197,13 +226,24 @@ struct NotificationListView: View {
 
         if viewModel.isAlarmSelectionMode {
             Button {
+                print("[NotificationRoute] selection tap alarmId=\(alarm.alarmId)")
                 viewModel.toggleAlarmSelection(alarm.alarmId)
             } label: {
                 alarmRowContent(for: alarm, isSelected: isSelected)
             }
             .buttonStyle(.plain)
         } else {
-            alarmRowContent(for: alarm, isSelected: false)
+            Button {
+                print(
+                    "[NotificationRoute] row tap alarmId=\(alarm.alarmId) type=\(alarm.type.rawValue) deepLink=\(alarm.deepLink)"
+                )
+                Task {
+                    await viewModel.handleAlarmTap(alarm)
+                }
+            } label: {
+                alarmRowContent(for: alarm, isSelected: false)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -248,6 +288,132 @@ struct NotificationListView: View {
                 .frame(height: 1)
         }
         .opacity(rowOpacity)
+    }
+
+    private var alarmNavigationLinks: some View {
+        ZStack {
+            NavigationLink(
+                isActive: myDiaryNavigationBinding,
+                destination: {
+                    if let destination = viewModel.activeMyDiaryDestination {
+                        MyCollectionDiary(
+                            diaryId: destination.diary.diaryId,
+                            displayTag: destination.displayTag,
+                            diary: destination.diary
+                        )
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+
+            NavigationLink(
+                isActive: socialDiaryNavigationBinding,
+                destination: {
+                    if let destination = viewModel.activeSocialDiaryDestination {
+                        SocialMyCollectionDiary(
+                            diaryId: destination.diary.diaryId,
+                            displayTag: destination.displayTag,
+                            diary: destination.diary,
+                            makeCollectionViewModel: { user in
+                                viewModel.makeSocialMyCollectionViewModel(for: user)
+                            }
+                        )
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+
+            NavigationLink(
+                isActive: socialCollectionNavigationBinding,
+                destination: {
+                    if let destination = viewModel.activeSocialCollectionDestination {
+                        SocialMyCollectionView(
+                            viewModel: viewModel.makeSocialMyCollectionViewModel(
+                                for: destination.user,
+                                initialUserFeedsResponse: destination.initialUserFeedsResponse
+                            )
+                        )
+                        .id(destination.user.userId)
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
+        }
+    }
+
+    private var myDiaryNavigationBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.activeMyDiaryDestination != nil
+            },
+            set: { isActive in
+                guard !isActive else { return }
+                viewModel.clearActiveMyDiaryDestination()
+            }
+        )
+    }
+
+    private var socialDiaryNavigationBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.activeSocialDiaryDestination != nil
+            },
+            set: { isActive in
+                guard !isActive else { return }
+                viewModel.clearActiveSocialDiaryDestination()
+            }
+        )
+    }
+
+    private var socialCollectionNavigationBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.activeSocialCollectionDestination != nil
+            },
+            set: { isActive in
+                guard !isActive else { return }
+                viewModel.clearActiveSocialCollectionDestination()
+            }
+        )
+    }
+
+    private var routingErrorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.routingErrorMessage != nil
+            },
+            set: { isPresented in
+                guard !isPresented else { return }
+                viewModel.clearRoutingError()
+            }
+        )
+    }
+
+    private var subscribeFansSheetPresentedBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.isSubscribeFansSheetPresented
+            },
+            set: { isPresented in
+                guard !isPresented else { return }
+                viewModel.dismissSubscribeFansSheet()
+            }
+        )
     }
 }
 
@@ -320,8 +486,81 @@ private enum AlarmDateFormatter {
     ]
 }
 
+private struct NotificationSubscribeFansSheet: View {
+    let users: [SubscribeUserModel]
+    let isLoading: Bool
+    let isLoadingMore: Bool
+    let errorMessage: String?
+    let onRetry: () -> Void
+    let onUserAppear: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.m) {
+            Text("내 팬덤")
+                .font(AppFont.paperlogy6SemiBold(size: 16))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isLoading && users.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(AppColors.primary600)
+                    Spacer()
+                }
+                .padding(.top, AppSpacing.xl)
+            } else if let errorMessage, users.isEmpty {
+                VStack(spacing: AppSpacing.s) {
+                    Text(errorMessage)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+
+                    Button("다시 시도") {
+                        onRetry()
+                    }
+                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .foregroundStyle(AppColors.primary600)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, AppSpacing.xl)
+            } else if users.isEmpty {
+                Text("표시할 친구가 없어요.")
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, AppSpacing.xl)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: AppSpacing.s) {
+                        ForEach(users) { user in
+                            SocialFriendRowView(user: .subscribed(user))
+                                .onAppear {
+                                    onUserAppear(user.userId)
+                                }
+                        }
+
+                        if isLoadingMore {
+                            ProgressView()
+                                .tint(AppColors.primary600)
+                                .padding(.top, AppSpacing.s)
+                        }
+                    }
+                    .padding(.bottom, AppSpacing.m)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(.horizontal, AppSpacing.l)
+        .padding(.top, AppSpacing.m)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .preferredColorScheme(.dark)
+    }
+}
+
 #Preview {
     NavigationStack {
-        NotificationListView(viewModel: SocialViewModel())
+        NotificationListView(viewModel: NotificationListViewModel())
     }
 }

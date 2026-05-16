@@ -5,6 +5,7 @@ protocol DiaryServicing {
     func fetchStoredDiaries(page: Int, size: Int) async throws -> StoredDiaryFeedsResponse
     func fetchMyFeeds(page: Int, size: Int) async throws -> MyDiaryFeedsResponse
     func fetchRandomDiaries() async throws -> RandomDiaryFeedsResponse
+    func fetchDiary(diaryId: Int) async throws -> DiaryFeedModel
     func fetchUserFeeds(userId: Int, page: Int, size: Int) async throws -> UserDiaryFeedsResponse
     func fetchDiaryLikeUsers(diaryId: Int, searchCond: String?, page: Int, size: Int) async throws -> UserSearchResponse
     func createDiary(request: DiaryCreateRequest) async throws -> DiaryCreateResult
@@ -136,6 +137,21 @@ struct DiaryService: DiaryServicing {
             )
 
             return try await apiClient.request(request, responseType: RandomDiaryFeedsResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
+    }
+
+    func fetchDiary(diaryId: Int) async throws -> DiaryFeedModel {
+        do {
+            let request = APIRequest(
+                path: "/diaries/\(diaryId)",
+                method: .get,
+                requiresAuthorization: true
+            )
+
+            return try await apiClient.request(request, responseType: DiaryFeedModel.self)
         } catch {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)

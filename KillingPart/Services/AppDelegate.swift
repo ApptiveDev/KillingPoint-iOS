@@ -12,6 +12,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
+        if let remotePayload = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
+            FCMManager.shared.handleLaunchRemoteNotification(remotePayload)
+        }
         print("[FCM][1] Firebase 초기화 완료")
         return true
     }

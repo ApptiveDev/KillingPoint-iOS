@@ -50,6 +50,28 @@ struct MainTabView: View {
                 selectedTab = .my
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didTapPushAlarm)) { notification in
+            guard let route = notification.object as? PushAlarmRoute else { return }
+            FCMManager.shared.clearPendingAlarmRoute()
+            routeByPushAlarm(route)
+        }
+        .task {
+            guard let pendingRoute = FCMManager.shared.consumePendingAlarmRoute() else { return }
+            routeByPushAlarm(pendingRoute)
+        }
+    }
+
+    private func routeByPushAlarm(_ route: PushAlarmRoute) {
+        print(
+            "[PushRoute] MainTab route type=\(route.type.rawValue) deepLink=\(route.deepLink) alarmId=\(route.alarmId?.description ?? "nil")"
+        )
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedTab = .social
+        }
+
+        Task { @MainActor in
+            await socialViewModel.notificationListViewModel.handlePushAlarmRoute(route)
+        }
     }
 }
 
