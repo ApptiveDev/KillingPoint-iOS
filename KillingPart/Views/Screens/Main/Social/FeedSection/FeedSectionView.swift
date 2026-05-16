@@ -348,7 +348,7 @@ struct FeedSectionView: View {
             profileImageUrl: profileImageUrl,
             userRoleType: "USER",
             socialType: "UNKNOWN",
-            isMyPick: nil
+            isMyPick: feed.isMyPick
         )
     }
 

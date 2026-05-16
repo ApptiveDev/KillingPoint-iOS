@@ -60,7 +60,9 @@ struct SocialView: View {
                                 viewModel: feedViewModel,
                                 isParentActive: isRootTabSelected && selectedTopTab == .feed,
                                 makeCollectionViewModel: { user in
-                                    viewModel.makeSocialMyCollectionViewModel(for: user)
+                                    viewModel.makeSocialMyCollectionViewModel(
+                                        for: resolvedCollectionUser(from: user)
+                                    )
                                 }
                             )
                         }
@@ -245,6 +247,20 @@ struct SocialView: View {
                 viewModel.notificationListViewModel.clearRoutingError()
             }
         )
+    }
+
+    private func resolvedCollectionUser(from user: UserModel) -> UserModel {
+        guard user.isMyPick == nil else { return user }
+
+        if let matchedMyPickUser = viewModel.myPickUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyPickUser, isMyPick: true)
+        }
+
+        if let matchedMyFandomUser = viewModel.myFandomUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyFandomUser, isMyPick: false)
+        }
+
+        return user
     }
 }
 

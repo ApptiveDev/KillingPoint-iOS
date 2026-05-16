@@ -24,7 +24,9 @@ struct RandomSearchView: View {
                             viewModel: feedViewModel,
                             isParentActive: isRootTabSelected,
                             makeCollectionViewModel: { user in
-                                socialViewModel.makeSocialMyCollectionViewModel(for: user)
+                                socialViewModel.makeSocialMyCollectionViewModel(
+                                    for: resolvedCollectionUser(from: user)
+                                )
                             }
                         )
                     }
@@ -39,8 +41,24 @@ struct RandomSearchView: View {
             }
         }
         .task {
-            await feedViewModel.loadInitialDataIfNeeded()
+            async let loadFeedTask: Void = feedViewModel.loadInitialDataIfNeeded()
+            async let loadSocialTask: Void = socialViewModel.loadInitialDataIfNeeded()
+            _ = await (loadFeedTask, loadSocialTask)
         }
+    }
+
+    private func resolvedCollectionUser(from user: UserModel) -> UserModel {
+        guard user.isMyPick == nil else { return user }
+
+        if let matchedMyPickUser = socialViewModel.myPickUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyPickUser, isMyPick: true)
+        }
+
+        if let matchedMyFandomUser = socialViewModel.myFandomUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyFandomUser, isMyPick: false)
+        }
+
+        return user
     }
 }
 
