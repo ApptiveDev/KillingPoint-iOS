@@ -1,12 +1,19 @@
 import UserNotifications
 import FirebaseMessaging
 
+struct PushAlarmRoute: Equatable {
+    let type: AlarmType
+    let deepLink: String
+    let alarmId: Int?
+}
+
 final class FCMManager {
     static let shared = FCMManager()
 
     private let fcmService: FCMServicing
     private let tokenStore: TokenStoring
     private let pendingTokenKey = "fcm.pendingToken"
+    private var pendingAlarmRoute: PushAlarmRoute?
 
     init(
         fcmService: FCMServicing = FCMService(),
@@ -73,8 +80,121 @@ final class FCMManager {
         parsePayload(userInfo)
     }
 
-    private func parsePayload(_ userInfo: [AnyHashable: Any]) {
-        // 추후 화면 이동 연결 포인트
-        // 예: if let screen = userInfo["screen"] as? String { ... }
+    func handleLaunchRemoteNotification(_ userInfo: [AnyHashable: Any]) {
+        print("[FCM] 앱 시작 remote payload: \(userInfo)")
+        parsePayload(userInfo)
     }
+
+    func consumePendingAlarmRoute() -> PushAlarmRoute? {
+        defer { pendingAlarmRoute = nil }
+        return pendingAlarmRoute
+    }
+
+    func clearPendingAlarmRoute() {
+        pendingAlarmRoute = nil
+    }
+
+    private func parsePayload(_ userInfo: [AnyHashable: Any]) {
+        let parsed = normalizedPayload(from: userInfo)
+
+        guard let rawType = parsed.string(for: ["type", "alarmType", "notificationType"]) else {
+            print("[FCM][Route] type 누락으로 라우팅 스킵")
+            return
+        }
+
+        let routeType = AlarmType(rawValue: rawType)
+        guard routeType == .like || routeType == .subscribe || routeType == .diary else {
+            print("[FCM][Route] 지원하지 않는 type: \(routeType.rawValue)")
+            return
+        }
+
+        let deepLink: String
+        if let resolvedDeepLink = parsed.string(for: ["deepLink", "deeplink", "link", "path"]),
+           !resolvedDeepLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            deepLink = resolvedDeepLink
+        } else if routeType == .subscribe,
+                  let subscribedId = parsed.int(for: ["subscribedId", "subscribedID", "userId", "userid"]) {
+            deepLink = "/api/subscribes/\(subscribedId)/fans"
+        } else if (routeType == .like || routeType == .diary),
+                  let diaryId = parsed.int(for: ["diaryId", "diaryID", "id"]) {
+            deepLink = "/api/diaries/\(diaryId)"
+        } else {
+            print("[FCM][Route] deepLink/ID 누락으로 라우팅 스킵")
+            return
+        }
+
+        let alarmId = parsed.int(for: ["alarmId", "alarmID"])
+        let route = PushAlarmRoute(type: routeType, deepLink: deepLink, alarmId: alarmId)
+        pendingAlarmRoute = route
+        print(
+            "[FCM][Route] emit type=\(route.type.rawValue) deepLink=\(route.deepLink) alarmId=\(route.alarmId?.description ?? "nil")"
+        )
+        NotificationCenter.default.post(name: .didTapPushAlarm, object: route)
+    }
+}
+
+private struct NormalizedPayload {
+    let values: [String: Any]
+
+    func string(for keys: [String]) -> String? {
+        for key in keys {
+            guard let value = values[key.lowercased()] else { continue }
+
+            if let string = value as? String {
+                let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    return trimmed
+                }
+            } else if let number = value as? NSNumber {
+                return number.stringValue
+            }
+        }
+        return nil
+    }
+
+    func int(for keys: [String]) -> Int? {
+        for key in keys {
+            guard let value = values[key.lowercased()] else { continue }
+            if let intValue = value as? Int, intValue > 0 {
+                return intValue
+            }
+
+            if let number = value as? NSNumber {
+                let intValue = number.intValue
+                if intValue > 0 {
+                    return intValue
+                }
+            }
+
+            if let string = value as? String,
+               let intValue = Int(string.trimmingCharacters(in: .whitespacesAndNewlines)),
+               intValue > 0 {
+                return intValue
+            }
+        }
+        return nil
+    }
+}
+
+private func normalizedPayload(from userInfo: [AnyHashable: Any]) -> NormalizedPayload {
+    var normalized: [String: Any] = [:]
+
+    for (key, value) in userInfo {
+        guard let stringKey = key as? String else { continue }
+        normalized[stringKey.lowercased()] = value
+    }
+
+    if let data = normalized["data"] as? [String: Any] {
+        for (key, value) in data {
+            normalized[key.lowercased()] = value
+        }
+    } else if let dataString = normalized["data"] as? String,
+              let rawData = dataString.data(using: .utf8),
+              let jsonObject = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any] {
+        for (key, value) in jsonObject {
+            normalized[key.lowercased()] = value
+        }
+    }
+
+    return NormalizedPayload(values: normalized)
 }

@@ -32,6 +32,11 @@ final class NotificationListViewModel: ObservableObject {
     @Published private(set) var activeMyDiaryDestination: AlarmMyDiaryDestination?
     @Published private(set) var activeSocialDiaryDestination: AlarmSocialDiaryDestination?
     @Published private(set) var activeSocialCollectionDestination: AlarmSocialCollectionDestination?
+    @Published private(set) var isSubscribeFansSheetPresented = false
+    @Published private(set) var subscribeFans: [SubscribeUserModel] = []
+    @Published private(set) var isLoadingSubscribeFans = false
+    @Published private(set) var isLoadingMoreSubscribeFans = false
+    @Published private(set) var subscribeFansErrorMessage: String?
     @Published private(set) var pendingExternalRoute: NotificationListExternalRoute?
     @Published private(set) var routingErrorMessage: String?
 
@@ -45,8 +50,12 @@ final class NotificationListViewModel: ObservableObject {
     private var hasLoadedInitialAlarms = false
     private var alarmsNextPage = 0
     private var hasNextAlarmsPage = true
+    private var subscribeFansUserID: Int?
+    private var subscribeFansNextPage = SubscribeService.defaultPage
+    private var hasNextSubscribeFansPage = true
     private var readAlarmIDs: Set<Int> = []
     private let alarmPageSize = 20
+    private let subscribeFansPageSize = 20
     private let alarmReadIDStorageKeyPrefix = "social.readAlarmIDs.user"
 
     init(
@@ -176,6 +185,64 @@ final class NotificationListViewModel: ObservableObject {
         isAlarmSelectionMode = false
     }
 
+    func dismissSubscribeFansSheet() {
+        isSubscribeFansSheetPresented = false
+        clearSubscribeFansState()
+    }
+
+    func refreshSubscribeFans() async {
+        guard let subscribeFansUserID else { return }
+        let requestUserID = subscribeFansUserID
+        guard !isLoadingSubscribeFans else { return }
+
+        isLoadingSubscribeFans = true
+        defer { isLoadingSubscribeFans = false }
+
+        subscribeFansErrorMessage = nil
+        resetSubscribeFansPagingState()
+
+        do {
+            let response = try await subscribeService.fetchSubscribers(
+                userId: requestUserID,
+                page: SubscribeService.defaultPage,
+                size: subscribeFansPageSize
+            )
+            guard requestUserID == subscribeFansUserID else { return }
+            subscribeFans = response.content
+            updateSubscribeFansPaging(from: response)
+        } catch {
+            if isRequestCancelled(error) { return }
+            guard requestUserID == subscribeFansUserID else { return }
+            subscribeFansErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
+    func loadMoreSubscribeFansIfNeeded(currentUserId: Int) async {
+        guard subscribeFans.last?.userId == currentUserId else { return }
+        guard let subscribeFansUserID else { return }
+        let requestUserID = subscribeFansUserID
+        guard hasNextSubscribeFansPage else { return }
+        guard !isLoadingSubscribeFans, !isLoadingMoreSubscribeFans else { return }
+
+        isLoadingMoreSubscribeFans = true
+        defer { isLoadingMoreSubscribeFans = false }
+
+        do {
+            let response = try await subscribeService.fetchSubscribers(
+                userId: requestUserID,
+                page: subscribeFansNextPage,
+                size: subscribeFansPageSize
+            )
+            guard requestUserID == subscribeFansUserID else { return }
+            appendSubscribeFans(with: response.content)
+            updateSubscribeFansPaging(from: response)
+        } catch {
+            if isRequestCancelled(error) { return }
+            guard requestUserID == subscribeFansUserID else { return }
+            subscribeFansErrorMessage = resolveErrorMessage(from: error)
+        }
+    }
+
     func handleAlarmTap(_ alarm: AlarmHistoryItem) async {
         guard !isAlarmSelectionMode else { return }
         routingErrorMessage = nil
@@ -184,10 +251,42 @@ final class NotificationListViewModel: ObservableObject {
             "[NotificationRoute] tap alarmId=\(alarm.alarmId) type=\(alarm.type.rawValue) deepLink=\(alarm.deepLink)"
         )
 
+        await executeRoute(
+            type: alarm.type,
+            deepLink: alarm.deepLink,
+            alarmId: alarm.alarmId,
+            source: "list",
+            shouldMarkAsRead: true
+        )
+    }
+
+    func handlePushAlarmRoute(_ route: PushAlarmRoute) async {
+        routingErrorMessage = nil
+        pendingExternalRoute = nil
+        print(
+            "[NotificationRoute][Push] tap type=\(route.type.rawValue) deepLink=\(route.deepLink) alarmId=\(route.alarmId?.description ?? "nil")"
+        )
+
+        await executeRoute(
+            type: route.type,
+            deepLink: route.deepLink,
+            alarmId: route.alarmId,
+            source: "push",
+            shouldMarkAsRead: route.alarmId != nil
+        )
+    }
+
+    private func executeRoute(
+        type: AlarmType,
+        deepLink: String,
+        alarmId: Int?,
+        source: String,
+        shouldMarkAsRead: Bool
+    ) async {
         do {
-            switch alarm.type {
+            switch type {
             case .like:
-                let diaryId = try resolveDiaryID(from: alarm.deepLink)
+                let diaryId = try resolveDiaryID(from: deepLink)
                 let diary = try await diaryService.fetchDiary(diaryId: diaryId)
                 print("[NotificationRoute] LIKE_ALARM diaryId=\(diaryId) -> MyCollectionDiary")
                 clearNavigationDestinations()
@@ -196,14 +295,21 @@ final class NotificationListViewModel: ObservableObject {
                     displayTag: resolvedDisplayTag(from: diary.tag)
                 )
             case .subscribe:
-                let subscribedUserID = try resolveSubscribedUserID(from: alarm.deepLink)
-                print(
-                    "[NotificationRoute] SUBSCRIBE_ALARM subscribedId=\(subscribedUserID) -> Social Friends Section"
-                )
+                let subscribedUserID = try resolveSubscribedUserID(from: deepLink)
                 clearNavigationDestinations()
-                pendingExternalRoute = .socialFriends
+                if source == "list" {
+                    print(
+                        "[NotificationRoute] SUBSCRIBE_ALARM subscribedId=\(subscribedUserID) -> Subscribe Fans Sheet"
+                    )
+                    await presentSubscribeFansSheet(for: subscribedUserID)
+                } else {
+                    print(
+                        "[NotificationRoute] SUBSCRIBE_ALARM subscribedId=\(subscribedUserID) -> Social Friends Section"
+                    )
+                    pendingExternalRoute = .socialFriends
+                }
             case .diary:
-                if let diaryId = resolveDiaryIDIfPresent(from: alarm.deepLink) {
+                if let diaryId = resolveDiaryIDIfPresent(from: deepLink) {
                     let diary = try await diaryService.fetchDiary(diaryId: diaryId)
                     guard diary.userId > 0 else { throw NotificationRoutingError.missingUserID }
                     print(
@@ -215,7 +321,7 @@ final class NotificationListViewModel: ObservableObject {
                         displayTag: resolvedDisplayTag(from: diary.tag),
                         user: makeUser(from: diary)
                     )
-                } else if let subscribedUserID = resolveSubscribedUserIDIfPresent(from: alarm.deepLink) {
+                } else if let subscribedUserID = resolveSubscribedUserIDIfPresent(from: deepLink) {
                     // Fallback for mixed payloads.
                     print(
                         "[NotificationRoute] DIARY_ALARM fallback subscribedId=\(subscribedUserID) -> SocialMyCollectionView"
@@ -232,12 +338,16 @@ final class NotificationListViewModel: ObservableObject {
                 throw NotificationRoutingError.unsupportedType
             }
 
-            markAlarmAsRead(alarm.alarmId)
-            print("[NotificationRoute] success alarmId=\(alarm.alarmId) markedAsRead=true")
+            if shouldMarkAsRead, let alarmId, alarmId > 0 {
+                markAlarmAsRead(alarmId)
+                print("[NotificationRoute] success source=\(source) alarmId=\(alarmId) markedAsRead=true")
+            } else {
+                print("[NotificationRoute] success source=\(source) alarmId=nil")
+            }
         } catch {
             if isRequestCancelled(error) { return }
             print(
-                "[NotificationRoute] failed alarmId=\(alarm.alarmId) type=\(alarm.type.rawValue) error=\(error.localizedDescription)"
+                "[NotificationRoute] failed source=\(source) alarmId=\(alarmId?.description ?? "nil") type=\(type.rawValue) error=\(error.localizedDescription)"
             )
             routingErrorMessage = resolveRoutingErrorMessage(from: error)
         }
@@ -261,6 +371,12 @@ final class NotificationListViewModel: ObservableObject {
 
     func clearPendingExternalRoute() {
         pendingExternalRoute = nil
+    }
+
+    private func presentSubscribeFansSheet(for subscribedUserID: Int) async {
+        subscribeFansUserID = subscribedUserID
+        isSubscribeFansSheetPresented = true
+        await refreshSubscribeFans()
     }
 
     func makeSocialMyCollectionViewModel(
@@ -402,6 +518,35 @@ final class NotificationListViewModel: ObservableObject {
         activeMyDiaryDestination = nil
         activeSocialDiaryDestination = nil
         activeSocialCollectionDestination = nil
+    }
+
+    private func clearSubscribeFansState() {
+        subscribeFans = []
+        subscribeFansErrorMessage = nil
+        subscribeFansUserID = nil
+        isLoadingSubscribeFans = false
+        isLoadingMoreSubscribeFans = false
+        resetSubscribeFansPagingState()
+    }
+
+    private func appendSubscribeFans(with newUsers: [SubscribeUserModel]) {
+        let existingIDs = Set(subscribeFans.map(\.userId))
+        let filtered = newUsers.filter { !existingIDs.contains($0.userId) }
+        subscribeFans.append(contentsOf: filtered)
+    }
+
+    private func updateSubscribeFansPaging(from response: SubscribeListResponse) {
+        subscribeFansNextPage = max(response.page.number, 0) + 1
+        let totalPages = max(response.page.totalPages, 0)
+        let hasNextByPage = subscribeFansNextPage < totalPages
+        let hasNextByCount = response.content.count >= subscribeFansPageSize
+        hasNextSubscribeFansPage = hasNextByPage || hasNextByCount
+    }
+
+    private func resetSubscribeFansPagingState() {
+        subscribeFans = []
+        subscribeFansNextPage = SubscribeService.defaultPage
+        hasNextSubscribeFansPage = true
     }
 
     private func appendAlarms(with newAlarms: [AlarmHistoryItem]) {

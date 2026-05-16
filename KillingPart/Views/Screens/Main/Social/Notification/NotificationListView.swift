@@ -3,7 +3,6 @@ import SwiftUI
 struct NotificationListView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: NotificationListViewModel
-    var onRouteToFriendsSection: (() -> Void)?
 
     var body: some View {
         GeometryReader { geometry in
@@ -46,21 +45,6 @@ struct NotificationListView: View {
         .onDisappear {
             viewModel.setAlarmSelectionMode(false)
         }
-        .onChange(of: viewModel.pendingExternalRoute) { pendingRoute in
-            guard let pendingRoute else { return }
-
-            switch pendingRoute {
-            case .socialFriends:
-                print("[NotificationRoute] external route -> Social Friends Section")
-                if let onRouteToFriendsSection {
-                    onRouteToFriendsSection()
-                } else {
-                    dismiss()
-                }
-            }
-
-            viewModel.clearPendingExternalRoute()
-        }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isAlarmSelectionMode)
         .alert(
             "알림 이동 실패",
@@ -71,6 +55,24 @@ struct NotificationListView: View {
             }
         } message: {
             Text(viewModel.routingErrorMessage ?? "알림을 열 수 없어요.")
+        }
+        .sheet(isPresented: subscribeFansSheetPresentedBinding) {
+            NotificationSubscribeFansSheet(
+                users: viewModel.subscribeFans,
+                isLoading: viewModel.isLoadingSubscribeFans,
+                isLoadingMore: viewModel.isLoadingMoreSubscribeFans,
+                errorMessage: viewModel.subscribeFansErrorMessage,
+                onRetry: {
+                    Task {
+                        await viewModel.refreshSubscribeFans()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreSubscribeFansIfNeeded(currentUserId: userId)
+                    }
+                }
+            )
         }
     }
 
@@ -401,6 +403,18 @@ struct NotificationListView: View {
             }
         )
     }
+
+    private var subscribeFansSheetPresentedBinding: Binding<Bool> {
+        Binding(
+            get: {
+                viewModel.isSubscribeFansSheetPresented
+            },
+            set: { isPresented in
+                guard !isPresented else { return }
+                viewModel.dismissSubscribeFansSheet()
+            }
+        )
+    }
 }
 
 private extension AlarmHistoryItem {
@@ -470,6 +484,79 @@ private enum AlarmDateFormatter {
         "yyyy-MM-dd'T'HH:mm:ss",
         "yyyy-MM-dd HH:mm:ss"
     ]
+}
+
+private struct NotificationSubscribeFansSheet: View {
+    let users: [SubscribeUserModel]
+    let isLoading: Bool
+    let isLoadingMore: Bool
+    let errorMessage: String?
+    let onRetry: () -> Void
+    let onUserAppear: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.m) {
+            Text("내 팬덤")
+                .font(AppFont.paperlogy6SemiBold(size: 16))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isLoading && users.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(AppColors.primary600)
+                    Spacer()
+                }
+                .padding(.top, AppSpacing.xl)
+            } else if let errorMessage, users.isEmpty {
+                VStack(spacing: AppSpacing.s) {
+                    Text(errorMessage)
+                        .font(AppFont.paperlogy4Regular(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+
+                    Button("다시 시도") {
+                        onRetry()
+                    }
+                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .foregroundStyle(AppColors.primary600)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, AppSpacing.xl)
+            } else if users.isEmpty {
+                Text("표시할 친구가 없어요.")
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, AppSpacing.xl)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: AppSpacing.s) {
+                        ForEach(users) { user in
+                            SocialFriendRowView(user: .subscribed(user))
+                                .onAppear {
+                                    onUserAppear(user.userId)
+                                }
+                        }
+
+                        if isLoadingMore {
+                            ProgressView()
+                                .tint(AppColors.primary600)
+                                .padding(.top, AppSpacing.s)
+                        }
+                    }
+                    .padding(.bottom, AppSpacing.m)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(.horizontal, AppSpacing.l)
+        .padding(.top, AppSpacing.m)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .preferredColorScheme(.dark)
+    }
 }
 
 #Preview {
