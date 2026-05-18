@@ -25,6 +25,7 @@ final class FeedViewModel: ObservableObject {
     private var hasLoadedInitialData = false
     private var nextPage = DiaryService.defaultPage
     private var hasNextPage = true
+    private var isRefreshingFeed = false
     private var isRefreshingInteractions = false
     private var lastInteractionRefreshAt: Date?
     private let interactionRefreshCooldown: TimeInterval = 0.75
@@ -50,11 +51,19 @@ final class FeedViewModel: ObservableObject {
         await refresh()
     }
 
-    func refresh() async {
-        guard !isLoadingInitial else { return }
-        isLoadingInitial = true
+    func refresh(showInitialLoading: Bool = true) async {
+        guard !isRefreshingFeed else { return }
+        isRefreshingFeed = true
+        if showInitialLoading {
+            isLoadingInitial = true
+        }
         errorMessage = nil
-        defer { isLoadingInitial = false }
+        defer {
+            if showInitialLoading {
+                isLoadingInitial = false
+            }
+            isRefreshingFeed = false
+        }
 
         do {
             let response = try await fetchFeeds(
@@ -221,7 +230,7 @@ final class FeedViewModel: ObservableObject {
     func loadMoreIfNeeded(currentDiaryId: Int) async {
         guard feeds.last?.diaryId == currentDiaryId else { return }
         guard hasNextPage else { return }
-        guard !isLoadingInitial, !isLoadingMore else { return }
+        guard !isLoadingInitial, !isLoadingMore, !isRefreshingFeed else { return }
 
         isLoadingMore = true
         defer { isLoadingMore = false }

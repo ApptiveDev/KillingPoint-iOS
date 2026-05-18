@@ -80,6 +80,7 @@ struct SocialDiaryLikeUsersSheet: View {
         }
         .padding(.horizontal, AppSpacing.l)
         .padding(.top, AppSpacing.m)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)

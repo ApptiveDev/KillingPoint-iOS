@@ -6,6 +6,18 @@ struct SocialView: View {
     @ObservedObject var feedViewModel: FeedViewModel
     @State private var selectedTopTab: SocialTopTab = .feed
     @State private var isNotificationListActive = false
+    @State private var friendSearchText: String
+
+    init(
+        isRootTabSelected: Bool,
+        viewModel: SocialViewModel,
+        feedViewModel: FeedViewModel
+    ) {
+        self.isRootTabSelected = isRootTabSelected
+        self.viewModel = viewModel
+        self.feedViewModel = feedViewModel
+        _friendSearchText = State(initialValue: viewModel.currentSearchQuery)
+    }
 
     var body: some View {
         NavigationStack {
@@ -53,6 +65,7 @@ struct SocialView: View {
                         if selectedTopTab == .friend {
                             FriendsSectionView(
                                 viewModel: viewModel,
+                                searchText: $friendSearchText,
                                 bottomContentInset: friendsBottomContentInset
                             )
                         } else {
@@ -60,7 +73,9 @@ struct SocialView: View {
                                 viewModel: feedViewModel,
                                 isParentActive: isRootTabSelected && selectedTopTab == .feed,
                                 makeCollectionViewModel: { user in
-                                    viewModel.makeSocialMyCollectionViewModel(for: user)
+                                    viewModel.makeSocialMyCollectionViewModel(
+                                        for: resolvedCollectionUser(from: user)
+                                    )
                                 }
                             )
                         }
@@ -245,6 +260,20 @@ struct SocialView: View {
                 viewModel.notificationListViewModel.clearRoutingError()
             }
         )
+    }
+
+    private func resolvedCollectionUser(from user: UserModel) -> UserModel {
+        guard user.isMyPick == nil else { return user }
+
+        if let matchedMyPickUser = viewModel.myPickUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyPickUser, isMyPick: true)
+        }
+
+        if let matchedMyFandomUser = viewModel.myFandomUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyFandomUser, isMyPick: false)
+        }
+
+        return user
     }
 }
 

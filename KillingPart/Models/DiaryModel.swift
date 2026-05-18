@@ -40,6 +40,7 @@ struct DiaryFeedModel: Decodable, Identifiable {
     let username: String?
     let tag: String?
     let profileImageUrl: String?
+    let isMyPick: Bool?
 
     var id: Int { diaryId }
 
@@ -216,7 +217,8 @@ struct UserDiaryFeedModel: Decodable, Identifiable {
             userId: user.userId,
             username: user.username,
             tag: user.tag,
-            profileImageUrl: user.profileImageUrl
+            profileImageUrl: user.profileImageUrl,
+            isMyPick: user.isMyPick
         )
     }
 }
@@ -549,7 +551,8 @@ private struct CalendarDiaryFeedResponse: Decodable {
             userId: 0,
             username: nil,
             tag: nil,
-            profileImageUrl: nil
+            profileImageUrl: nil,
+            isMyPick: nil
         )
     }
 
@@ -617,7 +620,8 @@ extension DiaryFeedModel {
             userId: userId,
             username: username,
             tag: tag,
-            profileImageUrl: profileImageUrl
+            profileImageUrl: profileImageUrl,
+            isMyPick: isMyPick
         )
     }
 }
