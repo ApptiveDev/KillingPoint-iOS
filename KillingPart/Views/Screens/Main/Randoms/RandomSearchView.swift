@@ -7,6 +7,8 @@ struct RandomSearchView: View {
     @StateObject private var feedViewModel = FeedViewModel(feedSource: .random)
     @State private var isRefreshingFromTabEvent = false
     @State private var refreshErrorMessage: String?
+    @State private var lastTabEventRefreshAt: Date = .distantPast
+    private let tabEventRefreshDebounceInterval: TimeInterval = 3
 
     var body: some View {
         NavigationStack {
@@ -99,7 +101,10 @@ struct RandomSearchView: View {
     }
 
     private func refreshByTabEvent() {
+        let now = Date()
+        guard now.timeIntervalSince(lastTabEventRefreshAt) >= tabEventRefreshDebounceInterval else { return }
         guard !isRefreshingFromTabEvent else { return }
+        lastTabEventRefreshAt = now
         isRefreshingFromTabEvent = true
         refreshErrorMessage = nil
 
