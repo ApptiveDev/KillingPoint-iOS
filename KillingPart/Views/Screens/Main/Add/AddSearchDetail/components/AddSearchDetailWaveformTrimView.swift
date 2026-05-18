@@ -11,7 +11,7 @@ struct AddSearchDetailWaveformTrimView: View {
     let onUpdateRange: (_ start: Double, _ end: Double) -> Void
 
     private let horizontalPadding: CGFloat = 18
-    private let pointsPerSecond: CGFloat = 18
+    private let pointsPerSecond: CGFloat = 8
     private let trackHeight: CGFloat = 104
     private let handleLabelHeight: CGFloat = 18
     private let handleLabelWidth: CGFloat = 76

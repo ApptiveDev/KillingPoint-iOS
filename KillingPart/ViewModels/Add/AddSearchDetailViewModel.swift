@@ -46,7 +46,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     private let youtubeService: YoutubeServicing
     private let diaryService: DiaryServicing
     private var hasLoaded = false
-    private let minimumClipDuration: Double = 1
+    private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
 
     init(

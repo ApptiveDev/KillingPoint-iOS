@@ -45,7 +45,7 @@ struct AddSearchDetailTrimSection: View {
 
                     Spacer()
 
-                    Text("최대 30초")
+                    Text("10초 이상 · 최대 30초")
                         .font(AppFont.paperlogy4Regular(size: 12))
                         .foregroundStyle(.white.opacity(0.7))
                 }
