@@ -14,6 +14,7 @@ struct SocialFeedPageCardView: View {
     let onBlockTap: () -> Void
     let onDoubleTap: () -> Void
     let onVideoPlaybackEnded: () -> Void
+    let onVideoPlaybackStateChanged: (YoutubePlayerView.PlaybackState) -> Void
     @State private var shouldIgnoreNextLikeTap = false
 
     var body: some View {
@@ -126,7 +127,8 @@ struct SocialFeedPageCardView: View {
                     isVideoPlaying: isVideoPlaying,
                     playbackFocusToken: playbackFocusToken,
                     shouldLoadPlayer: shouldLoadPlayer,
-                    onPlaybackEnded: onVideoPlaybackEnded
+                    onPlaybackEnded: onVideoPlaybackEnded,
+                    onPlaybackStateChanged: onVideoPlaybackStateChanged
                 )
             }
             .padding(.horizontal, AppSpacing.m)
@@ -233,6 +235,7 @@ private struct SocialFeedVideoSection: View {
     let playbackFocusToken: Int
     let shouldLoadPlayer: Bool
     let onPlaybackEnded: () -> Void
+    let onPlaybackStateChanged: (YoutubePlayerView.PlaybackState) -> Void
 
     var body: some View {
         Group {
@@ -244,7 +247,8 @@ private struct SocialFeedVideoSection: View {
                     isPlaying: isVideoPlaying,
                     playbackFocusToken: playbackFocusToken,
                     shouldLoopPlayback: false,
-                    onPlaybackEnded: onPlaybackEnded
+                    onPlaybackEnded: onPlaybackEnded,
+                    onPlaybackStateChanged: onPlaybackStateChanged
                 )
                 .id(feed.diaryId)
             } else {

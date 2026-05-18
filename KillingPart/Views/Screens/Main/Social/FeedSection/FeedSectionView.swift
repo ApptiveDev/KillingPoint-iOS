@@ -17,6 +17,9 @@ struct FeedSectionView: View {
     @State private var pendingLikeUserDestination: UserModel?
     @State private var likeUsersSearchText = ""
     @State private var diaryReportContent = ""
+    @State private var isAutoAdvanceTransitioning = false
+    @State private var pendingAutoAdvancePauseDiaryID: Int?
+    @State private var playbackStatesByDiaryID: [Int: YoutubePlayerView.PlaybackState] = [:]
     @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
@@ -177,7 +180,9 @@ struct FeedSectionView: View {
             TabView(selection: $currentPageIndex) {
                 ForEach(viewModel.feeds.indices, id: \.self) { index in
                     let feed = viewModel.feeds[index]
-                    let isActive = index == currentPageIndex && isPlaybackActive
+                    let isActive = index == currentPageIndex
+                        && isPlaybackActive
+                        && !isAutoAdvanceTransitioning
                     // 현재 페이지와 인접 페이지를 미리 로드해 스와이프 전환 시 버벅임을 줄인다.
                     let shouldLoadPlayer = abs(index - currentPageIndex) <= 1
 
@@ -222,6 +227,9 @@ struct FeedSectionView: View {
                         onVideoPlaybackEnded: {
                             guard currentPageIndex == index else { return }
                             handleVideoPlaybackEnded(currentIndex: index, feed: feed)
+                        },
+                        onVideoPlaybackStateChanged: { state in
+                            handleVideoPlaybackStateChanged(state, diaryId: feed.diaryId)
                         }
                     )
                     .tag(index)
@@ -380,29 +388,71 @@ struct FeedSectionView: View {
     }
      
     private func handleVideoPlaybackEnded(currentIndex: Int, feed: DiaryFeedModel) {
-        Task {
+        guard !isAutoAdvanceTransitioning else { return }
+
+        Task { @MainActor in
+            guard !isAutoAdvanceTransitioning else { return }
+            guard currentPageIndex == currentIndex else { return }
+
             let nextIndex = currentIndex + 1
-            
-            // 미리 다음 페이지 데이터 로드
+
+            // 다음 카드 진입 전에 데이터 prefetch를 당겨서 cold start를 줄인다.
             if nextIndex >= viewModel.feeds.count - 2 {
-                await viewModel.loadMoreIfNeeded(currentDiaryId: feed.diaryId)
+                if let lastDiaryId = viewModel.feeds.last?.diaryId {
+                    await viewModel.loadMoreIfNeeded(currentDiaryId: lastDiaryId)
+                }
             }
-            
-            // 데이터 로딩 대기
+
+            // prefetch 진행 중이면 최대 1초까지 대기한다.
             var waitCount = 0
             while viewModel.isLoadingMore && waitCount < 20 {
                 try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
                 waitCount += 1
             }
-            
+
             guard nextIndex < viewModel.feeds.count else { return }
-            
-            await MainActor.run {
-                elapsedInCurrentRange = 0
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    currentPageIndex = nextIndex
-                }
+
+            // Handoff 1) 현재 카드 재생 게이트를 먼저 닫아 겹침을 방지한다.
+            isAutoAdvanceTransitioning = true
+            pendingAutoAdvancePauseDiaryID = feed.diaryId
+
+            // 이미 paused/ended 상태라면 즉시 통과하고, 아니면 최대 200ms 대기한다.
+            if let currentState = playbackStatesByDiaryID[feed.diaryId],
+               currentState == .paused || currentState == .ended {
+                pendingAutoAdvancePauseDiaryID = nil
+            } else {
+                await waitForCurrentCardPauseConfirmation()
             }
+
+            // Handoff 2) 다음 카드로 전환.
+            elapsedInCurrentRange = 0
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentPageIndex = nextIndex
+            }
+
+            // Handoff 3) 게이트를 열어 다음 카드 재생 허용.
+            isAutoAdvanceTransitioning = false
         }
+    }
+
+    private func waitForCurrentCardPauseConfirmation(maxWait: TimeInterval = 0.2) async {
+        let start = Date()
+        while pendingAutoAdvancePauseDiaryID != nil {
+            let elapsed = Date().timeIntervalSince(start)
+            if elapsed >= maxWait { break }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        pendingAutoAdvancePauseDiaryID = nil
+    }
+
+    private func handleVideoPlaybackStateChanged(
+        _ state: YoutubePlayerView.PlaybackState,
+        diaryId: Int
+    ) {
+        playbackStatesByDiaryID[diaryId] = state
+
+        guard pendingAutoAdvancePauseDiaryID == diaryId else { return }
+        guard state == .paused || state == .ended else { return }
+        pendingAutoAdvancePauseDiaryID = nil
     }
 }

@@ -3,6 +3,13 @@ import UIKit
 import WebKit
 
 struct YoutubePlayerView: UIViewRepresentable {
+    enum PlaybackState: String, Equatable {
+        case playing
+        case paused
+        case buffering
+        case ended
+    }
+
     @Environment(\.openURL) private var openURL
 
     let videoURL: URL?
@@ -12,6 +19,7 @@ struct YoutubePlayerView: UIViewRepresentable {
     let playbackFocusToken: Int
     let shouldLoopPlayback: Bool
     let onPlaybackEnded: (() -> Void)?
+    let onPlaybackStateChanged: ((PlaybackState) -> Void)?
 
     init(
         videoURL: URL?,
@@ -20,7 +28,8 @@ struct YoutubePlayerView: UIViewRepresentable {
         isPlaying: Bool = true,
         playbackFocusToken: Int = 0,
         shouldLoopPlayback: Bool = true,
-        onPlaybackEnded: (() -> Void)? = nil
+        onPlaybackEnded: (() -> Void)? = nil,
+        onPlaybackStateChanged: ((PlaybackState) -> Void)? = nil
     ) {
         self.videoURL = videoURL
         self.startSeconds = startSeconds
@@ -29,6 +38,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         self.playbackFocusToken = playbackFocusToken
         self.shouldLoopPlayback = shouldLoopPlayback
         self.onPlaybackEnded = onPlaybackEnded
+        self.onPlaybackStateChanged = onPlaybackStateChanged
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -77,6 +87,7 @@ struct YoutubePlayerView: UIViewRepresentable {
             openURL(targetURL)
         }
         context.coordinator.onPlaybackEnded = onPlaybackEnded
+        context.coordinator.onPlaybackStateChanged = onPlaybackStateChanged
 
         guard
             let videoURL,
@@ -90,7 +101,7 @@ struct YoutubePlayerView: UIViewRepresentable {
 
         let targetStart = normalizedSeconds(startSeconds)
         let targetEnd = max(normalizedSeconds(endSeconds), targetStart + 0.1)
-        let preferMutedAutoplay = false
+        let preferMutedAutoplay = ProcessInfo.processInfo.isLowPowerModeEnabled
         if context.coordinator.loadedVideoID != videoID {
             context.coordinator.loadedVideoID = videoID
             context.coordinator.lastSyncedStart = targetStart
@@ -142,9 +153,6 @@ struct YoutubePlayerView: UIViewRepresentable {
                 || isMutedAutoplayPreferenceChanged
                 || isPlaybackFocusTokenChanged
         else {
-            if isPlaying {
-                context.coordinator.kickPlaybackRecoveryIfNeeded(forceSeek: false)
-            }
             return
         }
 
@@ -222,6 +230,9 @@ struct YoutubePlayerView: UIViewRepresentable {
             if (window.kpStopPlaybackWatchdog) {
                 window.kpStopPlaybackWatchdog();
             }
+            if (window.kpStopRangeLoop) {
+                window.kpStopRangeLoop();
+            }
             window.kpAutoplayMutedFallbackActive = false;
             window.kpAutoplayAudioRestoreAttempted = false;
             if (window.kpPlayer.unMute) {
@@ -269,6 +280,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         var redirectURL: URL?
         var openExternalURL: ((URL) -> Void)?
         var onPlaybackEnded: (() -> Void)?
+        var onPlaybackStateChanged: ((PlaybackState) -> Void)?
         var hasDispatchedEnded = false
         private var lowPowerModeObserver: NSObjectProtocol?
         private var didBecomeActiveObserver: NSObjectProtocol?
@@ -414,7 +426,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         private func applyAutoplayPolicyForCurrentPowerMode(forceSeek: Bool) {
             guard let webView, let isPlaying = lastSyncedIsPlaying else { return }
 
-            let preferMutedAutoplay = false
+            let preferMutedAutoplay = ProcessInfo.processInfo.isLowPowerModeEnabled
             lastSyncedPreferMutedAutoplay = preferMutedAutoplay
 
             let shouldAutoplayJS = isPlaying ? "true" : "false"
@@ -450,8 +462,13 @@ struct YoutubePlayerView: UIViewRepresentable {
                     if (window.kpStartPlaybackWatchdog) {
                         window.kpStartPlaybackWatchdog();
                     }
-                } else if (window.kpStopPlaybackWatchdog) {
-                    window.kpStopPlaybackWatchdog();
+                } else {
+                    if (window.kpStopRangeLoop) {
+                        window.kpStopRangeLoop();
+                    }
+                    if (window.kpStopPlaybackWatchdog) {
+                        window.kpStopPlaybackWatchdog();
+                    }
                 }
                 """,
                 completionHandler: nil
@@ -464,12 +481,28 @@ struct YoutubePlayerView: UIViewRepresentable {
         ) {
             guard message.name == Self.playbackEventMessageName else { return }
             guard let event = message.body as? String else { return }
-            guard event == "ended" else { return }
-            guard !hasDispatchedEnded else { return }
-            hasDispatchedEnded = true
-            DispatchQueue.main.async {
-                self.onPlaybackEnded?()
+
+            if event == "ended" {
+                guard !hasDispatchedEnded else { return }
+                hasDispatchedEnded = true
+                DispatchQueue.main.async {
+                    self.onPlaybackStateChanged?(.ended)
+                    self.onPlaybackEnded?()
+                }
+                return
             }
+
+            if let playbackState = playbackState(from: event) {
+                DispatchQueue.main.async {
+                    self.onPlaybackStateChanged?(playbackState)
+                }
+            }
+        }
+
+        private func playbackState(from event: String) -> PlaybackState? {
+            guard event.hasPrefix("state:") else { return nil }
+            let raw = String(event.dropFirst("state:".count))
+            return PlaybackState(rawValue: raw)
         }
     }
 
@@ -626,6 +659,18 @@ struct YoutubePlayerView: UIViewRepresentable {
                     }
                 };
 
+                window.kpNotifyPlaybackState = function(stateLabel) {
+                    if (
+                        window.webkit
+                        && window.webkit.messageHandlers
+                        && window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName)
+                    ) {
+                        window.webkit.messageHandlers.\(Coordinator.playbackEventMessageName).postMessage(
+                            'state:' + stateLabel
+                        );
+                    }
+                };
+
                 function kpNormalizedStart() {
                     var targetStart = Number(window.kpDesiredStart || 0);
                     if (isNaN(targetStart) || targetStart < 0) {
@@ -702,10 +747,15 @@ struct YoutubePlayerView: UIViewRepresentable {
                     }, retryDelay);
                 };
 
-                window.kpStartRangeLoop = function() {
+                window.kpStopRangeLoop = function() {
                     if (window.kpLoopTimer) {
                         clearInterval(window.kpLoopTimer);
+                        window.kpLoopTimer = null;
                     }
+                };
+
+                window.kpStartRangeLoop = function() {
+                    window.kpStopRangeLoop();
 
                     window.kpLoopTimer = setInterval(function() {
                         if (!window.kpPlayerReady || !window.kpPlayer) {
@@ -722,11 +772,11 @@ struct YoutubePlayerView: UIViewRepresentable {
                             var targetEnd = kpNormalizedEnd(targetStart);
                             var current = Number(window.kpPlayer.getCurrentTime ? window.kpPlayer.getCurrentTime() : targetStart);
                             
-                            // 영상 끝 감지 - 0.3초 여유를 둠
+                            // 종료 판정을 너무 일찍 하지 않도록 여유를 최소화한다.
                             if (
                                 !window.kpShouldLoopPlayback
                                 && !isNaN(current)
-                                && current >= (targetEnd - 0.3)
+                                && current >= (targetEnd - 0.08)
                             ) {
                                 if (window.kpPlayer.pauseVideo) {
                                     window.kpPlayer.pauseVideo();
@@ -863,6 +913,9 @@ struct YoutubePlayerView: UIViewRepresentable {
                                     window.kpStartPlaybackWatchdog();
                                     window.kpResumeAutoplayIfNeeded(true);
                                 } else {
+                                    if (window.kpStopRangeLoop) {
+                                        window.kpStopRangeLoop();
+                                    }
                                     window.kpStopPlaybackWatchdog();
                                     if (window.kpPlayer.unMute) {
                                         window.kpPlayer.unMute();
@@ -873,6 +926,16 @@ struct YoutubePlayerView: UIViewRepresentable {
                             },
                             onStateChange: function(event) {
                                 var state = Number(event.data);
+                                if (state === 1) {
+                                    window.kpNotifyPlaybackState('playing');
+                                } else if (state === 3) {
+                                    window.kpNotifyPlaybackState('buffering');
+                                } else if (state === 2 || state === 5) {
+                                    window.kpNotifyPlaybackState('paused');
+                                } else if (state === 0) {
+                                    window.kpNotifyPlaybackState('ended');
+                                }
+
                                 if (!window.kpShouldAutoplay) {
                                     return;
                                 }
@@ -969,9 +1032,8 @@ struct YoutubePlayerView: UIViewRepresentable {
                 });
 
                 window.addEventListener('beforeunload', function() {
-                    if (window.kpLoopTimer) {
-                        clearInterval(window.kpLoopTimer);
-                        window.kpLoopTimer = null;
+                    if (window.kpStopRangeLoop) {
+                        window.kpStopRangeLoop();
                     }
                     if (window.kpAutoplayRetryTimer) {
                         clearTimeout(window.kpAutoplayRetryTimer);
