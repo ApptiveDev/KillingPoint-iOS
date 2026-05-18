@@ -115,7 +115,11 @@ final class AppViewModel: ObservableObject {
 
         do {
             let settings = try await userService.fetchInitSettings()
-            applyRoute(for: settings)
+            let shouldSkipNameSetupForAppleLogin = await resolveShouldSkipNameSetupForAppleLogin(with: settings)
+            applyRoute(
+                for: settings,
+                shouldSkipNameSetupForAppleLogin: shouldSkipNameSetupForAppleLogin
+            )
 
             if settings.app.needsForceUpdate {
                 updatePrompt = .force
@@ -146,10 +150,14 @@ final class AppViewModel: ObservableObject {
         currentStep = .login
     }
 
-    private func applyRoute(for settings: UserInitSettingsResponse) {
+    private func applyRoute(
+        for settings: UserInitSettingsResponse,
+        shouldSkipNameSetupForAppleLogin: Bool
+    ) {
         if settings.needsPolicyAgreement || settings.needsTagSetup {
             let setupViewModel = InitialSetupFlowViewModel(
                 settings: settings,
+                shouldSkipNameSetupForAppleLogin: shouldSkipNameSetupForAppleLogin,
                 userService: userService,
                 diaryService: diaryService,
                 calendarService: calendarService
@@ -165,9 +173,40 @@ final class AppViewModel: ObservableObject {
         enterMainFlow()
     }
 
+    private func resolveShouldSkipNameSetupForAppleLogin(with settings: UserInitSettingsResponse) async -> Bool {
+        guard settings.needsPolicyAgreement || settings.needsTagSetup else {
+            return false
+        }
+
+        if let provider = loginViewModel.lastSuccessfulLoginProvider {
+            switch provider {
+            case .apple:
+                return true
+            case .kakao, .google, .tester:
+                return false
+            }
+        }
+
+        do {
+            let user = try await userService.fetchMyUser()
+            return isAppleSocialType(user.socialType)
+        } catch {
+            return false
+        }
+    }
+
+    private func isAppleSocialType(_ rawSocialType: String) -> Bool {
+        rawSocialType
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased() == "APPLE"
+    }
+
     private func enterMainFlow() {
         setupFlowViewModel = nil
         currentStep = .main
+        DispatchQueue.main.async {
+            PushNotificationPermissionManager.handleAuthorizationAfterEnteringMain()
+        }
     }
 
     private func resolveErrorMessage(from error: Error) -> String {

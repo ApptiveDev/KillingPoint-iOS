@@ -2,14 +2,19 @@ import SwiftUI
 
 struct RandomSearchView: View {
     let isRootTabSelected: Bool
+    let refreshTrigger: Int
     @StateObject private var socialViewModel = SocialViewModel()
     @StateObject private var feedViewModel = FeedViewModel(feedSource: .random)
+    @State private var isRefreshingFromTabEvent = false
+    @State private var refreshErrorMessage: String?
+    @State private var lastTabEventRefreshAt: Date = .distantPast
+    private let tabEventRefreshDebounceInterval: TimeInterval = 3
 
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
-                let extraBottomInset = AppSpacing.m
+                let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.xl
+                let extraBottomInset = AppSpacing.xl
 
                 ZStack {
                     Image("my_background")
@@ -24,7 +29,9 @@ struct RandomSearchView: View {
                             viewModel: feedViewModel,
                             isParentActive: isRootTabSelected,
                             makeCollectionViewModel: { user in
-                                socialViewModel.makeSocialMyCollectionViewModel(for: user)
+                                socialViewModel.makeSocialMyCollectionViewModel(
+                                    for: resolvedCollectionUser(from: user)
+                                )
                             }
                         )
                     }
@@ -32,6 +39,16 @@ struct RandomSearchView: View {
                     .padding(.horizontal, AppSpacing.m)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.bottom, bottomInset + extraBottomInset)
+
+                    if isRefreshingFromTabEvent {
+                        Color.black.opacity(0.28)
+                            .ignoresSafeArea()
+
+                        ProgressView()
+                            .tint(AppColors.primary600)
+                            .padding(AppSpacing.l)
+                            .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .toolbar(.hidden, for: .navigationBar)
@@ -39,11 +56,81 @@ struct RandomSearchView: View {
             }
         }
         .task {
-            await feedViewModel.loadInitialDataIfNeeded()
+            async let loadFeedTask: Void = feedViewModel.loadInitialDataIfNeeded()
+            async let loadSocialTask: Void = socialViewModel.loadInitialDataIfNeeded()
+            _ = await (loadFeedTask, loadSocialTask)
         }
+        .onChange(of: refreshTrigger) { _ in
+            guard isRootTabSelected else { return }
+            refreshByTabEvent()
+        }
+        .alert(
+            "탐색 새로고침 실패",
+            isPresented: refreshErrorPresentedBinding
+        ) {
+            Button("확인", role: .cancel) {
+                refreshErrorMessage = nil
+            }
+        } message: {
+            Text(refreshErrorMessage ?? "새로고침에 실패했어요.")
+        }
+    }
+
+    private func resolvedCollectionUser(from user: UserModel) -> UserModel {
+        guard user.isMyPick == nil else { return user }
+
+        if let matchedMyPickUser = socialViewModel.myPickUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyPickUser, isMyPick: true)
+        }
+
+        if let matchedMyFandomUser = socialViewModel.myFandomUsers.first(where: { $0.userId == user.userId }) {
+            return UserModel(from: matchedMyFandomUser, isMyPick: false)
+        }
+
+        return user
+    }
+
+    private var refreshErrorPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { refreshErrorMessage != nil },
+            set: { isPresented in
+                guard !isPresented else { return }
+                refreshErrorMessage = nil
+            }
+        )
+    }
+
+    private func refreshByTabEvent() {
+        let now = Date()
+        guard now.timeIntervalSince(lastTabEventRefreshAt) >= tabEventRefreshDebounceInterval else { return }
+        guard !isRefreshingFromTabEvent else { return }
+        lastTabEventRefreshAt = now
+        isRefreshingFromTabEvent = true
+        refreshErrorMessage = nil
+
+        Task { @MainActor in
+            async let refreshFeedTask: Void = feedViewModel.refresh(showInitialLoading: false)
+            async let refreshSocialTask: Void = socialViewModel.refreshDefaultLists()
+            _ = await (refreshFeedTask, refreshSocialTask)
+
+            if let message = resolvedRefreshErrorMessage() {
+                refreshErrorMessage = message
+            }
+            isRefreshingFromTabEvent = false
+        }
+    }
+
+    private func resolvedRefreshErrorMessage() -> String? {
+        if let feedErrorMessage = feedViewModel.errorMessage {
+            return feedErrorMessage
+        }
+        if let socialErrorMessage = socialViewModel.errorMessage {
+            return socialErrorMessage
+        }
+        return nil
     }
 }
 
 #Preview {
-    RandomSearchView(isRootTabSelected: true)
+    RandomSearchView(isRootTabSelected: true, refreshTrigger: 0)
 }

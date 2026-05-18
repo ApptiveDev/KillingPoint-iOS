@@ -643,7 +643,8 @@ private extension DiaryFeedModel {
             userId: userId,
             username: username,
             tag: tag,
-            profileImageUrl: profileImageUrl
+            profileImageUrl: profileImageUrl,
+            isMyPick: isMyPick
         )
     }
 }

@@ -36,22 +36,29 @@ final class InitialSetupFlowViewModel: ObservableObject {
     private let userService: UserServicing
     private let diaryService: DiaryServicing
     private let calendarService: CalendarServicing
+    private let shouldSkipNameSetupForAppleLogin: Bool
 
     var onComplete: (() -> Void)?
 
     init(
         settings: UserInitSettingsResponse,
+        shouldSkipNameSetupForAppleLogin: Bool = false,
         userService: UserServicing = UserService(),
         diaryService: DiaryServicing = DiaryService(),
         calendarService: CalendarServicing = CalendarService()
     ) {
         self.initSettings = settings
+        self.shouldSkipNameSetupForAppleLogin = shouldSkipNameSetupForAppleLogin
         self.userService = userService
         self.diaryService = diaryService
         self.calendarService = calendarService
-        self.step = settings.needsPolicyAgreement
-            ? .policyAgreement
-            : (settings.needsTagSetup ? .nameSetup : .tutorialChoice)
+        if settings.needsPolicyAgreement {
+            self.step = .policyAgreement
+        } else if settings.needsTagSetup {
+            self.step = shouldSkipNameSetupForAppleLogin ? .tagSetup : .nameSetup
+        } else {
+            self.step = .tutorialChoice
+        }
         syncPolicyAgreementState(with: settings)
     }
 
@@ -298,7 +305,7 @@ final class InitialSetupFlowViewModel: ObservableObject {
         }
 
         if settings.needsTagSetup {
-            step = .nameSetup
+            step = shouldSkipNameSetupForAppleLogin ? .tagSetup : .nameSetup
             return
         }
 

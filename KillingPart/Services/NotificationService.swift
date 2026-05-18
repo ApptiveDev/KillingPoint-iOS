@@ -3,10 +3,99 @@ import Foundation
 protocol NotificationServicing {
     func fetchMyNotificationSetting() async throws -> NotificationSettingModel
     func updateMyNotificationSetting(alarmEnabled: Bool) async throws -> NotificationSettingModel
+    func fetchAlarmHistory(page: Int, size: Int) async throws -> AlarmHistoryResponse
+}
+
+struct AlarmType: RawRepresentable, Hashable, Codable {
+    let rawValue: String
+
+    init(rawValue: String) {
+        self.rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
+    static let like = AlarmType(rawValue: "LIKE_ALARM")
+    static let subscribe = AlarmType(rawValue: "SUBSCRIBE_ALARM")
+    static let diary = AlarmType(rawValue: "DIARY_ALARM")
+    static let unknown = AlarmType(rawValue: "UNKNOWN")
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let decoded = (try? container.decode(String.self)) ?? ""
+        self.init(rawValue: decoded)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 struct NotificationSettingModel {
     let alarmEnabled: Bool
+}
+
+struct AlarmHistoryItem: Decodable, Identifiable, Hashable {
+    let alarmId: Int
+    let title: String
+    let content: String
+    let deepLink: String
+    let type: AlarmType
+    let createDate: String?
+
+    var id: Int { alarmId }
+
+    private enum CodingKeys: String, CodingKey {
+        case alarmId
+        case title
+        case content
+        case deepLink
+        case type
+        case createDate
+        case createdDate
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if let intValue = try? container.decode(Int.self, forKey: .alarmId) {
+            alarmId = intValue
+        } else if
+            let stringValue = try? container.decode(String.self, forKey: .alarmId),
+            let intValue = Int(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        {
+            alarmId = intValue
+        } else {
+            alarmId = 0
+        }
+
+        title = (try? container.decode(String.self, forKey: .title)) ?? ""
+        content = (try? container.decode(String.self, forKey: .content)) ?? ""
+        deepLink = (try? container.decode(String.self, forKey: .deepLink)) ?? ""
+        type = (try? container.decode(AlarmType.self, forKey: .type)) ?? .unknown
+
+        if let createDateValue = try? container.decodeIfPresent(String.self, forKey: .createDate), !createDateValue.isEmpty {
+            createDate = createDateValue
+        } else if let createdDateValue = try? container.decodeIfPresent(String.self, forKey: .createdDate), !createdDateValue.isEmpty {
+            createDate = createdDateValue
+        } else if let createdAtValue = try? container.decodeIfPresent(String.self, forKey: .createdAt), !createdAtValue.isEmpty {
+            createDate = createdAtValue
+        } else {
+            createDate = nil
+        }
+    }
+}
+
+struct AlarmHistoryPage: Decodable {
+    let size: Int
+    let number: Int
+    let totalElements: Int
+    let totalPages: Int
+}
+
+struct AlarmHistoryResponse: Decodable {
+    let content: [AlarmHistoryItem]
+    let page: AlarmHistoryPage
 }
 
 enum NotificationServiceError: LocalizedError {
@@ -37,6 +126,24 @@ struct NotificationService: NotificationServicing {
 
     init(apiClient: APIClienting = APIClient.shared) {
         self.apiClient = apiClient
+    }
+
+    func fetchAlarmHistory(page: Int, size: Int) async throws -> AlarmHistoryResponse {
+        do {
+            let request = APIRequest(
+                path: "/alarms",
+                method: .get,
+                queryItems: [
+                    URLQueryItem(name: "page", value: "\(max(page, 0))"),
+                    URLQueryItem(name: "size", value: "\(max(size, 1))")
+                ],
+                requiresAuthorization: true
+            )
+            return try await apiClient.request(request, responseType: AlarmHistoryResponse.self)
+        } catch {
+            if isRequestCancelled(error) { throw error }
+            throw mapError(error)
+        }
     }
 
     func fetchMyNotificationSetting() async throws -> NotificationSettingModel {

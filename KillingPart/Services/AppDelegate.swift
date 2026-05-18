@@ -12,8 +12,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
-        print("[FCM][1] Firebase 초기화 완료, 알림 권한 요청 시작")
-        requestNotificationAuthorization()
+        if let remotePayload = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
+            FCMManager.shared.handleLaunchRemoteNotification(remotePayload)
+        }
+        print("[FCM][1] Firebase 초기화 완료")
         return true
     }
 
@@ -45,27 +47,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         completionHandler(.newData)
     }
 
-    private func requestNotificationAuthorization() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            print("[FCM][2] 현재 알림 권한 상태: \(settings.authorizationStatus.debugDescription)")
-        }
-
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if let error {
-                print("[FCM][2] ❌ 알림 권한 요청 오류: \(error.localizedDescription)")
-                return
-            }
-            print("[FCM][2] 알림 권한 \(granted ? "✅ 허용" : "❌ 거부")")
-            if granted {
-                DispatchQueue.main.async {
-                    print("[FCM][2] APNs 등록 요청 시작")
-                    UIApplication.shared.registerForRemoteNotifications()
-                }
-            } else {
-                print("[FCM][2] ⚠️ 권한 거부 — 설정 앱에서 알림을 허용해야 합니다")
-            }
-        }
-    }
 }
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
@@ -106,18 +87,5 @@ extension AppDelegate: MessagingDelegate {
 
         print("[FCM][4] FCM 토큰: \(token)")
         FCMManager.shared.didReceiveToken(token)
-    }
-}
-
-private extension UNAuthorizationStatus {
-    var debugDescription: String {
-        switch self {
-        case .notDetermined: return "notDetermined"
-        case .denied:        return "denied ❌"
-        case .authorized:    return "authorized ✅"
-        case .provisional:   return "provisional"
-        case .ephemeral:     return "ephemeral"
-        @unknown default:    return "unknown"
-        }
     }
 }
