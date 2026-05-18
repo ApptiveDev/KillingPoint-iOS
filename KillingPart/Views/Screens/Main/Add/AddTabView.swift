@@ -10,12 +10,22 @@ struct AddTabView: View {
                 let listBottomContentInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
 
                 ZStack {
-                    Image("add_background")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                    Color.kpGray900
                         .ignoresSafeArea()
+
+                    VStack {
+                        Image("ic_killingpart_dark")
+                            .renderingMode(.original)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 300, height: 300)
+                            .allowsHitTesting(false)
+
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 40)
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
 
                     VStack(alignment: .leading, spacing: AppSpacing.m) {
                         AddSearchFieldView(
