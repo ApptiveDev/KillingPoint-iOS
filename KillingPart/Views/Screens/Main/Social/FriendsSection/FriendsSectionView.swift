@@ -2,9 +2,9 @@ import SwiftUI
 
 struct FriendsSectionView: View {
     @ObservedObject var viewModel: SocialViewModel
+    @Binding var searchText: String
     let bottomContentInset: CGFloat
     @State private var selectedFriendSection: SocialFriendSection = .myPick
-    @State private var searchText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.m) {

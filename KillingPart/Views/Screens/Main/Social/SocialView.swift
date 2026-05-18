@@ -6,6 +6,18 @@ struct SocialView: View {
     @ObservedObject var feedViewModel: FeedViewModel
     @State private var selectedTopTab: SocialTopTab = .feed
     @State private var isNotificationListActive = false
+    @State private var friendSearchText: String
+
+    init(
+        isRootTabSelected: Bool,
+        viewModel: SocialViewModel,
+        feedViewModel: FeedViewModel
+    ) {
+        self.isRootTabSelected = isRootTabSelected
+        self.viewModel = viewModel
+        self.feedViewModel = feedViewModel
+        _friendSearchText = State(initialValue: viewModel.currentSearchQuery)
+    }
 
     var body: some View {
         NavigationStack {
@@ -53,6 +65,7 @@ struct SocialView: View {
                         if selectedTopTab == .friend {
                             FriendsSectionView(
                                 viewModel: viewModel,
+                                searchText: $friendSearchText,
                                 bottomContentInset: friendsBottomContentInset
                             )
                         } else {
