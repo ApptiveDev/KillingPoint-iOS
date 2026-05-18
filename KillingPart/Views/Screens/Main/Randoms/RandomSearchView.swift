@@ -8,8 +8,8 @@ struct RandomSearchView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
-                let extraBottomInset = AppSpacing.m
+                let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.xl
+                let extraBottomInset = AppSpacing.xl
 
                 ZStack {
                     Image("my_background")
