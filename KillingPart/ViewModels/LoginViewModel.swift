@@ -45,7 +45,7 @@ final class LoginViewModel: ObservableObject {
             if isSuccess {
                 isNewUser = false
                 lastSuccessfulLoginProvider = nil
-                trackLoginSuccess(provider: "email", isNewUser: false)
+                trackLoginCompletion(provider: "email", isNewUser: false)
                 onLoginSuccess?(false)
             } else {
                 loginErrorMessage = "이메일과 비밀번호를 입력해주세요."
@@ -64,7 +64,7 @@ final class LoginViewModel: ObservableObject {
                 let response = try await authenticationService.loginWithKakao(accessToken: kakaoAccessToken)
                 isNewUser = response.isNew
                 lastSuccessfulLoginProvider = .kakao
-                trackLoginSuccess(provider: "kakao", isNewUser: response.isNew)
+                trackLoginCompletion(provider: "kakao", isNewUser: response.isNew)
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
@@ -92,7 +92,7 @@ final class LoginViewModel: ObservableObject {
                 )
                 isNewUser = response.isNew
                 lastSuccessfulLoginProvider = .apple
-                trackLoginSuccess(provider: "apple", isNewUser: response.isNew)
+                trackLoginCompletion(provider: "apple", isNewUser: response.isNew)
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
@@ -115,7 +115,7 @@ final class LoginViewModel: ObservableObject {
                 let response = try await authenticationService.loginWithGoogle(idToken: googleIDToken)
                 isNewUser = response.isNew
                 lastSuccessfulLoginProvider = .google
-                trackLoginSuccess(provider: "google", isNewUser: response.isNew)
+                trackLoginCompletion(provider: "google", isNewUser: response.isNew)
                 onLoginSuccess?(response.isNew)
             } catch let authError as AuthenticationServiceError {
                 loginErrorMessage = authError.errorDescription
@@ -137,7 +137,7 @@ final class LoginViewModel: ObservableObject {
                 _ = try await authService.loginWithTester()
                 isNewUser = true
                 lastSuccessfulLoginProvider = .tester
-                trackLoginSuccess(provider: "tester", isNewUser: true)
+                trackLoginCompletion(provider: "tester", isNewUser: true)
                 onLoginSuccess?(true)
             } catch let socialError as AuthServiceError {
                 loginErrorMessage = socialError.errorDescription
@@ -169,9 +169,10 @@ final class LoginViewModel: ObservableObject {
         activeSocialLoginProvider = nil
     }
 
-    private func trackLoginSuccess(provider: String, isNewUser: Bool) {
+    private func trackLoginCompletion(provider: String, isNewUser: Bool) {
+        let eventType = isNewUser ? "signup_completed" : "signin_completed"
         AmplitudeClient.shared.track(
-            eventType: "auth_login_success",
+            eventType: eventType,
             properties: [
                 "provider": provider,
                 "is_new_user": isNewUser

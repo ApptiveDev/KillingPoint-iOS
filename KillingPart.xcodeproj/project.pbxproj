@@ -11,12 +11,12 @@
 		1224698D2FA765FE00A6EF76 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 1224698C2FA765FE00A6EF76 /* FirebaseMessaging */; };
 		1260BBC62FA88B900006BF01 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 1260BBC52FA88B900006BF01 /* GoogleSignIn */; };
 		1260BBC82FA88B900006BF01 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1260BBC72FA88B900006BF01 /* GoogleSignInSwift */; };
-		13A100032FF5A00000A1B001 /* AmplitudeUnified in Frameworks */ = {isa = PBXBuildFile; productRef = 13A100022FF5A00000A1B001 /* AmplitudeUnified */; };
 		12CE25AA2F3DC9BE0057A858 /* Development.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25A92F3DC9BE0057A858 /* Development.xcconfig */; };
 		12CE25AC2F3DCA940057A858 /* Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25AB2F3DCA940057A858 /* Release.xcconfig */; };
 		12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0112F3F010000A00001 /* KakaoSDKCommon */; };
 		12F7A0022F3F010000A00001 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0122F3F010000A00001 /* KakaoSDKAuth */; };
 		12F7A0032F3F010000A00001 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0132F3F010000A00001 /* KakaoSDKUser */; };
+		13A100032FF5A00000A1B001 /* AmplitudeUnified in Frameworks */ = {isa = PBXBuildFile; productRef = 13A100022FF5A00000A1B001 /* AmplitudeUnified */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -452,7 +452,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KillingPart/KillingPart.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 40;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_APP_SANDBOX = YES;
@@ -477,7 +477,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.2.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.killingpoint.killingpart;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -497,7 +497,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KillingPart/KillingPart.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 40;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_APP_SANDBOX = YES;
@@ -522,7 +522,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.2.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.killingpoint.killingpart;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -687,19 +687,19 @@
 				minimumVersion = 9.1.0;
 			};
 		};
-		13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/amplitude/AmplitudeUnified-Swift";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
 		12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kakao/kakao-ios-sdk";
 			requirement = {
 				branch = master;
+				kind = branch;
+			};
+		};
+		13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/amplitude/AmplitudeUnified-Swift";
+			requirement = {
+				branch = main;
 				kind = branch;
 			};
 		};
@@ -726,11 +726,6 @@
 			package = 1260BBC42FA88B900006BF01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
 		};
-		13A100022FF5A00000A1B001 /* AmplitudeUnified */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */;
-			productName = AmplitudeUnified;
-		};
 		12F7A0112F3F010000A00001 /* KakaoSDKCommon */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
@@ -745,6 +740,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
 			productName = KakaoSDKUser;
+		};
+		13A100022FF5A00000A1B001 /* AmplitudeUnified */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */;
+			productName = AmplitudeUnified;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         let amplitudeApiKey = (Bundle.main.object(forInfoDictionaryKey: "AMPLITUDE_API_KEY") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         AmplitudeClient.shared.configure(apiKey: amplitudeApiKey)
-        AmplitudeClient.shared.track(eventType: "amplitude_test_app_launch")
+        AmplitudeClient.shared.track(eventType: "app_opened")
         print("[FCM][1] Firebase 초기화 완료")
         return true
     }
