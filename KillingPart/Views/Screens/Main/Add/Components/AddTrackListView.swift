@@ -20,6 +20,12 @@ struct AddTrackListView: View {
                         AddTrackRowView(track: track)
                     }
                     .buttonStyle(.plain)
+                    .simultaneousGesture(
+                        TapGesture()
+                            .onEnded {
+                                trackSelectedEvent(for: track)
+                            }
+                    )
                     .onAppear {
                         onTrackAppear(track.id)
                     }
@@ -40,6 +46,18 @@ struct AddTrackListView: View {
         }
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
+    }
+
+    private func trackSelectedEvent(for track: SpotifySimpleTrack) {
+        AmplitudeClient.shared.track(
+            eventType: "track_selected",
+            properties: [
+                "track_id": track.id,
+                "track_title": track.title,
+                "track_artist": track.artist,
+                "album_id": track.albumId
+            ]
+        )
     }
 }
 

@@ -1,6 +1,12 @@
 import SwiftUI
 import UIKit
 
+enum AddSearchDetailTrimInteractionControl: String {
+    case left
+    case right
+    case spectrumBar = "spectrum_bar"
+}
+
 struct AddSearchDetailWaveformTrimView: View {
     @Binding var startSeconds: Double
     @Binding var endSeconds: Double
@@ -8,6 +14,7 @@ struct AddSearchDetailWaveformTrimView: View {
     let startTimeText: String
     let endTimeText: String
     let onTrimInteracted: () -> Void
+    let onInteractionEnded: (_ control: AddSearchDetailTrimInteractionControl) -> Void
     let onUpdateRange: (_ start: Double, _ end: Double) -> Void
 
     private let horizontalPadding: CGFloat = 18
@@ -41,6 +48,7 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var timelineViewportOffsetX: CGFloat = 0
     @State private var timelineViewportWidth: CGFloat = 0
     @State private var timelineContentWidth: CGFloat = 0
+    @State private var timelineScrollEndWorkItem: DispatchWorkItem?
 
     var body: some View {
         GeometryReader { proxy in
@@ -67,9 +75,7 @@ struct AddSearchDetailWaveformTrimView: View {
                                 }
                             },
                             onViewportChange: { viewport in
-                                timelineViewportOffsetX = viewport.contentOffsetX
-                                timelineViewportWidth = viewport.viewportWidth
-                                timelineContentWidth = viewport.contentWidth
+                                handleTimelineViewportChanged(viewport)
                             }
                         )
                     }
@@ -88,6 +94,8 @@ struct AddSearchDetailWaveformTrimView: View {
         }
         .onDisappear {
             stopAutoScrollTimer()
+            timelineScrollEndWorkItem?.cancel()
+            timelineScrollEndWorkItem = nil
         }
     }
 
@@ -261,6 +269,9 @@ struct AddSearchDetailWaveformTrimView: View {
                     let target = timeForOverviewX(value.location.x, width: width)
                     moveSelectionCenter(to: target)
                 }
+                .onEnded { _ in
+                    onInteractionEnded(.spectrumBar)
+                }
         )
     }
 
@@ -385,6 +396,34 @@ struct AddSearchDetailWaveformTrimView: View {
         return clampedOffset...upper
     }
 
+    private func handleTimelineViewportChanged(_ viewport: AddSearchDetailTimelineViewport) {
+        let previousOffset = timelineViewportOffsetX
+        timelineViewportOffsetX = viewport.contentOffsetX
+        timelineViewportWidth = viewport.viewportWidth
+        timelineContentWidth = viewport.contentWidth
+
+        let didOffsetChange = abs(previousOffset - viewport.contentOffsetX) > 0.5
+        guard didOffsetChange else { return }
+        guard activeHandleDragDirection == nil else { return }
+        guard viewport.isTracking || viewport.isDragging || viewport.isDecelerating else { return }
+
+        scheduleTimelineScrollEndEvent()
+    }
+
+    private func scheduleTimelineScrollEndEvent() {
+        timelineScrollEndWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            guard let scrollView = timelineScrollView else { return }
+            if scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating {
+                scheduleTimelineScrollEndEvent()
+                return
+            }
+            onInteractionEnded(.spectrumBar)
+        }
+        timelineScrollEndWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+    }
+
     private func startHandleDragGesture(contentWidth: CGFloat, viewportWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(timelineCoordinateSpaceName))
             .onChanged { value in
@@ -399,6 +438,7 @@ struct AddSearchDetailWaveformTrimView: View {
             }
             .onEnded { _ in
                 startDragBase = nil
+                onInteractionEnded(.left)
                 endActiveHandleDrag()
             }
     }
@@ -417,6 +457,7 @@ struct AddSearchDetailWaveformTrimView: View {
             }
             .onEnded { _ in
                 endDragBase = nil
+                onInteractionEnded(.right)
                 endActiveHandleDrag()
             }
     }
@@ -655,6 +696,9 @@ private struct AddSearchDetailTimelineViewport {
     let contentOffsetX: CGFloat
     let viewportWidth: CGFloat
     let contentWidth: CGFloat
+    let isTracking: Bool
+    let isDragging: Bool
+    let isDecelerating: Bool
 }
 
 private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
@@ -762,7 +806,10 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
             let snapshot = AddSearchDetailTimelineViewport(
                 contentOffsetX: scrollView.contentOffset.x,
                 viewportWidth: scrollView.bounds.width,
-                contentWidth: scrollView.contentSize.width
+                contentWidth: scrollView.contentSize.width,
+                isTracking: scrollView.isTracking,
+                isDragging: scrollView.isDragging,
+                isDecelerating: scrollView.isDecelerating
             )
             DispatchQueue.main.async {
                 self.onViewportChange(snapshot)

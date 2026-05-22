@@ -146,6 +146,9 @@ struct AddSearchDetailView: View {
                         if isTutorialTrimFocusActive {
                             isTutorialTrimFocusActive = false
                         }
+                    },
+                    onTrimInteractionEnded: { control in
+                        trackCutHandleAdjusted(control: control)
                     }
                 )
                     .transition(stepTransition)
@@ -240,7 +243,10 @@ struct AddSearchDetailView: View {
         }
         isForwardStepTransition = true
         withAnimation(.easeInOut(duration: 0.28)) {
-            _ = viewModel.moveToCommentStep()
+            let isMoved = viewModel.moveToCommentStep()
+            if isMoved {
+                trackCutCompleted()
+            }
         }
     }
 
@@ -255,6 +261,11 @@ struct AddSearchDetailView: View {
         Task {
             let isSuccess = await viewModel.submitDiary()
             if isSuccess {
+                if isTutorialTrimFocusEnabled {
+                    trackOnboardingKillingPartCutCompleted()
+                } else {
+                    trackKillingPartCutCompleted()
+                }
                 onSaved?()
                 if shouldNavigateToPlayKillingPartOnSave {
                     NotificationCenter.default.post(name: .navigateToPlayKillingPart, object: nil)
@@ -267,6 +278,68 @@ struct AddSearchDetailView: View {
                 }
             }
         }
+    }
+
+    private func trackCutHandleAdjusted(control: AddSearchDetailTrimInteractionControl) {
+        var properties = trimRangeProperties
+        properties["control"] = control.rawValue
+        AmplitudeClient.shared.track(eventType: "cut_handle_adjusted", properties: properties)
+    }
+
+    private func trackCutCompleted() {
+        var properties = trackIdentityProperties
+        properties.merge(trimRangeProperties) { _, new in new }
+        AmplitudeClient.shared.track(eventType: "cut_completed", properties: properties)
+    }
+
+    private func trackKillingPartCutCompleted() {
+        let totalCount = AddSearchDetailCutCounter.incrementAndGet()
+        var properties = trackIdentityProperties
+        properties.merge(trimRangeProperties) { _, new in new }
+        properties["total_killingpart_cut_count"] = totalCount
+        AmplitudeClient.shared.track(eventType: "killingpart_cut_completed", properties: properties)
+    }
+
+    private func trackOnboardingKillingPartCutCompleted() {
+        var properties = trackIdentityProperties
+        properties.merge(trimRangeProperties) { _, new in new }
+        AmplitudeClient.shared.track(
+            eventType: "onboarding_killingpart_cut_completed",
+            properties: properties
+        )
+    }
+
+    private var trackIdentityProperties: [String: Any] {
+        [
+            "track_id": viewModel.track.id,
+            "track_title": viewModel.track.title,
+            "track_artist": viewModel.track.artist
+        ]
+    }
+
+    private var trimRangeProperties: [String: Any] {
+        let start = roundedSeconds(viewModel.startSeconds)
+        let end = roundedSeconds(viewModel.endSeconds)
+        return [
+            "start_sec": start,
+            "end_sec": end,
+            "clip_duration_sec": roundedSeconds(max(end - start, 0))
+        ]
+    }
+
+    private func roundedSeconds(_ seconds: Double) -> Double {
+        (seconds * 100).rounded() / 100
+    }
+}
+
+private enum AddSearchDetailCutCounter {
+    private static let key = "amplitude_total_killingpart_cut_count"
+
+    static func incrementAndGet() -> Int {
+        let defaults = UserDefaults.standard
+        let nextValue = defaults.integer(forKey: key) + 1
+        defaults.set(nextValue, forKey: key)
+        return nextValue
     }
 }
 
