@@ -11,6 +11,7 @@
 		1224698D2FA765FE00A6EF76 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 1224698C2FA765FE00A6EF76 /* FirebaseMessaging */; };
 		1260BBC62FA88B900006BF01 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 1260BBC52FA88B900006BF01 /* GoogleSignIn */; };
 		1260BBC82FA88B900006BF01 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1260BBC72FA88B900006BF01 /* GoogleSignInSwift */; };
+		13A100032FF5A00000A1B001 /* AmplitudeUnified in Frameworks */ = {isa = PBXBuildFile; productRef = 13A100022FF5A00000A1B001 /* AmplitudeUnified */; };
 		12CE25AA2F3DC9BE0057A858 /* Development.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25A92F3DC9BE0057A858 /* Development.xcconfig */; };
 		12CE25AC2F3DCA940057A858 /* Release.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 12CE25AB2F3DCA940057A858 /* Release.xcconfig */; };
 		12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0112F3F010000A00001 /* KakaoSDKCommon */; };
@@ -81,6 +82,7 @@
 			files = (
 				12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */,
 				12F7A0022F3F010000A00001 /* KakaoSDKAuth in Frameworks */,
+				13A100032FF5A00000A1B001 /* AmplitudeUnified in Frameworks */,
 				1260BBC82FA88B900006BF01 /* GoogleSignInSwift in Frameworks */,
 				1224698D2FA765FE00A6EF76 /* FirebaseMessaging in Frameworks */,
 				1224698B2FA765FE00A6EF76 /* FirebaseCore in Frameworks */,
@@ -155,6 +157,7 @@
 				1224698C2FA765FE00A6EF76 /* FirebaseMessaging */,
 				1260BBC52FA88B900006BF01 /* GoogleSignIn */,
 				1260BBC72FA88B900006BF01 /* GoogleSignInSwift */,
+				13A100022FF5A00000A1B001 /* AmplitudeUnified */,
 			);
 			productName = KillingPart;
 			productReference = 1231F11D2F372E5B00CFA51D /* KillingPart.app */;
@@ -242,6 +245,7 @@
 				12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 				122469892FA765FE00A6EF76 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				1260BBC42FA88B900006BF01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1231F11E2F372E5B00CFA51D /* Products */;
@@ -683,6 +687,14 @@
 				minimumVersion = 9.1.0;
 			};
 		};
+		13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/amplitude/AmplitudeUnified-Swift";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kakao/kakao-ios-sdk";
@@ -713,6 +725,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1260BBC42FA88B900006BF01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		13A100022FF5A00000A1B001 /* AmplitudeUnified */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */;
+			productName = AmplitudeUnified;
 		};
 		12F7A0112F3F010000A00001 /* KakaoSDKCommon */ = {
 			isa = XCSwiftPackageProductDependency;
