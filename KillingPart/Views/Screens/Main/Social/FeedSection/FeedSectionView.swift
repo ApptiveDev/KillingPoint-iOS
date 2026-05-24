@@ -5,10 +5,12 @@ struct FeedSectionView: View {
     @ObservedObject var viewModel: FeedViewModel
     let isParentActive: Bool
     let makeCollectionViewModel: (UserModel) -> SocialMyCollectionViewModel
+    let onPageChanged: ((_ oldIndex: Int, _ newIndex: Int, _ diaryId: Int) -> Void)?
     @State private var currentPageIndex = 0
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var isViewActive = false
     @State private var previousFeedCount = 0
+    @State private var lastTrackedPageIndex: Int?
     @State private var playbackFocusToken = 0
     @State private var selectedProfileUser: UserModel?
     @State private var isProfileNavigationActive = false
@@ -23,6 +25,18 @@ struct FeedSectionView: View {
     @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
+
+    init(
+        viewModel: FeedViewModel,
+        isParentActive: Bool,
+        makeCollectionViewModel: @escaping (UserModel) -> SocialMyCollectionViewModel,
+        onPageChanged: ((_ oldIndex: Int, _ newIndex: Int, _ diaryId: Int) -> Void)? = nil
+    ) {
+        self.viewModel = viewModel
+        self.isParentActive = isParentActive
+        self.makeCollectionViewModel = makeCollectionViewModel
+        self.onPageChanged = onPageChanged
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -67,6 +81,7 @@ struct FeedSectionView: View {
         .onAppear {
             isViewActive = true
             previousFeedCount = viewModel.feeds.count
+            lastTrackedPageIndex = currentPageIndex
             handleFocusActivated()
         }
         .onDisappear {
@@ -88,8 +103,12 @@ struct FeedSectionView: View {
             if newCount == 0 {
                 currentPageIndex = 0
                 elapsedInCurrentRange = 0
+                lastTrackedPageIndex = nil
             } else if currentPageIndex >= newCount {
                 currentPageIndex = max(newCount - 1, 0)
+            }
+            if newCount > 0 {
+                lastTrackedPageIndex = currentPageIndex
             }
             if hasAppendedFeed && isPlaybackActive {
                 bumpPlaybackFocusToken()
@@ -255,7 +274,15 @@ struct FeedSectionView: View {
             guard isPlaybackActive else { return }
             elapsedInCurrentRange += 0.25
         }
-        .onChange(of: currentPageIndex) { _ in
+        .onChange(of: currentPageIndex) { newIndex in
+            if
+                let oldIndex = lastTrackedPageIndex,
+                oldIndex != newIndex,
+                let diaryId = diaryID(at: newIndex)
+            {
+                onPageChanged?(oldIndex, newIndex, diaryId)
+            }
+            lastTrackedPageIndex = newIndex
             elapsedInCurrentRange = 0
             bumpPlaybackFocusToken()
         }
@@ -342,6 +369,11 @@ struct FeedSectionView: View {
 
     private func feed(for diaryId: Int) -> DiaryFeedModel? {
         viewModel.feeds.first(where: { $0.diaryId == diaryId })
+    }
+
+    private func diaryID(at index: Int) -> Int? {
+        guard viewModel.feeds.indices.contains(index) else { return nil }
+        return viewModel.feeds[index].diaryId
     }
 
     private func makeUserModel(from feed: DiaryFeedModel) -> UserModel {

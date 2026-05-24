@@ -3,6 +3,7 @@ import SwiftUI
 struct AddSearchDetailTrimSection: View {
     @ObservedObject var viewModel: AddSearchDetailViewModel
     let onTrimInteracted: () -> Void
+    let onTrimInteractionEnded: (_ control: AddSearchDetailTrimInteractionControl) -> Void
 
     private var startDisplayTimeText: String {
         TimeFormatter.minuteSecondText(from: viewModel.startSeconds)
@@ -32,6 +33,7 @@ struct AddSearchDetailTrimSection: View {
                     startTimeText: startDisplayTimeText,
                     endTimeText: endDisplayTimeText,
                     onTrimInteracted: onTrimInteracted,
+                    onInteractionEnded: onTrimInteractionEnded,
                     onUpdateRange: { start, end in
                         viewModel.updateRange(start: start, end: end)
                     }

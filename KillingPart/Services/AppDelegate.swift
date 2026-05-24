@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         if let remotePayload = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
             FCMManager.shared.handleLaunchRemoteNotification(remotePayload)
         }
+        let amplitudeApiKey = (Bundle.main.object(forInfoDictionaryKey: "AMPLITUDE_API_KEY") as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        AmplitudeClient.shared.configure(apiKey: amplitudeApiKey)
+        AmplitudeClient.shared.track(eventType: "app_opened")
         print("[FCM][1] Firebase 초기화 완료")
         return true
     }

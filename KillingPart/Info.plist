@@ -4,6 +4,8 @@
 <dict>
 	<key>APP_STORE_URL</key>
 	<string>$(APP_STORE_URL)</string>
+	<key>AMPLITUDE_API_KEY</key>
+	<string>$(AMPLITUDE_API_KEY)</string>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
 	<key>CFBundleURLTypes</key>

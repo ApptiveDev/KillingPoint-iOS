@@ -16,6 +16,7 @@
 		12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0112F3F010000A00001 /* KakaoSDKCommon */; };
 		12F7A0022F3F010000A00001 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0122F3F010000A00001 /* KakaoSDKAuth */; };
 		12F7A0032F3F010000A00001 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 12F7A0132F3F010000A00001 /* KakaoSDKUser */; };
+		13A100032FF5A00000A1B001 /* AmplitudeUnified in Frameworks */ = {isa = PBXBuildFile; productRef = 13A100022FF5A00000A1B001 /* AmplitudeUnified */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,6 +82,7 @@
 			files = (
 				12F7A0012F3F010000A00001 /* KakaoSDKCommon in Frameworks */,
 				12F7A0022F3F010000A00001 /* KakaoSDKAuth in Frameworks */,
+				13A100032FF5A00000A1B001 /* AmplitudeUnified in Frameworks */,
 				1260BBC82FA88B900006BF01 /* GoogleSignInSwift in Frameworks */,
 				1224698D2FA765FE00A6EF76 /* FirebaseMessaging in Frameworks */,
 				1224698B2FA765FE00A6EF76 /* FirebaseCore in Frameworks */,
@@ -155,6 +157,7 @@
 				1224698C2FA765FE00A6EF76 /* FirebaseMessaging */,
 				1260BBC52FA88B900006BF01 /* GoogleSignIn */,
 				1260BBC72FA88B900006BF01 /* GoogleSignInSwift */,
+				13A100022FF5A00000A1B001 /* AmplitudeUnified */,
 			);
 			productName = KillingPart;
 			productReference = 1231F11D2F372E5B00CFA51D /* KillingPart.app */;
@@ -242,6 +245,7 @@
 				12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 				122469892FA765FE00A6EF76 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				1260BBC42FA88B900006BF01 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1231F11E2F372E5B00CFA51D /* Products */;
@@ -448,7 +452,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KillingPart/KillingPart.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 41;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_APP_SANDBOX = YES;
@@ -473,7 +477,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.killingpoint.killingpart;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -493,7 +497,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KillingPart/KillingPart.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 41;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_APP_SANDBOX = YES;
@@ -518,7 +522,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.2.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.killingpoint.killingpart;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -691,6 +695,14 @@
 				kind = branch;
 			};
 		};
+		13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/amplitude/AmplitudeUnified-Swift";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -728,6 +740,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 12F7A0212F3F010000A00001 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
 			productName = KakaoSDKUser;
+		};
+		13A100022FF5A00000A1B001 /* AmplitudeUnified */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 13A100012FF5A00000A1B001 /* XCRemoteSwiftPackageReference "AmplitudeUnified-Swift" */;
+			productName = AmplitudeUnified;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
