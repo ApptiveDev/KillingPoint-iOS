@@ -8,7 +8,7 @@ struct MyCollectionDiary: View {
 
     let diaryId: Int
     let displayTag: String
-    let onDiaryUpdated: (() -> Void)?
+    let onDiaryUpdated: ((DiaryFeedModel) -> Void)?
     let onDiaryDeleted: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
@@ -21,7 +21,7 @@ struct MyCollectionDiary: View {
         diaryId: Int,
         displayTag: String,
         diary: DiaryFeedModel,
-        onDiaryUpdated: (() -> Void)? = nil,
+        onDiaryUpdated: ((DiaryFeedModel) -> Void)? = nil,
         onDiaryDeleted: ((Int) -> Void)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
@@ -292,7 +292,7 @@ struct MyCollectionDiary: View {
         Task {
             let isSuccess = await viewModel.submitEdit()
             guard isSuccess else { return }
-            onDiaryUpdated?()
+            onDiaryUpdated?(viewModel.diary)
         }
     }
 

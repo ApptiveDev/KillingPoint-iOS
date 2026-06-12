@@ -8,7 +8,10 @@ struct RootFlowView: View {
         Group {
             switch viewModel.currentStep {
             case .splash:
-                SplashView(onFinished: viewModel.completeSplash)
+                SplashView(
+                    isReadyToFinish: viewModel.isSplashReadyToFinish,
+                    onFinished: viewModel.completeSplash
+                )
             case .login:
                 LoginView(viewModel: viewModel.loginViewModel)
             case .setup:
@@ -18,11 +21,14 @@ struct RootFlowView: View {
                     LoginView(viewModel: viewModel.loginViewModel)
                 }
             case .main:
-                MainTabView(onLogout: viewModel.logout)
+                MainTabView(
+                    onLogout: viewModel.logout,
+                    startupPayload: viewModel.mainStartupPayload
+                )
             }
         }
         .overlay {
-            if viewModel.isResolvingPostLoginFlow {
+            if viewModel.isResolvingPostLoginFlow && viewModel.currentStep != .splash {
                 ZStack {
                     Color.black.opacity(0.35).ignoresSafeArea()
                     ProgressView()
@@ -55,6 +61,9 @@ struct RootFlowView: View {
             }
         } message: { prompt in
             Text(prompt.message)
+        }
+        .task {
+            viewModel.prepareSplashIfNeeded()
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.currentStep)
     }

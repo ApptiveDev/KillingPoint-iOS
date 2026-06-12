@@ -3,9 +3,11 @@ import SwiftUI
 struct SocialMyCollectionView: View {
     @StateObject private var viewModel: SocialMyCollectionViewModel
     @State private var activeConnectionSheet: ConnectionSheetType?
-    @State private var pendingNavigationUser: SubscribeUserModel?
-    @State private var selectedNavigationUser: SubscribeUserModel?
+    @State private var activeLikeUsersSheet: LikeUsersSheetContext?
+    @State private var pendingNavigationUser: UserModel?
+    @State private var selectedNavigationUser: UserModel?
     @State private var isUserCollectionNavigationActive = false
+    @State private var likeUsersSearchText = ""
 
     init(viewModel: SocialMyCollectionViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -39,7 +41,14 @@ struct SocialMyCollectionView: View {
                             } label: {
                                 SocialMyCollectionFeedCard(
                                     feed: feed,
-                                    formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate)
+                                    formattedUpdateDate: viewModel.formattedUpdateDate(from: feed.updateDate),
+                                    onLikeLongPress: {
+                                        likeUsersSearchText = ""
+                                        activeLikeUsersSheet = LikeUsersSheetContext(diaryId: feed.diaryId)
+                                        Task {
+                                            await viewModel.loadLikeUsers(diaryId: feed.diaryId, searchCond: nil)
+                                        }
+                                    }
                                 )
                             }
                             .buttonStyle(.plain)
@@ -85,6 +94,18 @@ struct SocialMyCollectionView: View {
                 isUserCollectionNavigationActive = true
             }
         }
+        .onChange(of: activeLikeUsersSheet) { sheetContext in
+            if sheetContext == nil {
+                viewModel.clearLikeUsersState()
+                likeUsersSearchText = ""
+                guard let pendingNavigationUser else { return }
+                self.pendingNavigationUser = nil
+                selectedNavigationUser = pendingNavigationUser
+                DispatchQueue.main.async {
+                    isUserCollectionNavigationActive = true
+                }
+            }
+        }
         .onChange(of: isUserCollectionNavigationActive) { isActive in
             if !isActive {
                 selectedNavigationUser = nil
@@ -109,8 +130,47 @@ struct SocialMyCollectionView: View {
                     }
                 },
                 onUserTap: { user in
-                    pendingNavigationUser = user
+                    pendingNavigationUser = UserModel(from: user)
                     activeConnectionSheet = nil
+                }
+            )
+        }
+        .sheet(item: $activeLikeUsersSheet) { sheetContext in
+            SocialDiaryLikeUsersSheet(
+                title: "좋아요한 사용자",
+                searchText: $likeUsersSearchText,
+                users: viewModel.likeUsers,
+                isLoading: viewModel.isLoadingLikeUsers,
+                isLoadingMore: viewModel.isLoadingMoreLikeUsers,
+                errorMessage: viewModel.likeUsersErrorMessage,
+                emptyMessage: "좋아요를 누른 사용자가 아직 없어요.",
+                onSearchSubmit: {
+                    Task {
+                        await viewModel.loadLikeUsers(
+                            diaryId: sheetContext.diaryId,
+                            searchCond: normalizedLikeUsersSearchCond
+                        )
+                    }
+                },
+                onSearchClear: {
+                    likeUsersSearchText = ""
+                    Task {
+                        await viewModel.loadLikeUsers(diaryId: sheetContext.diaryId, searchCond: nil)
+                    }
+                },
+                onRetry: {
+                    Task {
+                        await viewModel.retryLikeUsersLoading()
+                    }
+                },
+                onUserAppear: { userId in
+                    Task {
+                        await viewModel.loadMoreLikeUsersIfNeeded(currentUserId: userId)
+                    }
+                },
+                onUserTap: { user in
+                    pendingNavigationUser = user
+                    activeLikeUsersSheet = nil
                 }
             )
         }
@@ -190,6 +250,11 @@ struct SocialMyCollectionView: View {
         }
     }
 
+    private var normalizedLikeUsersSearchCond: String? {
+        let trimmed = likeUsersSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private enum ConnectionSheetType: String, Identifiable {
         case picks
         case fandom
@@ -222,6 +287,11 @@ struct SocialMyCollectionView: View {
                 return .fandom
             }
         }
+    }
+
+    private struct LikeUsersSheetContext: Identifiable, Equatable {
+        let diaryId: Int
+        var id: Int { diaryId }
     }
 }
 

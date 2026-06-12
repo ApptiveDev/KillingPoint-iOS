@@ -61,16 +61,21 @@ struct SocialFeedPlaybackRangeBar: View {
     }
 
     private var startProgress: CGFloat {
-        CGFloat(min(max(startSeconds / totalSeconds, 0), 1))
+        CGFloat(min(max(startSeconds / safeTotalSeconds, 0), 1))
     }
 
     private var endProgress: CGFloat {
-        CGFloat(min(max(endSeconds / totalSeconds, startSeconds / totalSeconds), 1))
+        CGFloat(min(max(endSeconds / safeTotalSeconds, startSeconds / safeTotalSeconds), 1))
     }
 
     private var playheadProgress: CGFloat {
-        let absoluteSeconds = min(startSeconds + elapsedInCurrentRange, endSeconds)
-        return CGFloat(min(max(absoluteSeconds / totalSeconds, 0), 1))
+        let clampedElapsed = min(max(elapsedInCurrentRange, 0), max(endSeconds - startSeconds, 0))
+        let absoluteSeconds = min(startSeconds + clampedElapsed, endSeconds)
+        return CGFloat(min(max(absoluteSeconds / safeTotalSeconds, 0), 1))
+    }
+
+    private var safeTotalSeconds: Double {
+        max(totalSeconds, endSeconds, startSeconds + 0.1, 0.1)
     }
 
     private func resolvedLabelLayout(

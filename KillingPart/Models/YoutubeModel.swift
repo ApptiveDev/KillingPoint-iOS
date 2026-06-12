@@ -68,22 +68,51 @@ struct YoutubeVideo: Identifiable, Decodable, Equatable {
     }
 
     var thumbnailURL: URL? {
-        guard let videoID = normalizedVideoID else {
+        guard let videoID = youtubeVideoID else {
             return nil
         }
         return URL(string: "https://i.ytimg.com/vi/\(videoID)/hqdefault.jpg")
     }
 
     var embedURL: URL? {
+        if let canonicalEmbedURL {
+            return canonicalEmbedURL
+        }
+
         if let urlString, let embedURL = URL(string: urlString) {
             return embedURL
         }
 
-        guard let videoID = normalizedVideoID else {
+        return nil
+    }
+
+    var canonicalEmbedURL: URL? {
+        guard let videoID = youtubeVideoID else {
             return nil
         }
 
-        return URL(string: "https://www.youtube.com/embed/\(videoID)?playsinline=1")
+        var components = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")
+        components?.queryItems = [
+            URLQueryItem(name: "playsinline", value: "1"),
+            URLQueryItem(name: "enablejsapi", value: "1")
+        ]
+        return components?.url
+    }
+
+    var watchURL: URL? {
+        guard let videoID = youtubeVideoID else {
+            return nil
+        }
+
+        var components = URLComponents(string: "https://www.youtube.com/watch")
+        components?.queryItems = [
+            URLQueryItem(name: "v", value: videoID)
+        ]
+        return components?.url
+    }
+
+    var youtubeVideoID: String? {
+        normalizedVideoID
     }
 
     private var normalizedVideoID: String? {

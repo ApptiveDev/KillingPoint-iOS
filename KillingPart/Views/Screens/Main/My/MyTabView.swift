@@ -4,6 +4,7 @@ import UIKit
 struct MyTabView: View {
     let onLogout: () -> Void
     let isRootTabSelected: Bool
+    let startupPayload: MainStartupPayload?
     @State private var selectedTab: MyTopTab = .playKillingPart
     @State private var tabTransitionDirection: Edge = .trailing
     private static var hasConfiguredSegmentedControlAppearance = false
@@ -35,7 +36,8 @@ struct MyTabView: View {
                                     .transition(tabContentTransition)
                             } else if selectedTab == .playKillingPart {
                                 PlayKillingPartView(
-                                    isParentActive: isRootTabSelected && selectedTab == .playKillingPart
+                                    isParentActive: isRootTabSelected && selectedTab == .playKillingPart,
+                                    preloadedCollectionViewModel: startupPayload?.playCollectionViewModel
                                 )
                                     .transition(tabContentTransition)
                             } else {
@@ -158,6 +160,7 @@ private enum MyTopTab: CaseIterable {
         onLogout: {
             print("로그아웃")
         },
-        isRootTabSelected: true
+        isRootTabSelected: true,
+        startupPayload: nil
     )
 }

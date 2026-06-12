@@ -7,7 +7,6 @@ struct MyCollectionView: View {
     @StateObject private var storesViewModel: MyCollectionStoresViewModel
     @StateObject private var profileSettingViewModel: ProfileSettingViewModel
     @State private var isSettingsNavigationPresented = false
-    @State private var collectionListRenderID = UUID()
     @State private var selectedKillingPartSection: MyCollectionKillingPartSection = .myKillingPart
     @State private var activeConnectionSheet: ConnectionSheetType?
     @State private var activeLikeUsersSheet: LikeUsersSheetContext?
@@ -44,16 +43,19 @@ struct MyCollectionView: View {
         myFeedSection
         .onAppear {
             Task {
-                async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
-                async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
-                _ = await (myKillingPartRefresh, storedKillingPartRefresh)
+                async let myKillingPartLoad: Void = viewModel.loadInitialDataIfNeeded()
+                if selectedKillingPartSection == .storeKillingPart {
+                    async let storedKillingPartLoad: Void = storesViewModel.loadInitialDataIfNeeded()
+                    _ = await (myKillingPartLoad, storedKillingPartLoad)
+                } else {
+                    _ = await myKillingPartLoad
+                }
             }
         }
         .onChange(of: viewModel.user?.identifier) { _ in
             profileSettingViewModel.syncUser(viewModel.user)
         }
         .onReceive(NotificationCenter.default.publisher(for: .diaryCreated)) { _ in
-            collectionListRenderID = UUID()
             Task {
                 async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
                 async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
@@ -67,21 +69,10 @@ struct MyCollectionView: View {
                 diaryId: route.diaryId,
                 displayTag: viewModel.displayTag,
                 diary: diary
-            ) {
-                collectionListRenderID = UUID()
-                Task {
-                    async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
-                    async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
-                    _ = await (myKillingPartRefresh, storedKillingPartRefresh)
-                }
+            ) { updatedDiary in
+                viewModel.applyUpdatedFeed(updatedDiary)
             } onDiaryDeleted: { changedDiaryId in
                 viewModel.removeMyFeedLocally(diaryId: changedDiaryId)
-                collectionListRenderID = UUID()
-                Task {
-                    async let myKillingPartRefresh: Void = viewModel.refetchCollectionDataOnFocus()
-                    async let storedKillingPartRefresh: Void = storesViewModel.refetchStoredDiariesOnFocus()
-                    _ = await (myKillingPartRefresh, storedKillingPartRefresh)
-                }
             }
         }
         .navigationDestination(for: StoreKillingPartDetailRoute.self) { route in
@@ -256,7 +247,6 @@ struct MyCollectionView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, AppSpacing.l)
         }
-        .id(collectionListRenderID)
         .onChange(of: selectedKillingPartSection) { section in
             guard section == .storeKillingPart else { return }
             Task {

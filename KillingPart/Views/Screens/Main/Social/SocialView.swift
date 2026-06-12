@@ -4,6 +4,7 @@ struct SocialView: View {
     let isRootTabSelected: Bool
     @ObservedObject var viewModel: SocialViewModel
     @ObservedObject var feedViewModel: FeedViewModel
+    @ObservedObject private var notificationListViewModel: NotificationListViewModel
     @State private var selectedTopTab: SocialTopTab = .feed
     @State private var isNotificationListActive = false
     @State private var friendSearchText: String
@@ -16,6 +17,7 @@ struct SocialView: View {
         self.isRootTabSelected = isRootTabSelected
         self.viewModel = viewModel
         self.feedViewModel = feedViewModel
+        _notificationListViewModel = ObservedObject(wrappedValue: viewModel.notificationListViewModel)
         _friendSearchText = State(initialValue: viewModel.currentSearchQuery)
     }
 
@@ -51,7 +53,7 @@ struct SocialView: View {
                                                 .fill(Color.white.opacity(0.1))
                                         )
 
-                                    if viewModel.notificationListViewModel.hasUnreadAlarms {
+                                    if notificationListViewModel.hasUnreadAlarms {
                                         Circle()
                                             .fill(Color.red)
                                             .frame(width: 9, height: 9)
@@ -101,10 +103,10 @@ struct SocialView: View {
         .task(id: isRootTabSelected) {
             guard isRootTabSelected else { return }
             async let refreshSocialList: Void = viewModel.refreshDefaultLists()
-            async let refreshAlarmList: Void = viewModel.notificationListViewModel.refreshAlarms()
+            async let refreshAlarmList: Void = notificationListViewModel.refreshAlarms()
             _ = await (refreshSocialList, refreshAlarmList)
         }
-        .onChange(of: viewModel.notificationListViewModel.pendingExternalRoute) { pendingRoute in
+        .onChange(of: notificationListViewModel.pendingExternalRoute) { pendingRoute in
             guard let pendingRoute else { return }
 
             switch pendingRoute {
@@ -114,17 +116,17 @@ struct SocialView: View {
                 isNotificationListActive = false
             }
 
-            viewModel.notificationListViewModel.clearPendingExternalRoute()
+            notificationListViewModel.clearPendingExternalRoute()
         }
         .alert(
             "알림 이동 실패",
             isPresented: routingErrorPresentedBinding
         ) {
             Button("확인", role: .cancel) {
-                viewModel.notificationListViewModel.clearRoutingError()
+                notificationListViewModel.clearRoutingError()
             }
         } message: {
-            Text(viewModel.notificationListViewModel.routingErrorMessage ?? "알림을 열 수 없어요.")
+            Text(notificationListViewModel.routingErrorMessage ?? "알림을 열 수 없어요.")
         }
     }
 
@@ -139,7 +141,7 @@ struct SocialView: View {
         NavigationLink(
             isActive: $isNotificationListActive,
             destination: {
-                NotificationListView(viewModel: viewModel.notificationListViewModel)
+                NotificationListView(viewModel: notificationListViewModel)
             },
             label: {
                 EmptyView()
@@ -153,7 +155,7 @@ struct SocialView: View {
             NavigationLink(
                 isActive: myDiaryNavigationBinding,
                 destination: {
-                    if let destination = viewModel.notificationListViewModel.activeMyDiaryDestination {
+                    if let destination = notificationListViewModel.activeMyDiaryDestination {
                         MyCollectionDiary(
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
@@ -172,13 +174,13 @@ struct SocialView: View {
             NavigationLink(
                 isActive: socialDiaryNavigationBinding,
                 destination: {
-                    if let destination = viewModel.notificationListViewModel.activeSocialDiaryDestination {
+                    if let destination = notificationListViewModel.activeSocialDiaryDestination {
                         SocialMyCollectionDiary(
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
                             diary: destination.diary,
                             makeCollectionViewModel: { user in
-                                viewModel.notificationListViewModel.makeSocialMyCollectionViewModel(for: user)
+                                notificationListViewModel.makeSocialMyCollectionViewModel(for: user)
                             }
                         )
                     } else {
@@ -194,9 +196,9 @@ struct SocialView: View {
             NavigationLink(
                 isActive: socialCollectionNavigationBinding,
                 destination: {
-                    if let destination = viewModel.notificationListViewModel.activeSocialCollectionDestination {
+                    if let destination = notificationListViewModel.activeSocialCollectionDestination {
                         SocialMyCollectionView(
-                            viewModel: viewModel.notificationListViewModel.makeSocialMyCollectionViewModel(
+                            viewModel: notificationListViewModel.makeSocialMyCollectionViewModel(
                                 for: destination.user,
                                 initialUserFeedsResponse: destination.initialUserFeedsResponse
                             )
@@ -217,11 +219,11 @@ struct SocialView: View {
     private var myDiaryNavigationBinding: Binding<Bool> {
         Binding(
             get: {
-                viewModel.notificationListViewModel.activeMyDiaryDestination != nil
+                notificationListViewModel.activeMyDiaryDestination != nil
             },
             set: { isActive in
                 guard !isActive else { return }
-                viewModel.notificationListViewModel.clearActiveMyDiaryDestination()
+                notificationListViewModel.clearActiveMyDiaryDestination()
             }
         )
     }
@@ -229,11 +231,11 @@ struct SocialView: View {
     private var socialDiaryNavigationBinding: Binding<Bool> {
         Binding(
             get: {
-                viewModel.notificationListViewModel.activeSocialDiaryDestination != nil
+                notificationListViewModel.activeSocialDiaryDestination != nil
             },
             set: { isActive in
                 guard !isActive else { return }
-                viewModel.notificationListViewModel.clearActiveSocialDiaryDestination()
+                notificationListViewModel.clearActiveSocialDiaryDestination()
             }
         )
     }
@@ -241,11 +243,11 @@ struct SocialView: View {
     private var socialCollectionNavigationBinding: Binding<Bool> {
         Binding(
             get: {
-                viewModel.notificationListViewModel.activeSocialCollectionDestination != nil
+                notificationListViewModel.activeSocialCollectionDestination != nil
             },
             set: { isActive in
                 guard !isActive else { return }
-                viewModel.notificationListViewModel.clearActiveSocialCollectionDestination()
+                notificationListViewModel.clearActiveSocialCollectionDestination()
             }
         )
     }
@@ -253,11 +255,11 @@ struct SocialView: View {
     private var routingErrorPresentedBinding: Binding<Bool> {
         Binding(
             get: {
-                !isNotificationListActive && viewModel.notificationListViewModel.routingErrorMessage != nil
+                !isNotificationListActive && notificationListViewModel.routingErrorMessage != nil
             },
             set: { isPresented in
                 guard !isPresented else { return }
-                viewModel.notificationListViewModel.clearRoutingError()
+                notificationListViewModel.clearRoutingError()
             }
         )
     }

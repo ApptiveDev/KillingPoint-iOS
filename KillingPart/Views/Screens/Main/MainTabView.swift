@@ -4,6 +4,7 @@ import UIKit
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     let onLogout: () -> Void
+    let startupPayload: MainStartupPayload?
     @State private var selectedTab: MainRootTab = .my
     @State private var randomRefreshTrigger = 0
     @StateObject private var socialViewModel = SocialViewModel()
@@ -17,7 +18,8 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             MyTabView(
                 onLogout: onLogout,
-                isRootTabSelected: selectedTab == .my
+                isRootTabSelected: selectedTab == .my,
+                startupPayload: startupPayload
             )
                 .tabItem {
                     Label("MY", systemImage: "house")
