@@ -5,6 +5,8 @@ struct PlayKillingPartCurrentTrackContent: View {
     let isPlaying: Bool
     let playbackFocusToken: Int
     let playerReloadToken: UUID
+    let onPlaybackEnded: () -> Void
+    let onPlaybackProgressChanged: (YoutubePlaybackProgress) -> Void
 
     private let videoAspectRatio: CGFloat = 16 / 9
     private let videoCornerRadius: CGFloat = 16
@@ -18,7 +20,10 @@ struct PlayKillingPartCurrentTrackContent: View {
                         startSeconds: track.startSeconds,
                         endSeconds: track.endSeconds,
                         isPlaying: isPlaying,
-                        playbackFocusToken: playbackFocusToken
+                        playbackFocusToken: playbackFocusToken,
+                        shouldLoopPlayback: false,
+                        onPlaybackEnded: onPlaybackEnded,
+                        onPlaybackProgressChanged: onPlaybackProgressChanged
                     )
                     .id("\(track.id)-\(playerReloadToken)")
                     .frame(maxWidth: .infinity)

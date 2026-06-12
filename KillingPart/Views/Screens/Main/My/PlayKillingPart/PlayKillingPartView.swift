@@ -17,6 +17,7 @@ struct PlayKillingPartView: View {
     @State private var lastReorderDate = Date.distantPast
     @State private var hasCompletedInitialLoad = false
     @State private var lastTickDate = Date()
+    @State private var lastPlaybackProgressDate: Date?
     @State private var playerReloadToken = UUID()
     @State private var playbackFocusToken = 0
 
@@ -103,19 +104,15 @@ struct PlayKillingPartView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active && isParentActive {
-                elapsedInCurrentRange = 0
-                playerReloadToken = UUID()
                 bumpPlaybackFocusToken()
             }
             resetTickReference()
         }
         .onChange(of: isParentActive) { isParentActive in
             if isParentActive {
-                elapsedInCurrentRange = 0
                 if currentTrack != nil {
                     isPlaying = true
                 }
-                playerReloadToken = UUID()
                 bumpPlaybackFocusToken()
             }
             resetTickReference()
@@ -142,7 +139,13 @@ struct PlayKillingPartView: View {
                     track: currentTrack,
                     isPlaying: isPlaying,
                     playbackFocusToken: playbackFocusToken,
-                    playerReloadToken: playerReloadToken
+                    playerReloadToken: playerReloadToken,
+                    onPlaybackEnded: {
+                        handleCurrentTrackPlaybackEnded(trackID: currentTrack.id)
+                    },
+                    onPlaybackProgressChanged: { progress in
+                        handlePlaybackProgress(progress, trackID: currentTrack.id)
+                    }
                 )
             } else if hasCompletedInitialLoad {
                 PlayKillingPartEmptyStateCard()
@@ -462,6 +465,7 @@ struct PlayKillingPartView: View {
         guard playlistTracks.indices.contains(nextIndex) else {
             isPlaying = false
             elapsedInCurrentRange = 0
+            resetPlaybackProgressTracking()
             return
         }
         selectTrack(at: nextIndex)
@@ -472,6 +476,7 @@ struct PlayKillingPartView: View {
         let selectedTrack = playlistTracks[index]
         guard selectedTrackID != selectedTrack.id else {
             elapsedInCurrentRange = 0
+            resetPlaybackProgressTracking()
             resetTickReference()
             return
         }
@@ -479,6 +484,7 @@ struct PlayKillingPartView: View {
         selectedTrackID = selectedTrack.id
         isPlaying = true
         elapsedInCurrentRange = 0
+        resetPlaybackProgressTracking()
         playerReloadToken = UUID()
         bumpPlaybackFocusToken()
         resetTickReference()
@@ -489,6 +495,7 @@ struct PlayKillingPartView: View {
             selectedTrackID = nil
             elapsedInCurrentRange = 0
             isPlaying = false
+            resetPlaybackProgressTracking()
             return
         }
 
@@ -503,12 +510,14 @@ struct PlayKillingPartView: View {
         {
             if elapsedInCurrentRange > selectedTrack.rangeDuration {
                 elapsedInCurrentRange = 0
+                resetPlaybackProgressTracking()
             }
             return
         }
 
         selectedTrackID = playlistTracks[0].id
         elapsedInCurrentRange = 0
+        resetPlaybackProgressTracking()
         playerReloadToken = UUID()
         bumpPlaybackFocusToken()
         resetTickReference()
@@ -522,6 +531,7 @@ struct PlayKillingPartView: View {
         guard isPlaybackActive else { return }
         guard isPlaying else { return }
         guard let currentTrack else { return }
+        guard !hasRecentPlaybackProgress(now: now) else { return }
 
         let delta = now.timeIntervalSince(lastTickDate)
         guard delta > 0 else { return }
@@ -536,8 +546,29 @@ struct PlayKillingPartView: View {
         moveToNextTrack()
     }
 
+    private func handlePlaybackProgress(_ progress: YoutubePlaybackProgress, trackID: Int) {
+        guard currentTrack?.id == trackID else { return }
+        elapsedInCurrentRange = progress.elapsedInRange
+        lastPlaybackProgressDate = Date()
+    }
+
+    private func handleCurrentTrackPlaybackEnded(trackID: Int) {
+        guard currentTrack?.id == trackID else { return }
+        elapsedInCurrentRange = 0
+        moveToNextTrack()
+    }
+
+    private func hasRecentPlaybackProgress(now: Date) -> Bool {
+        guard let lastPlaybackProgressDate else { return false }
+        return now.timeIntervalSince(lastPlaybackProgressDate) < 1.0
+    }
+
     private func resetTickReference() {
         lastTickDate = Date()
+    }
+
+    private func resetPlaybackProgressTracking() {
+        lastPlaybackProgressDate = nil
     }
 
     private var isPlaybackActive: Bool {
@@ -568,6 +599,7 @@ struct PlayKillingPartView: View {
     private func restartPlaybackFromFirstTrack() {
         selectedTrackID = nil
         elapsedInCurrentRange = 0
+        resetPlaybackProgressTracking()
         isPlaying = true
         playerReloadToken = UUID()
         bumpPlaybackFocusToken()

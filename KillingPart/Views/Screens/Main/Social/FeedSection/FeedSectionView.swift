@@ -22,6 +22,7 @@ struct FeedSectionView: View {
     @State private var isAutoAdvanceTransitioning = false
     @State private var pendingAutoAdvancePauseDiaryID: Int?
     @State private var playbackStatesByDiaryID: [Int: YoutubePlayerView.PlaybackState] = [:]
+    @State private var lastPlaybackProgressDate: Date?
     @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
 
     private let playbackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
@@ -103,9 +104,11 @@ struct FeedSectionView: View {
             if newCount == 0 {
                 currentPageIndex = 0
                 elapsedInCurrentRange = 0
+                resetPlaybackProgressTracking()
                 lastTrackedPageIndex = nil
             } else if currentPageIndex >= newCount {
                 currentPageIndex = max(newCount - 1, 0)
+                resetPlaybackProgressTracking()
             }
             if newCount > 0 {
                 lastTrackedPageIndex = currentPageIndex
@@ -249,6 +252,9 @@ struct FeedSectionView: View {
                         },
                         onVideoPlaybackStateChanged: { state in
                             handleVideoPlaybackStateChanged(state, diaryId: feed.diaryId)
+                        },
+                        onVideoPlaybackProgressChanged: { progress in
+                            handleVideoPlaybackProgressChanged(progress, diaryId: feed.diaryId)
                         }
                     )
                     .tag(index)
@@ -272,6 +278,7 @@ struct FeedSectionView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onReceive(playbackTimer) { _ in
             guard isPlaybackActive else { return }
+            guard !hasRecentPlaybackProgress() else { return }
             elapsedInCurrentRange += 0.25
         }
         .onChange(of: currentPageIndex) { newIndex in
@@ -284,6 +291,7 @@ struct FeedSectionView: View {
             }
             lastTrackedPageIndex = newIndex
             elapsedInCurrentRange = 0
+            resetPlaybackProgressTracking()
             bumpPlaybackFocusToken()
         }
         .onChange(of: isProfileNavigationActive) { isActive in
@@ -324,7 +332,6 @@ struct FeedSectionView: View {
 
     private func handleFocusActivated() {
         guard isPlaybackActive else { return }
-        elapsedInCurrentRange = 0
         bumpPlaybackFocusToken()
         Task {
             await viewModel.refreshLoadedFeedInteractionsIfNeeded()
@@ -458,6 +465,7 @@ struct FeedSectionView: View {
 
             // Handoff 2) 다음 카드로 전환.
             elapsedInCurrentRange = 0
+            resetPlaybackProgressTracking()
             withAnimation(.easeInOut(duration: 0.3)) {
                 currentPageIndex = nextIndex
             }
@@ -486,5 +494,23 @@ struct FeedSectionView: View {
         guard pendingAutoAdvancePauseDiaryID == diaryId else { return }
         guard state == .paused || state == .ended else { return }
         pendingAutoAdvancePauseDiaryID = nil
+    }
+
+    private func handleVideoPlaybackProgressChanged(
+        _ progress: YoutubePlaybackProgress,
+        diaryId: Int
+    ) {
+        guard diaryID(at: currentPageIndex) == diaryId else { return }
+        elapsedInCurrentRange = progress.elapsedInRange
+        lastPlaybackProgressDate = Date()
+    }
+
+    private func hasRecentPlaybackProgress() -> Bool {
+        guard let lastPlaybackProgressDate else { return false }
+        return Date().timeIntervalSince(lastPlaybackProgressDate) < 1.0
+    }
+
+    private func resetPlaybackProgressTracking() {
+        lastPlaybackProgressDate = nil
     }
 }
