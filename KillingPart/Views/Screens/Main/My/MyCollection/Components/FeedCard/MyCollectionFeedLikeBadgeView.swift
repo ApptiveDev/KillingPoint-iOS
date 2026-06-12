@@ -8,10 +8,10 @@ struct MyCollectionFeedLikeBadgeView: View {
         HStack(spacing: 5) {
             Image(systemName: "heart.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isLiked ? Color.kpPrimary : Color.white.opacity(0.68))
+                .foregroundStyle(isLiked ? Color.kpPrimary : Color.white)
 
             Text("\(likeCount)")
-                .foregroundStyle(Color.kpGray300)
+                .foregroundStyle(Color.white)
         }
         .font(.system(size: 13, weight: .semibold))
         .padding(.horizontal, 10)

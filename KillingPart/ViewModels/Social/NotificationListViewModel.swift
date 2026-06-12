@@ -57,7 +57,6 @@ final class NotificationListViewModel: ObservableObject {
     private var readAlarmIDs: Set<Int> = []
     private var deletedAlarmIDs: Set<Int> = []
     private var deletedAlarmsBeforeDate: Date?
-    private var isAlarmListActive = false
     private let alarmPageSize = 20
     private let subscribeFansPageSize = 20
     private let alarmReadIDStorageKeyPrefix = "social.readAlarmIDs.user"
@@ -79,9 +78,7 @@ final class NotificationListViewModel: ObservableObject {
     }
 
     func enterList() async {
-        isAlarmListActive = true
         if hasLoadedInitialAlarms {
-            markLoadedAlarmsAsRead()
             return
         }
 
@@ -89,7 +86,7 @@ final class NotificationListViewModel: ObservableObject {
     }
 
     func exitList() {
-        isAlarmListActive = false
+        markLoadedAlarmsAsRead()
         setAlarmSelectionMode(false)
     }
 
@@ -114,11 +111,7 @@ final class NotificationListViewModel: ObservableObject {
             alarms = visibleAlarms(from: response.content)
             updateAlarmsPaging(from: response)
             hasLoadedInitialAlarms = true
-            if isAlarmListActive {
-                markLoadedAlarmsAsRead()
-            } else {
-                updateUnreadAlarmIndicator()
-            }
+            updateUnreadAlarmIndicator()
         } catch {
             if isRequestCancelled(error) { return }
             alarmsErrorMessage = resolveErrorMessage(from: error)
@@ -145,11 +138,7 @@ final class NotificationListViewModel: ObservableObject {
             )
             appendAlarms(with: response.content)
             updateAlarmsPaging(from: response)
-            if isAlarmListActive {
-                markLoadedAlarmsAsRead()
-            } else {
-                updateUnreadAlarmIndicator()
-            }
+            updateUnreadAlarmIndicator()
         } catch {
             if isRequestCancelled(error) { return }
             alarmsErrorMessage = resolveErrorMessage(from: error)
