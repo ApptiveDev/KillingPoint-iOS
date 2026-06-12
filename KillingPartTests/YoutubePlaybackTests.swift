@@ -111,4 +111,18 @@ struct YoutubePlaybackTests {
             )
         )
     }
+
+    @Test
+    func playbackProgressClampsElapsedAndValidatesRange() {
+        let progress = YoutubePlaybackProgress(
+            currentSeconds: 20,
+            startSeconds: 10,
+            endSeconds: 15,
+            isInsideRange: false
+        )
+
+        #expect(progress.elapsedInRange == 5)
+        #expect(progress.matchesRange(startSeconds: 10, endSeconds: 15))
+        #expect(!progress.matchesRange(startSeconds: 12, endSeconds: 15))
+    }
 }

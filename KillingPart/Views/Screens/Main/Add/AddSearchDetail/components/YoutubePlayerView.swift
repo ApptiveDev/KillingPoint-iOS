@@ -657,6 +657,13 @@ struct YoutubePlayerView: UIViewRepresentable {
         let respectsUserInteractionJS = respectsUserInteraction ? "true" : "false"
         let showsMutedFallbackControlJS = showsMutedFallbackControl ? "true" : "false"
         let isLowPowerModeEnabledJS = isLowPowerModeEnabled ? "true" : "false"
+        let shouldShowInitialLowPowerNotice = (
+            isLowPowerModeEnabled
+            && shouldAutoplay
+            && allowsMutedAutoplayFallback
+            && showsMutedFallbackControl
+        )
+        let initialMutedFallbackDisplay = shouldShowInitialLowPowerNotice ? "flex" : "none"
         let autoplayFlag = shouldAutoplay ? 1 : 0
 
         return """
@@ -680,53 +687,130 @@ struct YoutubePlayerView: UIViewRepresentable {
                 }
                 #kp-muted-fallback {
                     position: absolute;
-                    left: 10px;
-                    right: 10px;
-                    bottom: 10px;
+                    inset: 0;
                     display: none;
-                    align-items: flex-start;
-                    gap: 8px;
-                    padding: 8px 10px;
-                    border: 1px solid rgba(220, 255, 82, 0.75);
-                    border-radius: 999px;
-                    background: rgba(0, 0, 0, 0.72);
-                    color: #ffffff;
-                    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-                    font-size: 11px;
-                    line-height: 1.25;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 12px;
+                    background: rgba(0, 0, 0, 0.42);
+                    box-sizing: border-box;
                     z-index: 10;
                     pointer-events: auto;
+                    -webkit-backdrop-filter: blur(4px);
+                    backdrop-filter: blur(4px);
+                }
+                #kp-muted-fallback-card {
+                    width: min(332px, 100%);
+                    max-height: 100%;
+                    overflow-y: auto;
+                    box-sizing: border-box;
+                    padding: 14px;
+                    border: 1px solid rgba(220, 255, 82, 0.85);
+                    border-radius: 16px;
+                    background: rgba(8, 8, 8, 0.94);
+                    color: #ffffff;
+                    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
                     -webkit-backdrop-filter: blur(8px);
                     backdrop-filter: blur(8px);
+                    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+                }
+                #kp-muted-fallback-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 8px;
+                }
+                #kp-battery-icon {
+                    position: relative;
+                    flex: 0 0 auto;
+                    width: 30px;
+                    height: 16px;
+                    border: 2px solid #dcff52;
+                    border-radius: 5px;
+                    box-sizing: border-box;
+                }
+                #kp-battery-icon::after {
+                    content: "";
+                    position: absolute;
+                    top: 4px;
+                    right: -5px;
+                    width: 3px;
+                    height: 6px;
+                    border-radius: 0 2px 2px 0;
+                    background: #dcff52;
+                }
+                #kp-battery-icon span {
+                    display: block;
+                    width: 44%;
+                    height: 100%;
+                    background: #dcff52;
+                    border-radius: 2px;
+                }
+                #kp-muted-fallback-title {
+                    font-size: 14px;
+                    line-height: 1.25;
+                    font-weight: 800;
+                    color: #ffffff;
+                }
+                #kp-muted-fallback-subtitle {
+                    margin-top: 2px;
+                    font-size: 10px;
+                    line-height: 1.2;
+                    color: rgba(255, 255, 255, 0.68);
                 }
                 #kp-muted-fallback button {
                     flex: 0 0 auto;
                     border: 0;
-                    border-radius: 999px;
-                    padding: 6px 9px;
-                    background: #dcff52;
-                    color: #000000;
+                    border-radius: 10px;
+                    padding: 9px 11px;
                     font: inherit;
+                    font-size: 12px;
+                    line-height: 1;
                     font-weight: 700;
                     white-space: nowrap;
                 }
+                #kp-unmute-button {
+                    background: #dcff52;
+                    color: #000000;
+                }
+                #kp-dismiss-button {
+                    background: rgba(255, 255, 255, 0.12);
+                    color: #ffffff;
+                }
                 #kp-muted-fallback-message {
-                    min-width: 0;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                    margin-top: 8px;
+                    color: rgba(255, 255, 255, 0.9);
+                    font-size: 12px;
+                    line-height: 1.38;
                     white-space: normal;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
+                }
+                #kp-muted-fallback-actions {
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 8px;
+                    margin-top: 12px;
                 }
             </style>
         </head>
         <body>
             <div id="player"></div>
-            <div id="kp-muted-fallback">
-                <button id="kp-unmute-button" type="button">소리 켜기</button>
-                <div id="kp-muted-fallback-message">
-                    iOS/YouTube 정책으로 무음 자동재생 중이에요.
+            <div id="kp-muted-fallback" role="dialog" aria-modal="true" aria-labelledby="kp-muted-fallback-title" style="display: \(initialMutedFallbackDisplay);">
+                <div id="kp-muted-fallback-card">
+                    <div id="kp-muted-fallback-header">
+                        <div id="kp-battery-icon" aria-hidden="true"><span></span></div>
+                        <div>
+                            <div id="kp-muted-fallback-title">저전력 모드 해제 권장</div>
+                            <div id="kp-muted-fallback-subtitle">YouTube 자동재생 안내</div>
+                        </div>
+                    </div>
+                    <div id="kp-muted-fallback-message">
+                        저전력 모드가 켜져 있어 iOS가 YouTube 자동재생을 제한할 수 있어요. 저전력 모드를 해제하면 YouTube 자동재생과 끊김 없는 영상 재생이 가능합니다.
+                    </div>
+                    <div id="kp-muted-fallback-actions">
+                        <button id="kp-dismiss-button" type="button">계속 보기</button>
+                        <button id="kp-unmute-button" type="button">소리 켜기</button>
+                    </div>
                 </div>
             </div>
             <script>
@@ -754,6 +838,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpStallStartedAt = 0;
                 window.kpLastPlaybackState = -1;
                 window.kpLowPowerNoticeDismissed = false;
+                window.kpMutedFallbackControlDismissed = false;
 
                 window.kpDispatchPlaybackEnded = function() {
                     if (window.kpHasDispatchedEnded) {
@@ -860,34 +945,56 @@ struct YoutubePlayerView: UIViewRepresentable {
                     });
                 }
 
-                function kpSetMutedFallbackVisible(isVisible, message) {
+                function kpSetMutedFallbackVisible(isVisible, title, message) {
                     var container = document.getElementById('kp-muted-fallback');
+                    var titleNode = document.getElementById('kp-muted-fallback-title');
                     var messageNode = document.getElementById('kp-muted-fallback-message');
-                    if (!container || !messageNode) {
+                    if (!container || !titleNode || !messageNode) {
                         return;
                     }
 
                     container.style.display = isVisible && window.kpShowsMutedFallbackControl ? 'flex' : 'none';
+                    if (title) {
+                        titleNode.textContent = title;
+                    }
                     if (message) {
                         messageNode.textContent = message;
                     }
                 }
 
+                function kpMutedFallbackTitle() {
+                    return window.kpIsLowPowerModeEnabled
+                        ? '저전력 모드 해제 권장'
+                        : '자동재생 정책 안내';
+                }
+
                 function kpMutedFallbackMessage() {
                     if (window.kpIsLowPowerModeEnabled) {
-                        return '저전력 모드에서는 iOS가 자동재생을 더 엄격하게 제한해요. 해제하면 유튜브 자동재생과 끊김 없는 재생이 더 안정적이에요.';
+                        return '저전력 모드가 켜져 있어 iOS가 YouTube 자동재생을 제한할 수 있어요. 저전력 모드를 해제하면 YouTube 자동재생과 끊김 없는 영상 재생이 가능합니다.';
                     }
-                    return 'iOS/YouTube 정책으로 무음 자동재생 중이에요. 저전력 모드를 해제하면 자동재생이 더 안정적이에요.';
+                    return 'iOS/YouTube 정책으로 무음 자동재생 중이에요. 소리가 필요하면 소리 켜기를 눌러 주세요. 저전력 모드 해제 상태에서는 자동재생이 더 안정적이에요.';
                 }
 
                 function kpLowPowerNoticeMessage() {
-                    return '저전력 모드가 켜져 있어 자동재생이 제한될 수 있어요. 해제하면 유튜브 자동재생과 끊김 없는 재생이 더 안정적이에요.';
+                    return '저전력 모드가 켜져 있어 iOS가 YouTube 자동재생을 제한할 수 있어요. 저전력 모드를 해제하면 YouTube 자동재생과 끊김 없는 영상 재생이 가능합니다.';
                 }
 
                 function kpUpdateMutedFallbackControl() {
-                    if (window.kpMutedFallbackActive && kpIsMuted()) {
+                    if (
+                        window.kpMutedFallbackControlDismissed
+                        && (
+                            !window.kpIsLowPowerModeEnabled
+                            || window.kpLowPowerNoticeDismissed
+                        )
+                    ) {
+                        kpSetMutedFallbackVisible(false, '', '');
+                        return;
+                    }
+
+                    if (window.kpMutedFallbackActive && kpIsMuted() && !window.kpMutedFallbackControlDismissed) {
                         kpSetMutedFallbackVisible(
                             true,
+                            kpMutedFallbackTitle(),
                             kpMutedFallbackMessage()
                         );
                         return;
@@ -900,11 +1007,15 @@ struct YoutubePlayerView: UIViewRepresentable {
                         && !window.kpUserInteracted
                         && !window.kpLowPowerNoticeDismissed
                     ) {
-                        kpSetMutedFallbackVisible(true, kpLowPowerNoticeMessage());
+                        kpSetMutedFallbackVisible(
+                            true,
+                            '저전력 모드 해제 권장',
+                            kpLowPowerNoticeMessage()
+                        );
                         return;
                     }
 
-                    kpSetMutedFallbackVisible(false, '');
+                    kpSetMutedFallbackVisible(false, '', '');
                 }
 
                 function kpResetAppControl() {
@@ -916,6 +1027,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     window.kpStallStartedAt = 0;
                     window.kpHasDispatchedEnded = false;
                     window.kpLowPowerNoticeDismissed = false;
+                    window.kpMutedFallbackControlDismissed = false;
                     kpUpdateMutedFallbackControl();
                 }
 
@@ -966,6 +1078,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     window.kpHasUsedMutedFallback = true;
                     window.kpMutedFallbackActive = true;
                     window.kpLowPowerNoticeDismissed = false;
+                    window.kpMutedFallbackControlDismissed = false;
                     if (window.kpPlayer.mute) {
                         window.kpPlayer.mute();
                     }
@@ -979,6 +1092,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpSetLowPowerMode = function(isEnabled) {
                     window.kpIsLowPowerModeEnabled = !!isEnabled;
                     window.kpLowPowerNoticeDismissed = false;
+                    window.kpMutedFallbackControlDismissed = false;
                     kpUpdateMutedFallbackControl();
 
                     if (
@@ -1245,14 +1359,17 @@ struct YoutubePlayerView: UIViewRepresentable {
                         if (!kpIsMuted()) {
                             window.kpMutedFallbackActive = false;
                             window.kpLowPowerNoticeDismissed = true;
+                            window.kpMutedFallbackControlDismissed = true;
                             kpUpdateMutedFallbackControl();
                             return;
                         }
 
+                        window.kpMutedFallbackControlDismissed = false;
                         kpSetMutedFallbackVisible(
                             true,
+                            kpMutedFallbackTitle(),
                             window.kpIsLowPowerModeEnabled
-                                ? '저전력 모드에서는 소리 자동재생이 제한될 수 있어요. 해제 후 다시 눌러 주세요.'
+                                ? '저전력 모드에서는 소리 자동재생이 제한될 수 있어요. 저전력 모드를 해제한 뒤 다시 눌러 주세요.'
                                 : '브라우저 정책상 소리 자동재생이 제한됐어요. 다시 눌러 주세요.'
                         );
                     }, 350);
@@ -1264,6 +1381,17 @@ struct YoutubePlayerView: UIViewRepresentable {
                         event.preventDefault();
                         event.stopPropagation();
                         kpTryUserUnmute();
+                    });
+                }
+
+                var dismissButton = document.getElementById('kp-dismiss-button');
+                if (dismissButton) {
+                    dismissButton.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        window.kpLowPowerNoticeDismissed = true;
+                        window.kpMutedFallbackControlDismissed = true;
+                        kpUpdateMutedFallbackControl();
                     });
                 }
 
