@@ -24,24 +24,29 @@ struct PlayKillingPartView: View {
     private let controlsHeight: CGFloat = 98
     private let reorderThrottleInterval: TimeInterval = 0.18
     private let reorderAnimationDuration: Double = 0.24
+    private let usesPreloadedPlaybackData: Bool
 
     init(
         isParentActive: Bool = true,
+        preloadedCollectionViewModel: MyCollectionViewModel? = nil,
         authenticationService: AuthenticationServicing = AuthenticationService(),
         userService: UserServicing = UserService(),
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.isParentActive = isParentActive
+        self.usesPreloadedPlaybackData = preloadedCollectionViewModel != nil
+        let resolvedCollectionViewModel = preloadedCollectionViewModel ?? MyCollectionViewModel(
+            authenticationService: authenticationService,
+            userService: userService,
+            diaryService: diaryService
+        )
         _viewModel = StateObject(
-            wrappedValue: MyCollectionViewModel(
-                authenticationService: authenticationService,
-                userService: userService,
-                diaryService: diaryService
-            )
+            wrappedValue: resolvedCollectionViewModel
         )
         _playViewModel = StateObject(
             wrappedValue: PlayKillingPartViewModel(diaryService: diaryService)
         )
+        _hasCompletedInitialLoad = State(initialValue: preloadedCollectionViewModel != nil)
     }
 
     var body: some View {
@@ -62,6 +67,12 @@ struct PlayKillingPartView: View {
             resetTickReference()
             bumpPlaybackFocusToken()
             Task {
+                if usesPreloadedPlaybackData && hasCompletedInitialLoad {
+                    reconcileOrderedDiaryIDsIfNeeded()
+                    synchronizeSelectedTrackIfNeeded()
+                    return
+                }
+
                 let refetchResult = await refreshPlaybackFeeds()
                 hasCompletedInitialLoad = true
                 reconcileOrderedDiaryIDsIfNeeded()

@@ -624,4 +624,30 @@ extension DiaryFeedModel {
             isMyPick: isMyPick
         )
     }
+
+    func replacingContent(_ content: String) -> DiaryFeedModel {
+        DiaryFeedModel(
+            diaryId: diaryId,
+            artist: artist,
+            musicTitle: musicTitle,
+            albumImageUrl: albumImageUrl,
+            content: content,
+            videoUrl: videoUrl,
+            scope: scope,
+            duration: duration,
+            totalDuration: totalDuration,
+            start: start,
+            end: end,
+            createDate: createDate,
+            updateDate: updateDate,
+            isLiked: isLiked,
+            isStored: isStored,
+            likeCount: likeCount,
+            userId: userId,
+            username: username,
+            tag: tag,
+            profileImageUrl: profileImageUrl,
+            isMyPick: isMyPick
+        )
+    }
 }

@@ -9,11 +9,11 @@ struct SocialMyCollectionPickToggleButton: View {
             HStack(alignment: .center, spacing: 6) {
                 Text(isMyPick ? "나의 PICK!" : "나의 픽으로 추가")
                     .font(AppFont.paperlogy5Medium(size: 14))
-                    .foregroundStyle(isMyPick ? .black : Color.kpPrimary)
+                    .foregroundStyle(isMyPick ? Color.kpPrimary : .black)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, AppSpacing.s)
-            .background(isMyPick ? Color.kpPrimary : Color.kpGray700)
+            .background(isMyPick ? Color.kpGray700 : Color.kpPrimary)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)

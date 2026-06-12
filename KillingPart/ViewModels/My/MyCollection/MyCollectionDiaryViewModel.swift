@@ -99,8 +99,8 @@ final class MyCollectionDiaryViewModel: ObservableObject {
         do {
             try await diaryService.updateDiary(diaryId: diary.diaryId, request: request)
             displayedContent = payload
+            diary = diary.replacingContent(payload)
             isEditMode = false
-            NotificationCenter.default.post(name: .diaryCreated, object: nil)
             return true
         } catch {
             if isRequestCancelled(error) { return false }
@@ -119,7 +119,6 @@ final class MyCollectionDiaryViewModel: ObservableObject {
         do {
             try await diaryService.deleteDiary(diaryId: diary.diaryId)
             isDeleted = true
-            NotificationCenter.default.post(name: .diaryCreated, object: nil)
             return true
         } catch {
             if isRequestCancelled(error) { return false }

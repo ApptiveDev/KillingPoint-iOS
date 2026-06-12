@@ -313,6 +313,19 @@ final class MyCollectionViewModel: ObservableObject {
         )
     }
 
+    func preloadPlaybackFeeds() async {
+        await refetchCollectionDataOnFocus()
+
+        var previousFeedCount = -1
+        var iteration = 0
+        while previousFeedCount != myFeeds.count && iteration < 200 {
+            if Task.isCancelled { return }
+            previousFeedCount = myFeeds.count
+            await loadMoreMyFeedsFromBottomIfNeeded()
+            iteration += 1
+        }
+    }
+
     func formattedUpdateDate(from rawUpdateDate: String) -> String {
         let datePart = rawUpdateDate.split(separator: "T").first.map(String.init) ?? rawUpdateDate
         return datePart.replacingOccurrences(of: "-", with: ".")
@@ -320,6 +333,11 @@ final class MyCollectionViewModel: ObservableObject {
 
     func removeMyFeedLocally(diaryId: Int) {
         myFeeds.removeAll { $0.diaryId == diaryId }
+    }
+
+    func applyUpdatedFeed(_ updatedFeed: DiaryFeedModel) {
+        guard let index = myFeeds.firstIndex(where: { $0.diaryId == updatedFeed.diaryId }) else { return }
+        myFeeds[index] = normalizeFeedVideoURLs(in: [updatedFeed])[0]
     }
 
     func applyUpdatedUser(_ updatedUser: UserModel) {

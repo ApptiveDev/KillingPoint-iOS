@@ -5,15 +5,21 @@ struct MyCollectionFeedLikeBadgeView: View {
     let likeCount: Int
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Image(systemName: "heart.fill")
-                .foregroundStyle(Color.kpPrimary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isLiked ? Color.kpPrimary : Color.white.opacity(0.68))
 
             Text("\(likeCount)")
                 .foregroundStyle(Color.kpGray300)
         }
         .font(.system(size: 13, weight: .semibold))
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .padding(.vertical, 5)
+        .background(Color.black.opacity(0.46), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.kpPrimary, lineWidth: 1.5)
+        }
     }
 }

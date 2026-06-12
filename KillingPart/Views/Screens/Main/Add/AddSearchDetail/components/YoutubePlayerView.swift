@@ -58,23 +58,6 @@ struct YoutubePlayerView: UIViewRepresentable {
         webView.uiDelegate = context.coordinator
         context.coordinator.attach(webView: webView)
 
-        let redirectOverlayButton = UIButton(type: .custom)
-        redirectOverlayButton.translatesAutoresizingMaskIntoConstraints = false
-        redirectOverlayButton.backgroundColor = .clear
-        redirectOverlayButton.accessibilityLabel = "유튜브에서 열기"
-        redirectOverlayButton.addTarget(
-            context.coordinator,
-            action: #selector(Coordinator.handleVideoTap),
-            for: .touchUpInside
-        )
-        webView.addSubview(redirectOverlayButton)
-        NSLayoutConstraint.activate([
-            redirectOverlayButton.topAnchor.constraint(equalTo: webView.topAnchor),
-            redirectOverlayButton.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
-            redirectOverlayButton.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
-            redirectOverlayButton.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
-        ])
-
         context.coordinator.openExternalURL = { targetURL in
             openURL(targetURL)
         }
@@ -101,7 +84,7 @@ struct YoutubePlayerView: UIViewRepresentable {
 
         let targetStart = normalizedSeconds(startSeconds)
         let targetEnd = max(normalizedSeconds(endSeconds), targetStart + 0.1)
-        let preferMutedAutoplay = ProcessInfo.processInfo.isLowPowerModeEnabled
+        let preferMutedAutoplay = false
         if context.coordinator.loadedVideoID != videoID {
             context.coordinator.loadedVideoID = videoID
             context.coordinator.lastSyncedStart = targetStart
@@ -192,15 +175,8 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpSetPreferMutedAutoplay(\(preferMutedAutoplayJS));
             } else {
                 window.kpPreferMutedAutoplay = \(preferMutedAutoplayJS);
-                if (window.kpPreferMutedAutoplay) {
-                    window.kpAutoplayMutedFallbackActive = true;
-                    window.kpAutoplayAudioRestoreAttempted = false;
-                    if (window.kpPlayer.mute) {
-                        window.kpPlayer.mute();
-                    }
-                } else {
-                    window.kpAutoplayAudioRestoreAttempted = false;
-                }
+                window.kpAutoplayMutedFallbackActive = false;
+                window.kpAutoplayAudioRestoreAttempted = false;
             }
             if (window.kpApplyDesiredRange) {
                 window.kpApplyDesiredRange(\(shouldForceSeekJS));
@@ -329,27 +305,17 @@ struct YoutubePlayerView: UIViewRepresentable {
             self.webView = webView
         }
 
-        @objc
-        func handleVideoTap() {
-            openRedirectURL()
-        }
-
         func webView(
             _ webView: WKWebView,
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
         ) {
-            let isUserNavigation =
-                navigationAction.navigationType == .linkActivated
-                || navigationAction.navigationType == .formSubmitted
-                || navigationAction.navigationType == .formResubmitted
-
-            guard isUserNavigation else {
+            guard shouldOpenExternally(navigationAction) else {
                 decisionHandler(.allow)
                 return
             }
 
-            openRedirectURL()
+            openExternalURL(for: navigationAction.request.url)
             decisionHandler(.cancel)
         }
 
@@ -364,13 +330,42 @@ struct YoutubePlayerView: UIViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            openRedirectURL()
+            openExternalURL(for: navigationAction.request.url)
             return nil
+        }
+
+        private func shouldOpenExternally(_ navigationAction: WKNavigationAction) -> Bool {
+            let isUserNavigation =
+                navigationAction.navigationType == .linkActivated
+                || navigationAction.navigationType == .formSubmitted
+                || navigationAction.navigationType == .formResubmitted
+
+            if isUserNavigation {
+                return true
+            }
+
+            guard navigationAction.targetFrame == nil else { return false }
+            guard let url = navigationAction.request.url else { return false }
+            return isHTTPURL(url)
+        }
+
+        private func openExternalURL(for targetURL: URL?) {
+            if let targetURL, isHTTPURL(targetURL) {
+                openExternalURL?(targetURL)
+                return
+            }
+
+            openRedirectURL()
         }
 
         private func openRedirectURL() {
             guard let redirectURL else { return }
             openExternalURL?(redirectURL)
+        }
+
+        private func isHTTPURL(_ url: URL) -> Bool {
+            let scheme = url.scheme?.lowercased()
+            return scheme == "http" || scheme == "https"
         }
 
         private func handleLowPowerModeChanged() {
@@ -426,7 +421,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         private func applyAutoplayPolicyForCurrentPowerMode(forceSeek: Bool) {
             guard let webView, let isPlaying = lastSyncedIsPlaying else { return }
 
-            let preferMutedAutoplay = ProcessInfo.processInfo.isLowPowerModeEnabled
+            let preferMutedAutoplay = false
             lastSyncedPreferMutedAutoplay = preferMutedAutoplay
 
             let shouldAutoplayJS = isPlaying ? "true" : "false"
@@ -530,7 +525,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let shouldLoopPlaybackJS = shouldLoopPlayback ? "true" : "false"
         let preferMutedAutoplayJS = preferMutedAutoplay ? "true" : "false"
         let autoplayFlag = shouldAutoplay ? 1 : 0
-        let muteFlag = preferMutedAutoplay ? 1 : 0
+        let muteFlag = 0
 
         return """
         <!doctype html>
@@ -570,9 +565,9 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpAutoplayBaseRetryDelayMs = 220;
                 window.kpAutoplayRetryBackoffStepMs = 120;
                 window.kpAutoplayRetryMaxDelayMs = 1600;
-                window.kpAutoplayMuteFallbackAfterCount = 3;
-                window.kpPreferMutedAutoplay = \(preferMutedAutoplayJS);
-                window.kpAutoplayMutedFallbackActive = window.kpPreferMutedAutoplay;
+                window.kpAutoplayMuteFallbackAfterCount = 0;
+                window.kpPreferMutedAutoplay = false;
+                window.kpAutoplayMutedFallbackActive = false;
                 window.kpAutoplayAudioRestoreAttempted = false;
 
                 window.kpStopAutoplayRetry = function() {
@@ -622,27 +617,12 @@ struct YoutubePlayerView: UIViewRepresentable {
                 };
 
                 window.kpSetPreferMutedAutoplay = function(shouldPreferMutedAutoplay) {
-                    window.kpPreferMutedAutoplay = !!shouldPreferMutedAutoplay;
-                    if (window.kpPreferMutedAutoplay) {
-                        window.kpAutoplayMutedFallbackActive = true;
-                        window.kpAutoplayAudioRestoreAttempted = false;
-                        if (window.kpPlayer && window.kpPlayer.mute) {
-                            window.kpPlayer.mute();
-                        }
-                        return;
-                    }
-
+                    window.kpPreferMutedAutoplay = false;
+                    window.kpAutoplayMutedFallbackActive = false;
                     if (window.kpPlayer && window.kpPlayer.unMute) {
                         window.kpPlayer.unMute();
                     }
                     window.kpAutoplayAudioRestoreAttempted = false;
-
-                    if (window.kpPlayer && window.kpPlayer.isMuted) {
-                        var isMuted = !!window.kpPlayer.isMuted();
-                        if (!isMuted) {
-                            window.kpAutoplayMutedFallbackActive = false;
-                        }
-                    }
                 };
 
                 window.kpDispatchPlaybackEnded = function() {
@@ -703,11 +683,8 @@ struct YoutubePlayerView: UIViewRepresentable {
                         window.kpPlayer.seekTo(targetStart, true);
                     }
 
-                    if (
-                        (window.kpPreferMutedAutoplay || window.kpAutoplayMutedFallbackActive)
-                        && window.kpPlayer.mute
-                    ) {
-                        window.kpPlayer.mute();
+                    if (window.kpPlayer.unMute) {
+                        window.kpPlayer.unMute();
                     }
                     window.kpPlayer.playVideo();
                 };
@@ -736,13 +713,6 @@ struct YoutubePlayerView: UIViewRepresentable {
                         }
 
                         window.kpAutoplayRetryCount = Math.min(window.kpAutoplayRetryCount + 1, 20);
-                        if (
-                            !window.kpAutoplayMutedFallbackActive
-                            && window.kpAutoplayRetryCount >= window.kpAutoplayMuteFallbackAfterCount
-                        ) {
-                            window.kpAutoplayMutedFallbackActive = true;
-                            window.kpAutoplayAudioRestoreAttempted = false;
-                        }
                         window.kpScheduleAutoplayRetry(false);
                     }, retryDelay);
                 };
@@ -852,9 +822,6 @@ struct YoutubePlayerView: UIViewRepresentable {
                                 }
 
                                 window.kpAutoplayAudioRestoreAttempted = false;
-                                if (window.kpAutoplayMutedFallbackActive && window.kpPlayer.mute) {
-                                    window.kpPlayer.mute();
-                                }
                                 if (
                                     stateAfterUnmute !== 1
                                     && stateAfterUnmute !== 3
@@ -955,6 +922,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                                                 || !window.kpPlayer
                                                 || !window.kpPlayer.unMute
                                             ) {
+                                                window.kpAutoplayAudioRestoreAttempted = false;
                                                 return;
                                             }
 
@@ -979,9 +947,6 @@ struct YoutubePlayerView: UIViewRepresentable {
                                             }
 
                                             window.kpAutoplayAudioRestoreAttempted = false;
-                                            if (window.kpPlayer.mute) {
-                                                window.kpPlayer.mute();
-                                            }
                                             if (window.kpPlayer.playVideo) {
                                                 window.kpPlayer.playVideo();
                                             }

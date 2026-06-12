@@ -3,11 +3,29 @@ import SwiftUI
 struct SocialMyCollectionFeedCard: View {
     let feed: DiaryFeedModel
     let formattedUpdateDate: String
+    let onLikeLongPress: () -> Void
+
+    init(
+        feed: DiaryFeedModel,
+        formattedUpdateDate: String,
+        onLikeLongPress: @escaping () -> Void = {}
+    ) {
+        self.feed = feed
+        self.formattedUpdateDate = formattedUpdateDate
+        self.onLikeLongPress = onLikeLongPress
+    }
 
     var body: some View {
         VStack(alignment: .center, spacing: AppSpacing.xs) {
             HStack {
                 MyCollectionFeedLikeBadgeView(isLiked: feed.isLiked, likeCount: feed.likeCount)
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        LongPressGesture(minimumDuration: 0.45)
+                            .onEnded { _ in
+                                onLikeLongPress()
+                            }
+                    )
                 Spacer()
                 MyCollectionFeedScopeBadgeView(scope: feed.scope)
             }
