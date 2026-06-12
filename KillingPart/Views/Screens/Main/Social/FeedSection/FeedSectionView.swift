@@ -501,7 +501,18 @@ struct FeedSectionView: View {
         diaryId: Int
     ) {
         guard diaryID(at: currentPageIndex) == diaryId else { return }
-        elapsedInCurrentRange = progress.elapsedInRange
+        guard let feed = feed(for: diaryId) else { return }
+        let startSeconds = parsedSeconds(from: feed.start) ?? 0
+        let endSeconds = resolvedEndSeconds(for: feed, startSeconds: startSeconds)
+        guard progress.matchesRange(startSeconds: startSeconds, endSeconds: endSeconds) else {
+            return
+        }
+
+        elapsedInCurrentRange = clampedElapsed(
+            currentSeconds: progress.currentSeconds,
+            startSeconds: startSeconds,
+            duration: max(endSeconds - startSeconds, 0)
+        )
         lastPlaybackProgressDate = Date()
     }
 
@@ -512,5 +523,41 @@ struct FeedSectionView: View {
 
     private func resetPlaybackProgressTracking() {
         lastPlaybackProgressDate = nil
+    }
+
+    private func parsedSeconds(from value: String) -> Double? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let raw = Double(trimmed) {
+            return max(raw, 0)
+        }
+
+        let sanitized = trimmed.replacingOccurrences(of: "초", with: "")
+        if sanitized.contains(":") {
+            let parts = sanitized.split(separator: ":").map(String.init)
+            guard
+                parts.count == 2,
+                let minutes = Double(parts[0]),
+                let seconds = Double(parts[1])
+            else {
+                return nil
+            }
+            return max((minutes * 60) + seconds, 0)
+        }
+
+        return nil
+    }
+
+    private func resolvedEndSeconds(for feed: DiaryFeedModel, startSeconds: Double) -> Double {
+        max(parsedSeconds(from: feed.end) ?? startSeconds, startSeconds + 0.1)
+    }
+
+    private func clampedElapsed(
+        currentSeconds: Double,
+        startSeconds: Double,
+        duration: Double
+    ) -> TimeInterval {
+        min(max(currentSeconds - startSeconds, 0), max(duration, 0))
     }
 }

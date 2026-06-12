@@ -11,6 +11,15 @@ struct YoutubePlaybackProgress: Equatable {
     var elapsedInRange: Double {
         min(max(currentSeconds - startSeconds, 0), max(endSeconds - startSeconds, 0))
     }
+
+    func matchesRange(
+        startSeconds expectedStartSeconds: Double,
+        endSeconds expectedEndSeconds: Double,
+        tolerance: Double = 0.25
+    ) -> Bool {
+        abs(startSeconds - expectedStartSeconds) <= tolerance
+            && abs(endSeconds - expectedEndSeconds) <= tolerance
+    }
 }
 
 struct YoutubePlaybackRange: Equatable {
@@ -46,12 +55,13 @@ struct YoutubePlayerAutoplayPolicy: Equatable {
         allowsMutedAutoplayFallback: Bool,
         hasUsedMutedFallback: Bool,
         hasUserInteracted: Bool,
+        isLowPowerModeEnabled: Bool = false,
         elapsedSinceUnmutedAttempt: TimeInterval
     ) -> Bool {
         allowsMutedAutoplayFallback
             && !hasUsedMutedFallback
             && !hasUserInteracted
-            && elapsedSinceUnmutedAttempt >= mutedFallbackDelay
+            && (isLowPowerModeEnabled || elapsedSinceUnmutedAttempt >= mutedFallbackDelay)
     }
 }
 
@@ -154,6 +164,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let targetStart = targetRange.startSeconds
         let targetEnd = targetRange.endSeconds
         let mutedFallbackDelayMS = Int(YoutubePlayerAutoplayPolicy.default.mutedFallbackDelay * 1000)
+        let isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
         if context.coordinator.loadedVideoID != videoID {
             context.coordinator.loadedVideoID = videoID
             context.coordinator.lastSyncedStart = targetStart
@@ -175,6 +186,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     allowsMutedAutoplayFallback: allowsMutedAutoplayFallback,
                     respectsUserInteraction: respectsUserInteraction,
                     showsMutedFallbackControl: showsMutedFallbackControl,
+                    isLowPowerModeEnabled: isLowPowerModeEnabled,
                     mutedFallbackDelayMS: mutedFallbackDelayMS
                 ),
                 baseURL: appRefererURL
@@ -255,6 +267,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let allowsMutedAutoplayFallbackJS = allowsMutedAutoplayFallback ? "true" : "false"
         let respectsUserInteractionJS = respectsUserInteraction ? "true" : "false"
         let showsMutedFallbackControlJS = showsMutedFallbackControl ? "true" : "false"
+        let isLowPowerModeEnabledJS = isLowPowerModeEnabled ? "true" : "false"
         let shouldResetControlModeJS = (isRangeChanged || (isPlayStateChanged && isPlaying)) ? "true" : "false"
 
         webView.evaluateJavaScript(
@@ -268,6 +281,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     allowsMutedAutoplayFallback: \(allowsMutedAutoplayFallbackJS),
                     respectsUserInteraction: \(respectsUserInteractionJS),
                     showsMutedFallbackControl: \(showsMutedFallbackControlJS),
+                    isLowPowerModeEnabled: \(isLowPowerModeEnabledJS),
                     resetControlMode: \(shouldResetControlModeJS)
                 });
             } else {
@@ -481,6 +495,7 @@ struct YoutubePlayerView: UIViewRepresentable {
             let isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
             guard isLowPowerModeEnabled != lastKnownLowPowerMode else { return }
             lastKnownLowPowerMode = isLowPowerModeEnabled
+            setLowPowerModeInPlayer(isLowPowerModeEnabled)
             startPlaybackHeartbeat(minimumInterval: 0)
         }
 
@@ -500,6 +515,19 @@ struct YoutubePlayerView: UIViewRepresentable {
                 """
                 if (window.kpNativeResume) {
                     window.kpNativeResume();
+                }
+                """,
+                completionHandler: nil
+            )
+        }
+
+        private func setLowPowerModeInPlayer(_ isEnabled: Bool) {
+            guard let webView else { return }
+            let isEnabledJS = isEnabled ? "true" : "false"
+            webView.evaluateJavaScript(
+                """
+                if (window.kpSetLowPowerMode) {
+                    window.kpSetLowPowerMode(\(isEnabledJS));
                 }
                 """,
                 completionHandler: nil
@@ -615,6 +643,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         allowsMutedAutoplayFallback: Bool,
         respectsUserInteraction: Bool,
         showsMutedFallbackControl: Bool,
+        isLowPowerModeEnabled: Bool,
         mutedFallbackDelayMS: Int
     ) -> String {
         let safeVideoID = escapeForJavaScript(videoID)
@@ -627,6 +656,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let allowsMutedAutoplayFallbackJS = allowsMutedAutoplayFallback ? "true" : "false"
         let respectsUserInteractionJS = respectsUserInteraction ? "true" : "false"
         let showsMutedFallbackControlJS = showsMutedFallbackControl ? "true" : "false"
+        let isLowPowerModeEnabledJS = isLowPowerModeEnabled ? "true" : "false"
         let autoplayFlag = shouldAutoplay ? 1 : 0
 
         return """
@@ -654,7 +684,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     right: 10px;
                     bottom: 10px;
                     display: none;
-                    align-items: center;
+                    align-items: flex-start;
                     gap: 8px;
                     padding: 8px 10px;
                     border: 1px solid rgba(220, 255, 82, 0.75);
@@ -678,12 +708,16 @@ struct YoutubePlayerView: UIViewRepresentable {
                     color: #000000;
                     font: inherit;
                     font-weight: 700;
+                    white-space: nowrap;
                 }
                 #kp-muted-fallback-message {
                     min-width: 0;
                     overflow: hidden;
                     text-overflow: ellipsis;
-                    white-space: nowrap;
+                    white-space: normal;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
                 }
             </style>
         </head>
@@ -703,6 +737,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpAllowsMutedAutoplayFallback = \(allowsMutedAutoplayFallbackJS);
                 window.kpRespectsUserInteraction = \(respectsUserInteractionJS);
                 window.kpShowsMutedFallbackControl = \(showsMutedFallbackControlJS);
+                window.kpIsLowPowerModeEnabled = \(isLowPowerModeEnabledJS);
                 window.kpMutedFallbackDelayMs = \(mutedFallbackDelayMS);
                 window.kpHasDispatchedEnded = false;
                 window.kpPlayer = null;
@@ -718,6 +753,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                 window.kpAppIssuedPause = false;
                 window.kpStallStartedAt = 0;
                 window.kpLastPlaybackState = -1;
+                window.kpLowPowerNoticeDismissed = false;
 
                 window.kpDispatchPlaybackEnded = function() {
                     if (window.kpHasDispatchedEnded) {
@@ -837,12 +873,34 @@ struct YoutubePlayerView: UIViewRepresentable {
                     }
                 }
 
+                function kpMutedFallbackMessage() {
+                    if (window.kpIsLowPowerModeEnabled) {
+                        return '저전력 모드에서는 iOS가 자동재생을 더 엄격하게 제한해요. 해제하면 유튜브 자동재생과 끊김 없는 재생이 더 안정적이에요.';
+                    }
+                    return 'iOS/YouTube 정책으로 무음 자동재생 중이에요. 저전력 모드를 해제하면 자동재생이 더 안정적이에요.';
+                }
+
+                function kpLowPowerNoticeMessage() {
+                    return '저전력 모드가 켜져 있어 자동재생이 제한될 수 있어요. 해제하면 유튜브 자동재생과 끊김 없는 재생이 더 안정적이에요.';
+                }
+
                 function kpUpdateMutedFallbackControl() {
                     if (window.kpMutedFallbackActive && kpIsMuted()) {
                         kpSetMutedFallbackVisible(
                             true,
-                            'iOS/YouTube 정책으로 무음 자동재생 중이에요.'
+                            kpMutedFallbackMessage()
                         );
+                        return;
+                    }
+
+                    if (
+                        window.kpIsLowPowerModeEnabled
+                        && window.kpShouldAutoplay
+                        && window.kpAllowsMutedAutoplayFallback
+                        && !window.kpUserInteracted
+                        && !window.kpLowPowerNoticeDismissed
+                    ) {
+                        kpSetMutedFallbackVisible(true, kpLowPowerNoticeMessage());
                         return;
                     }
 
@@ -857,6 +915,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     window.kpUnmutedAutoplayAttemptAt = 0;
                     window.kpStallStartedAt = 0;
                     window.kpHasDispatchedEnded = false;
+                    window.kpLowPowerNoticeDismissed = false;
                     kpUpdateMutedFallbackControl();
                 }
 
@@ -906,6 +965,7 @@ struct YoutubePlayerView: UIViewRepresentable {
 
                     window.kpHasUsedMutedFallback = true;
                     window.kpMutedFallbackActive = true;
+                    window.kpLowPowerNoticeDismissed = false;
                     if (window.kpPlayer.mute) {
                         window.kpPlayer.mute();
                     }
@@ -915,6 +975,28 @@ struct YoutubePlayerView: UIViewRepresentable {
                         window.kpPlayer.playVideo();
                     }
                 }
+
+                window.kpSetLowPowerMode = function(isEnabled) {
+                    window.kpIsLowPowerModeEnabled = !!isEnabled;
+                    window.kpLowPowerNoticeDismissed = false;
+                    kpUpdateMutedFallbackControl();
+
+                    if (
+                        window.kpIsLowPowerModeEnabled
+                        && window.kpShouldAutoplay
+                        && window.kpAllowsMutedAutoplayFallback
+                        && !window.kpUserInteracted
+                    ) {
+                        if (window.kpPlayerReady && window.kpPlayer) {
+                            kpApplyMutedFallback();
+                        }
+                        return;
+                    }
+
+                    if (window.kpPlayerReady && window.kpPlayer && window.kpShouldAutoplay) {
+                        window.kpStartHeartbeat();
+                    }
+                };
 
                 function kpPauseFromApp() {
                     if (!window.kpPlayerReady || !window.kpPlayer || !window.kpPlayer.pauseVideo) {
@@ -1006,6 +1088,16 @@ struct YoutubePlayerView: UIViewRepresentable {
                     }
 
                     if (
+                        window.kpIsLowPowerModeEnabled
+                        && window.kpAllowsMutedAutoplayFallback
+                        && !window.kpHasUsedMutedFallback
+                        && !window.kpUserInteracted
+                    ) {
+                        kpApplyMutedFallback();
+                        return;
+                    }
+
+                    if (
                         window.kpAllowsMutedAutoplayFallback
                         && !window.kpHasUsedMutedFallback
                         && !window.kpUserInteracted
@@ -1051,6 +1143,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                     window.kpAllowsMutedAutoplayFallback = !!config.allowsMutedAutoplayFallback;
                     window.kpRespectsUserInteraction = !!config.respectsUserInteraction;
                     window.kpShowsMutedFallbackControl = !!config.showsMutedFallbackControl;
+                    window.kpIsLowPowerModeEnabled = !!config.isLowPowerModeEnabled;
 
                     if (config.resetControlMode) {
                         kpResetAppControl();
@@ -1065,7 +1158,14 @@ struct YoutubePlayerView: UIViewRepresentable {
 
                     window.kpStartHeartbeat();
                     if (!wasAutoplay || config.resetControlMode) {
-                        kpAttemptUnmutedPlayback(!!config.resetControlMode);
+                        if (
+                            window.kpIsLowPowerModeEnabled
+                            && window.kpAllowsMutedAutoplayFallback
+                        ) {
+                            kpApplyMutedFallback();
+                        } else {
+                            kpAttemptUnmutedPlayback(!!config.resetControlMode);
+                        }
                     }
                 };
 
@@ -1102,6 +1202,7 @@ struct YoutubePlayerView: UIViewRepresentable {
                         window.kpStallStartedAt = 0;
                         if (!kpIsMuted()) {
                             window.kpMutedFallbackActive = false;
+                            window.kpLowPowerNoticeDismissed = true;
                             kpUpdateMutedFallbackControl();
                         }
                         return;
@@ -1143,13 +1244,16 @@ struct YoutubePlayerView: UIViewRepresentable {
                     setTimeout(function() {
                         if (!kpIsMuted()) {
                             window.kpMutedFallbackActive = false;
+                            window.kpLowPowerNoticeDismissed = true;
                             kpUpdateMutedFallbackControl();
                             return;
                         }
 
                         kpSetMutedFallbackVisible(
                             true,
-                            '브라우저 정책상 소리 자동재생이 제한됐어요. 다시 눌러 주세요.'
+                            window.kpIsLowPowerModeEnabled
+                                ? '저전력 모드에서는 소리 자동재생이 제한될 수 있어요. 해제 후 다시 눌러 주세요.'
+                                : '브라우저 정책상 소리 자동재생이 제한됐어요. 다시 눌러 주세요.'
                         );
                     }, 350);
                 }
@@ -1199,7 +1303,14 @@ struct YoutubePlayerView: UIViewRepresentable {
                                 }
                                 if (window.kpShouldAutoplay) {
                                     window.kpStartHeartbeat();
-                                    kpAttemptUnmutedPlayback(true);
+                                    if (
+                                        window.kpIsLowPowerModeEnabled
+                                        && window.kpAllowsMutedAutoplayFallback
+                                    ) {
+                                        kpApplyMutedFallback();
+                                    } else {
+                                        kpAttemptUnmutedPlayback(true);
+                                    }
                                 } else {
                                     if (window.kpPlayer.unMute) {
                                         window.kpPlayer.unMute();

@@ -96,4 +96,19 @@ struct YoutubePlaybackTests {
             )
         )
     }
+
+    @Test
+    func mutedFallbackStartsImmediatelyInLowPowerMode() {
+        let policy = YoutubePlayerAutoplayPolicy.default
+
+        #expect(
+            policy.shouldUseMutedFallback(
+                allowsMutedAutoplayFallback: true,
+                hasUsedMutedFallback: false,
+                hasUserInteracted: false,
+                isLowPowerModeEnabled: true,
+                elapsedSinceUnmutedAttempt: 0
+            )
+        )
+    }
 }
