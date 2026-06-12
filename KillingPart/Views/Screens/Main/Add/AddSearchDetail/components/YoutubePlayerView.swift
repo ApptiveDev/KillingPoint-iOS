@@ -808,8 +808,8 @@ struct YoutubePlayerView: UIViewRepresentable {
                         저전력 모드가 켜져 있어 iOS가 YouTube 자동재생을 제한할 수 있어요. 저전력 모드를 해제하면 YouTube 자동재생과 끊김 없는 영상 재생이 가능합니다.
                     </div>
                     <div id="kp-muted-fallback-actions">
-                        <button id="kp-dismiss-button" type="button">계속 보기</button>
-                        <button id="kp-unmute-button" type="button">소리 켜기</button>
+                        
+                        <button id="kp-unmute-button" type="button">재생하기</button>
                     </div>
                 </div>
             </div>
