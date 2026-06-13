@@ -148,43 +148,45 @@ struct MyCollectionDiary: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    handleSaveImageTap()
-                } label: {
-                    toolbarIconWithTitle(named: "ic_save", title: "저장")
-                }
-                .disabled(isExportActionDisabled)
-                .opacity(isExportActionDisabled ? 0.45 : 1)
-                .accessibilityLabel("이미지 저장")
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 0) {
+                    Button {
+                        handleSaveImageTap()
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_save", title: "저장")
+                    }
+                    .disabled(isExportActionDisabled)
+                    .opacity(isExportActionDisabled ? 0.45 : 1)
+                    .accessibilityLabel("이미지 저장")
 
-                Button {
-                    dismissKeyboard()
-                    isShareDialogPresented = true
-                } label: {
-                    toolbarIconWithTitle(named: "ic_share", title: "공유")
-                }
-                .disabled(isExportActionDisabled)
-                .opacity(isExportActionDisabled ? 0.45 : 1)
-                .accessibilityLabel("공유")
+                    Button {
+                        dismissKeyboard()
+                        isShareDialogPresented = true
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_share", title: "공유")
+                    }
+                    .disabled(isExportActionDisabled)
+                    .opacity(isExportActionDisabled ? 0.45 : 1)
+                    .accessibilityLabel("공유")
 
-                Button {
-                    viewModel.beginEdit()
-                } label: {
-                    toolbarIconWithTitle(named: "ic_edit", title: "수정")
-                }
-                .disabled(viewModel.isEditMode || viewModel.isProcessing)
-                .opacity((viewModel.isEditMode || viewModel.isProcessing) ? 0.45 : 1)
-                .accessibilityLabel("수정")
+                    Button {
+                        viewModel.beginEdit()
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_edit", title: "수정")
+                    }
+                    .disabled(viewModel.isEditMode || viewModel.isProcessing)
+                    .opacity((viewModel.isEditMode || viewModel.isProcessing) ? 0.45 : 1)
+                    .accessibilityLabel("수정")
 
-                Button(role: .destructive) {
-                    isDeleteDialogPresented = true
-                } label: {
-                    toolbarIconWithTitle(named: "ic_trash", title: "삭제")
+                    Button(role: .destructive) {
+                        isDeleteDialogPresented = true
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_trash", title: "삭제")
+                    }
+                    .disabled(viewModel.isProcessing)
+                    .opacity(viewModel.isProcessing ? 0.45 : 1)
+                    .accessibilityLabel("삭제")
                 }
-                .disabled(viewModel.isProcessing)
-                .opacity(viewModel.isProcessing ? 0.45 : 1)
-                .accessibilityLabel("삭제")
             }
         }
         .confirmationDialog(
@@ -436,19 +438,19 @@ struct MyCollectionDiary: View {
     }
 
     private func toolbarIconWithTitle(named name: String, title: String) -> some View {
-        VStack(spacing: 1) {
+        VStack(spacing: 2) {
             Image(name)
                 .renderingMode(.original)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 18, height: 18)
+                .frame(width: 22, height: 22)
 
             Text(title)
-                .font(AppFont.paperlogy5Medium(size: 9))
+                .font(AppFont.paperlogy5Medium(size: 10.5))
                 .foregroundStyle(.white.opacity(0.9))
                 .lineLimit(1)
         }
-        .frame(width: 30, height: 35)
+        .frame(width: 33, height: 40)
         .contentShape(Rectangle())
     }
 
