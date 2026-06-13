@@ -12,6 +12,9 @@ struct MyCollectionDiary: View {
     let onDiaryDeleted: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
+    @State private var isExportingImage = false
+    @State private var activityShareItem: MyCollectionDiaryActivityShareItem?
+    @State private var actionAlert: MyCollectionDiaryActionAlert?
     @State private var keyboardHeight: CGFloat = 0
     @State private var playerReloadToken = UUID()
 
@@ -144,24 +147,47 @@ struct MyCollectionDiary: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button(role: .destructive) {
-                    isDeleteDialogPresented = true
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.white)
-                }
-                .disabled(viewModel.isProcessing)
-                .opacity(viewModel.isProcessing ? 0.45 : 1)
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 0) {
+                    Button {
+                        handleSaveImageTap()
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_save", title: "저장")
+                    }
+                    .disabled(isExportActionDisabled)
+                    .opacity(isExportActionDisabled ? 0.45 : 1)
+                    .accessibilityLabel("이미지 저장")
 
-                Button {
-                    viewModel.beginEdit()
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .foregroundStyle(.white)
+                    Button {
+                        dismissKeyboard()
+                        handleNativeShareTap()
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_share", title: "공유")
+                    }
+                    .disabled(isExportActionDisabled)
+                    .opacity(isExportActionDisabled ? 0.45 : 1)
+                    .accessibilityLabel("공유")
+
+                    Button {
+                        viewModel.beginEdit()
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_edit", title: "수정")
+                    }
+                    .disabled(viewModel.isEditMode || viewModel.isProcessing)
+                    .opacity((viewModel.isEditMode || viewModel.isProcessing) ? 0.45 : 1)
+                    .accessibilityLabel("수정")
+
+                    Button(role: .destructive) {
+                        isDeleteDialogPresented = true
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_trash", title: "삭제")
+                    }
+                    .disabled(viewModel.isProcessing)
+                    .opacity(viewModel.isProcessing ? 0.45 : 1)
+                    .accessibilityLabel("삭제")
                 }
-                .disabled(viewModel.isEditMode || viewModel.isProcessing)
-                .opacity((viewModel.isEditMode || viewModel.isProcessing) ? 0.45 : 1)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
             }
         }
         .confirmationDialog(
@@ -183,6 +209,16 @@ struct MyCollectionDiary: View {
             Button("취소", role: .cancel) {}
         } message: {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
+        }
+        .sheet(item: $activityShareItem) { item in
+            MyCollectionDiaryActivityShareSheet(activityItems: [item.image])
+        }
+        .alert(item: $actionAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("확인"))
+            )
         }
     }
 
@@ -252,6 +288,10 @@ struct MyCollectionDiary: View {
         return raw.hasPrefix("@") ? raw : "@\(raw)"
     }
 
+    private var isExportActionDisabled: Bool {
+        viewModel.isProcessing || viewModel.isDeleted || isExportingImage
+    }
+
     private func updateKeyboardHeight(from notification: Notification) {
         guard
             let userInfo = notification.userInfo,
@@ -294,6 +334,106 @@ struct MyCollectionDiary: View {
             guard isSuccess else { return }
             onDiaryUpdated?(viewModel.diary)
         }
+    }
+
+    private func handleSaveImageTap() {
+        dismissKeyboard()
+        Task { @MainActor in
+            guard !isExportingImage else { return }
+            isExportingImage = true
+            defer { isExportingImage = false }
+
+            do {
+                let image = try await renderShareImage()
+                try await MyCollectionDiaryPhotoSaver.save(image)
+                actionAlert = MyCollectionDiaryActionAlert(
+                    title: "저장 완료",
+                    message: "이미지를 사진 보관함에 저장했어요."
+                )
+            } catch {
+                actionAlert = MyCollectionDiaryActionAlert(
+                    title: "저장 실패",
+                    message: exportErrorMessage(from: error)
+                )
+            }
+        }
+    }
+
+    private func handleInstagramStoryShareTap() {
+        dismissKeyboard()
+        Task { @MainActor in
+            guard !isExportingImage else { return }
+            isExportingImage = true
+            defer { isExportingImage = false }
+
+            do {
+                let image = try await renderShareImage()
+                try MyCollectionDiaryInstagramStorySharer.share(image)
+            } catch {
+                actionAlert = MyCollectionDiaryActionAlert(
+                    title: "공유 실패",
+                    message: exportErrorMessage(from: error)
+                )
+            }
+        }
+    }
+
+    private func handleNativeShareTap() {
+        dismissKeyboard()
+        Task { @MainActor in
+            guard !isExportingImage else { return }
+            isExportingImage = true
+            defer { isExportingImage = false }
+
+            do {
+                let image = try await renderShareImage()
+                activityShareItem = MyCollectionDiaryActivityShareItem(image: image)
+            } catch {
+                actionAlert = MyCollectionDiaryActionAlert(
+                    title: "공유 실패",
+                    message: exportErrorMessage(from: error)
+                )
+            }
+        }
+    }
+
+    @MainActor
+    private func renderShareImage() async throws -> UIImage {
+        try await MyCollectionDiaryShareImageRenderer.render(
+            diary: viewModel.diary,
+            displayedContent: viewModel.displayedContent,
+            createdDateText: createdDateText,
+            tagText: tagText,
+            startMinuteSecondText: viewModel.startMinuteSecondText,
+            endMinuteSecondText: viewModel.endMinuteSecondText,
+            startProgress: startProgress,
+            endProgress: endProgress
+        )
+    }
+
+    private func exportErrorMessage(from error: Error) -> String {
+        if let errorDescription = (error as? LocalizedError)?.errorDescription {
+            return errorDescription
+        }
+
+        return "이미지를 처리하는 중 오류가 발생했어요."
+    }
+
+    private func toolbarIconWithTitle(named name: String, title: String) -> some View {
+        VStack(spacing: 2) {
+            Image(name)
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+
+            Text(title)
+                .font(AppFont.paperlogy5Medium(size: 11))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+        }
+        .frame(width: 36, height: 43)
+        .contentShape(Rectangle())
     }
 
     private func dismissKeyboard() {

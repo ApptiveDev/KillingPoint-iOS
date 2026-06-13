@@ -20,14 +20,19 @@
 			</array>
 		</dict>
 	</array>
+	<key>FACEBOOK_APP_ID</key>
+	<string>$(FACEBOOK_APP_ID)</string>
 	<key>KAKAO_NATIVE_APP_KEY</key>
 	<string>$(KAKAO_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
+		<string>instagram-stories</string>
 		<string>kakaokompassauth</string>
 	</array>
 	<key>MUSIC_BASE_URL</key>
 	<string>$(MUSIC_BASE_URL)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>공유 이미지를 사진 보관함에 저장하기 위해 접근 권한이 필요합니다.</string>
 	<key>SPOTIFY_BASIC_AUTH</key>
 	<string>$(SPOTIFY_BASIC_AUTH)</string>
 	<key>UIAppFonts</key>
