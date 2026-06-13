@@ -12,7 +12,6 @@ struct MyCollectionDiary: View {
     let onDiaryDeleted: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
-    @State private var isShareDialogPresented = false
     @State private var isExportingImage = false
     @State private var activityShareItem: MyCollectionDiaryActivityShareItem?
     @State private var actionAlert: MyCollectionDiaryActionAlert?
@@ -161,7 +160,7 @@ struct MyCollectionDiary: View {
 
                     Button {
                         dismissKeyboard()
-                        isShareDialogPresented = true
+                        handleNativeShareTap()
                     } label: {
                         toolbarIconWithTitle(named: "ic_share", title: "공유")
                     }
@@ -187,26 +186,9 @@ struct MyCollectionDiary: View {
                     .opacity(viewModel.isProcessing ? 0.45 : 1)
                     .accessibilityLabel("삭제")
                 }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
             }
-        }
-        .confirmationDialog(
-            "공유하기",
-            isPresented: $isShareDialogPresented,
-            titleVisibility: .visible
-        ) {
-            Button("Instagram Story") {
-                handleInstagramStoryShareTap()
-            }
-            .disabled(isExportingImage)
-
-            Button("카카오톡으로 공유") {
-                handleKakaoShareTap()
-            }
-            .disabled(isExportingImage)
-
-            Button("취소", role: .cancel) {}
-        } message: {
-            Text("공유할 방식을 선택해 주세요.")
         }
         .confirmationDialog(
             "일기 삭제",
@@ -396,7 +378,7 @@ struct MyCollectionDiary: View {
         }
     }
 
-    private func handleKakaoShareTap() {
+    private func handleNativeShareTap() {
         dismissKeyboard()
         Task { @MainActor in
             guard !isExportingImage else { return }
@@ -443,14 +425,14 @@ struct MyCollectionDiary: View {
                 .renderingMode(.original)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 22, height: 22)
+                .frame(width: 24, height: 24)
 
             Text(title)
-                .font(AppFont.paperlogy5Medium(size: 10.5))
+                .font(AppFont.paperlogy5Medium(size: 11))
                 .foregroundStyle(.white.opacity(0.9))
                 .lineLimit(1)
         }
-        .frame(width: 33, height: 40)
+        .frame(width: 36, height: 43)
         .contentShape(Rectangle())
     }
 
