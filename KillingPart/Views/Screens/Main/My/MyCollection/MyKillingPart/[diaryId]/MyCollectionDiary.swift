@@ -12,6 +12,7 @@ struct MyCollectionDiary: View {
     let onDiaryDeleted: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
+    @State private var isShareDialogPresented = false
     @State private var isExportingImage = false
     @State private var activityShareItem: MyCollectionDiaryActivityShareItem?
     @State private var actionAlert: MyCollectionDiaryActionAlert?
@@ -160,7 +161,7 @@ struct MyCollectionDiary: View {
 
                     Button {
                         dismissKeyboard()
-                        handleNativeShareTap()
+                        isShareDialogPresented = true
                     } label: {
                         toolbarIconWithTitle(named: "ic_share", title: "공유")
                     }
@@ -189,6 +190,25 @@ struct MyCollectionDiary: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 3)
             }
+        }
+        .confirmationDialog(
+            "공유하기",
+            isPresented: $isShareDialogPresented,
+            titleVisibility: .visible
+        ) {
+            Button("공유") {
+                handleNativeShareTap()
+            }
+            .disabled(isExportingImage)
+
+            Button("인스타 스토리 공유") {
+                handleInstagramStoryShareTap()
+            }
+            .disabled(isExportingImage)
+
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("공유할 방식을 선택해 주세요.")
         }
         .confirmationDialog(
             "일기 삭제",
