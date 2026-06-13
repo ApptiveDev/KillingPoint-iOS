@@ -152,7 +152,7 @@ struct MyCollectionDiary: View {
                 Button {
                     handleSaveImageTap()
                 } label: {
-                    toolbarIcon(named: "ic_save")
+                    toolbarIconWithTitle(named: "ic_save", title: "저장")
                 }
                 .disabled(isExportActionDisabled)
                 .opacity(isExportActionDisabled ? 0.45 : 1)
@@ -162,7 +162,7 @@ struct MyCollectionDiary: View {
                     dismissKeyboard()
                     isShareDialogPresented = true
                 } label: {
-                    toolbarIcon(named: "ic_share")
+                    toolbarIconWithTitle(named: "ic_share", title: "공유")
                 }
                 .disabled(isExportActionDisabled)
                 .opacity(isExportActionDisabled ? 0.45 : 1)
@@ -171,7 +171,7 @@ struct MyCollectionDiary: View {
                 Button {
                     viewModel.beginEdit()
                 } label: {
-                    toolbarIcon(named: "ic_edit")
+                    toolbarIconWithTitle(named: "ic_edit", title: "수정")
                 }
                 .disabled(viewModel.isEditMode || viewModel.isProcessing)
                 .opacity((viewModel.isEditMode || viewModel.isProcessing) ? 0.45 : 1)
@@ -180,7 +180,7 @@ struct MyCollectionDiary: View {
                 Button(role: .destructive) {
                     isDeleteDialogPresented = true
                 } label: {
-                    toolbarIcon(named: "ic_trash")
+                    toolbarIconWithTitle(named: "ic_trash", title: "삭제")
                 }
                 .disabled(viewModel.isProcessing)
                 .opacity(viewModel.isProcessing ? 0.45 : 1)
@@ -435,12 +435,21 @@ struct MyCollectionDiary: View {
         return "이미지를 처리하는 중 오류가 발생했어요."
     }
 
-    private func toolbarIcon(named name: String) -> some View {
-        Image(name)
-            .renderingMode(.original)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 21, height: 21)
+    private func toolbarIconWithTitle(named name: String, title: String) -> some View {
+        VStack(spacing: 1) {
+            Image(name)
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+
+            Text(title)
+                .font(AppFont.paperlogy5Medium(size: 9))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+        }
+        .frame(width: 30, height: 35)
+        .contentShape(Rectangle())
     }
 
     private func dismissKeyboard() {

@@ -184,68 +184,85 @@ private struct MyCollectionDiaryShareImageView: View {
                 .frame(width: 360, height: 640)
                 .clipped()
 
-            Color.black.opacity(0.42)
+            Color.black.opacity(0.48)
+
+            VStack(spacing: 18) {
+                trackCard
+                    .frame(height: 292)
+
+                commentCard
+                    .frame(height: 238)
+            }
+            .padding(.horizontal, 21)
+            .padding(.top, 38)
+            .frame(width: 360, height: 640, alignment: .top)
+        }
+        .frame(width: 360, height: 640)
+        .clipped()
+    }
+
+    private var trackCard: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.black.opacity(0.72))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                }
 
             VStack(spacing: 0) {
                 AddSearchDetailAlbumArtworkView(
                     url: artworkURL,
                     preloadedImage: artworkImage,
-                    coverSize: 188
+                    coverSize: 160
                 )
-                .frame(width: 278, height: 188, alignment: .center)
-                .padding(.top, 54)
+                .frame(width: 238, height: 160, alignment: .center)
+                .padding(.top, 24)
 
                 trackTextSection
-                    .padding(.top, 18)
+                    .padding(.top, 16)
 
                 MyCollectionDiaryTimelineRangeView(
                     startMinuteSecondText: startMinuteSecondText,
                     endMinuteSecondText: endMinuteSecondText,
                     startProgress: startProgress,
                     endProgress: endProgress,
-                    trackHeight: 3,
-                    segmentHeight: 7,
-                    labelWidth: 44,
-                    labelY: 27,
-                    height: 44,
-                    startFontSize: 12,
-                    endFontSize: 12,
-                    trackColor: Color.white.opacity(0.46),
+                    trackHeight: 2.5,
+                    segmentHeight: 6,
+                    labelWidth: 40,
+                    labelY: 24,
+                    height: 38,
+                    startFontSize: 10,
+                    endFontSize: 10,
+                    trackColor: Color.white.opacity(0.42),
                     segmentColor: AppColors.primary600,
-                    startLabelColor: Color.white.opacity(0.68),
-                    endLabelColor: Color.white.opacity(0.68)
+                    startLabelColor: Color.white.opacity(0.62),
+                    endLabelColor: Color.white.opacity(0.62)
                 )
-                .padding(.horizontal, 34)
-                .padding(.top, 12)
+                .padding(.horizontal, 36)
+                .padding(.top, 10)
 
-                Spacer(minLength: 18)
-
-                commentCard
-                    .frame(height: 238)
-                    .padding(.horizontal, 21)
-                    .padding(.bottom, 34)
+                Spacer(minLength: 12)
             }
         }
-        .frame(width: 360, height: 640)
-        .clipped()
     }
 
     private var trackTextSection: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 5) {
             Text(musicTitle)
-                .font(AppFont.paperlogy7Bold(size: 24))
+                .font(AppFont.paperlogy7Bold(size: 19))
                 .foregroundStyle(.white)
                 .lineLimit(2)
-                .minimumScaleFactor(0.78)
+                .minimumScaleFactor(0.74)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 306)
+                .frame(maxWidth: 266)
 
             Text(artist)
-                .font(AppFont.paperlogy4Regular(size: 18))
+                .font(AppFont.paperlogy4Regular(size: 14))
                 .foregroundStyle(.white.opacity(0.82))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
-                .frame(maxWidth: 306)
+                .frame(maxWidth: 266)
         }
         .frame(maxWidth: .infinity)
     }
@@ -260,23 +277,23 @@ private struct MyCollectionDiaryShareImageView: View {
                 }
 
             Text(displayedContent.isEmpty ? "작성된 코멘트가 없어요." : displayedContent)
-                .font(AppFont.paperlogy4Regular(size: 15))
+                .font(AppFont.paperlogy4Regular(size: 13))
                 .foregroundStyle(.white.opacity(0.92))
                 .multilineTextAlignment(.leading)
-                .lineSpacing(4)
+                .lineSpacing(3)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 24)
-                .padding(.top, 26)
-                .padding(.bottom, 82)
+                .padding(.horizontal, 22)
+                .padding(.top, 24)
+                .padding(.bottom, 74)
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(createdDateText)
-                        .font(AppFont.paperlogy4Regular(size: 12))
+                        .font(AppFont.paperlogy4Regular(size: 10.5))
                         .foregroundStyle(.white.opacity(0.52))
 
                     Text(tagText)
-                        .font(AppFont.paperlogy5Medium(size: 13))
+                        .font(AppFont.paperlogy5Medium(size: 11.5))
                         .foregroundStyle(.white.opacity(0.70))
                 }
 
@@ -284,7 +301,7 @@ private struct MyCollectionDiaryShareImageView: View {
 
                 appIcon
             }
-            .padding(.leading, 24)
+            .padding(.leading, 22)
             .padding(.trailing, 18)
             .padding(.bottom, 18)
         }
@@ -296,15 +313,15 @@ private struct MyCollectionDiaryShareImageView: View {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 54, height: 54)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 46, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         } else {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(AppColors.primary600)
-                .frame(width: 54, height: 54)
+                .frame(width: 46, height: 46)
                 .overlay {
                     Text("KP")
-                        .font(AppFont.paperlogy8ExtraBold(size: 22))
+                        .font(AppFont.paperlogy8ExtraBold(size: 18))
                         .foregroundStyle(.black)
                 }
         }
