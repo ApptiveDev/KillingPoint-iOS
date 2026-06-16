@@ -29,6 +29,7 @@
 	<array>
 		<string>instagram-stories</string>
 		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
 	</array>
 	<key>MUSIC_BASE_URL</key>
 	<string>$(MUSIC_BASE_URL)</string>

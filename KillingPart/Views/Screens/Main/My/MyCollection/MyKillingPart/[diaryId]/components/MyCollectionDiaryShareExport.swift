@@ -1,6 +1,8 @@
 import Photos
 import SwiftUI
 import UIKit
+import KakaoSDKShare
+import KakaoSDKTemplate
 
 struct MyCollectionDiaryActivityShareItem: Identifiable {
     let id = UUID()
@@ -32,6 +34,10 @@ enum MyCollectionDiaryShareExportError: LocalizedError {
     case shareURLUnavailable
     case instagramAppIDMissing
     case instagramUnavailable
+    case kakaoTalkUnavailable
+    case kakaoImageUploadFailed
+    case kakaoShareFailed
+    case kakaoShareOpenFailed
 
     var errorDescription: String? {
         switch self {
@@ -49,6 +55,14 @@ enum MyCollectionDiaryShareExportError: LocalizedError {
             return "Instagram Story 공유를 위해 FACEBOOK_APP_ID 설정이 필요해요."
         case .instagramUnavailable:
             return "Instagram 앱을 열 수 없어요. Instagram 설치 여부를 확인해 주세요."
+        case .kakaoTalkUnavailable:
+            return "카카오톡 앱 설치 여부를 확인해 주세요."
+        case .kakaoImageUploadFailed:
+            return "카카오톡 공유 이미지를 업로드하지 못했어요."
+        case .kakaoShareFailed:
+            return "카카오톡 공유 메시지를 만들지 못했어요."
+        case .kakaoShareOpenFailed:
+            return "카카오톡 공유 화면을 열지 못했어요."
         }
     }
 }
@@ -137,7 +151,7 @@ enum MyCollectionDiaryPhotoSaver {
 
 @MainActor
 enum MyCollectionDiaryInstagramStorySharer {
-    static func share(_ image: UIImage) throws {
+    static func share(_ image: UIImage, url: URL) throws {
         let appID = (Bundle.main.object(forInfoDictionaryKey: "FACEBOOK_APP_ID") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !appID.isEmpty, appID != "$(FACEBOOK_APP_ID)" else {
@@ -156,7 +170,10 @@ enum MyCollectionDiaryInstagramStorySharer {
         }
 
         let pasteboardItems = [
-            ["com.instagram.sharedSticker.backgroundImage": pngData]
+            [
+                "com.instagram.sharedSticker.backgroundImage": pngData,
+                "com.instagram.sharedSticker.contentURL": url.absoluteString
+            ]
         ]
         let pasteboardOptions: [UIPasteboard.OptionsKey: Any] = [
             .expirationDate: Date().addingTimeInterval(60 * 5)
@@ -164,6 +181,136 @@ enum MyCollectionDiaryInstagramStorySharer {
 
         UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
         UIApplication.shared.open(urlScheme, options: [:], completionHandler: nil)
+    }
+}
+
+struct MyCollectionDiaryKakaoSharePayload: Equatable {
+    let title: String
+    let description: String
+    let imageURL: URL
+    let imageWidth: Int
+    let imageHeight: Int
+    let shareURL: URL
+
+    static func make(
+        diary: DiaryFeedModel,
+        displayedContent: String,
+        imageURL: URL,
+        imageWidth: Int,
+        imageHeight: Int,
+        shareURL: URL
+    ) -> MyCollectionDiaryKakaoSharePayload {
+        let trackTitle = [diary.musicTitle, diary.artist]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " - ")
+        let fallbackTitle = trackTitle.isEmpty ? "킬링파트 다이어리" : trackTitle
+        let trimmedContent = displayedContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = trimmedContent.isEmpty ? "킬링파트에서 다이어리를 확인해 보세요." : trimmedContent
+
+        return MyCollectionDiaryKakaoSharePayload(
+            title: fallbackTitle,
+            description: description,
+            imageURL: imageURL,
+            imageWidth: imageWidth,
+            imageHeight: imageHeight,
+            shareURL: shareURL
+        )
+    }
+
+    func makeFeedTemplate() -> FeedTemplate {
+        let link = Link(webUrl: shareURL, mobileWebUrl: shareURL)
+        let content = Content(
+            title: title,
+            imageUrl: imageURL,
+            imageWidth: imageWidth,
+            imageHeight: imageHeight,
+            description: description,
+            link: link
+        )
+        return FeedTemplate(
+            content: content,
+            buttons: [
+                Button(title: "킬링파트 보러가기", link: link)
+            ]
+        )
+    }
+}
+
+@MainActor
+enum MyCollectionDiaryKakaoSharer {
+    static func share(
+        image: UIImage,
+        diary: DiaryFeedModel,
+        displayedContent: String,
+        diaryId: Int
+    ) async throws {
+        guard ShareApi.isKakaoTalkSharingAvailable() else {
+            throw MyCollectionDiaryShareExportError.kakaoTalkUnavailable
+        }
+
+        guard let shareURL = DeepLinkURLBuilder.diaryURL(diaryId: diaryId) else {
+            throw MyCollectionDiaryShareExportError.shareURLUnavailable
+        }
+
+        let uploadedImage = try await uploadImage(image)
+        let payload = MyCollectionDiaryKakaoSharePayload.make(
+            diary: diary,
+            displayedContent: displayedContent,
+            imageURL: uploadedImage.url,
+            imageWidth: uploadedImage.width,
+            imageHeight: uploadedImage.height,
+            shareURL: shareURL
+        )
+        let kakaoShareURL = try await makeShareURL(template: payload.makeFeedTemplate())
+        let didOpen = await open(kakaoShareURL)
+        guard didOpen else {
+            throw MyCollectionDiaryShareExportError.kakaoShareOpenFailed
+        }
+    }
+
+    private static func uploadImage(_ image: UIImage) async throws -> ImageInfo {
+        try await withCheckedThrowingContinuation { continuation in
+            ShareApi.shared.imageUpload(image: image) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let imageInfo = result?.infos.original else {
+                    continuation.resume(throwing: MyCollectionDiaryShareExportError.kakaoImageUploadFailed)
+                    return
+                }
+
+                continuation.resume(returning: imageInfo)
+            }
+        }
+    }
+
+    private static func makeShareURL(template: FeedTemplate) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            ShareApi.shared.shareDefault(templatable: template) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let shareURL = result?.url else {
+                    continuation.resume(throwing: MyCollectionDiaryShareExportError.kakaoShareFailed)
+                    return
+                }
+
+                continuation.resume(returning: shareURL)
+            }
+        }
+    }
+
+    private static func open(_ url: URL) async -> Bool {
+        await withCheckedContinuation { continuation in
+            UIApplication.shared.open(url, options: [:]) { isSuccess in
+                continuation.resume(returning: isSuccess)
+            }
+        }
     }
 }
 
