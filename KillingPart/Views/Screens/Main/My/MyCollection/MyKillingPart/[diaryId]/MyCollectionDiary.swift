@@ -231,7 +231,7 @@ struct MyCollectionDiary: View {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
         }
         .sheet(item: $activityShareItem) { item in
-            MyCollectionDiaryActivityShareSheet(activityItems: [item.image])
+            MyCollectionDiaryActivityShareSheet(activityItems: [item.image, item.url])
         }
         .alert(item: $actionAlert) { alert in
             Alert(
@@ -407,7 +407,13 @@ struct MyCollectionDiary: View {
 
             do {
                 let image = try await renderShareImage()
-                activityShareItem = MyCollectionDiaryActivityShareItem(image: image)
+                guard let shareURL = DeepLinkURLBuilder.diaryURL(diaryId: diaryId) else {
+                    throw MyCollectionDiaryShareExportError.shareURLUnavailable
+                }
+                activityShareItem = MyCollectionDiaryActivityShareItem(
+                    image: image,
+                    url: shareURL
+                )
             } catch {
                 actionAlert = MyCollectionDiaryActionAlert(
                     title: "공유 실패",

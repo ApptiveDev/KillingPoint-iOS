@@ -44,6 +44,7 @@ final class AppViewModel: ObservableObject {
     @Published var isResolvingPostLoginFlow = false
     @Published private(set) var isSplashReadyToFinish = false
     @Published private(set) var mainStartupPayload: MainStartupPayload?
+    @Published private(set) var activeDeepLinkRequest: DeepLinkRequest?
 
     let loginViewModel: LoginViewModel
 
@@ -58,6 +59,7 @@ final class AppViewModel: ObservableObject {
     private var sessionExpiredObserver: NSObjectProtocol?
     private var splashPreparationTask: Task<Void, Never>?
     private var preparedPostSplashStep: AppFlowStep?
+    private var pendingDeepLinkRequest: DeepLinkRequest?
 
     init(
         authenticationService: AuthenticationServicing = AuthenticationService(),
@@ -97,7 +99,7 @@ final class AppViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.logout()
+                self?.resetSession(preservePendingDeepLink: self?.pendingDeepLinkRequest != nil)
             }
         }
     }
@@ -137,6 +139,35 @@ final class AppViewModel: ObservableObject {
             deferStepUntilSplash: false,
             shouldPreloadMain: false
         )
+    }
+
+    func handleDeepLink(_ url: URL) -> Bool {
+        guard let route = DeepLinkRoute(url: url) else {
+            return false
+        }
+
+        pendingDeepLinkRequest = DeepLinkRequest(route: route)
+        activeDeepLinkRequest = nil
+
+        if currentStep == .splash {
+            prepareSplashIfNeeded()
+            return true
+        }
+
+        guard tokenStore.hasSessionTokens else {
+            currentStep = .login
+            return true
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.resolvePostLoginFlow()
+        }
+        return true
+    }
+
+    func consumeDeepLinkRequest(_ request: DeepLinkRequest) {
+        guard activeDeepLinkRequest == request else { return }
+        activeDeepLinkRequest = nil
     }
 
     private func prepareSplash() async {
@@ -209,6 +240,10 @@ final class AppViewModel: ObservableObject {
     }
 
     func logout() {
+        resetSession(preservePendingDeepLink: false)
+    }
+
+    private func resetSession(preservePendingDeepLink: Bool) {
         splashPreparationTask?.cancel()
         splashPreparationTask = nil
         preparedPostSplashStep = nil
@@ -216,6 +251,10 @@ final class AppViewModel: ObservableObject {
         loginViewModel.resetState()
         setupFlowViewModel = nil
         mainStartupPayload = nil
+        activeDeepLinkRequest = nil
+        if !preservePendingDeepLink {
+            pendingDeepLinkRequest = nil
+        }
         updatePrompt = nil
         currentStep = .login
     }
@@ -295,6 +334,13 @@ final class AppViewModel: ObservableObject {
             currentStep = .main
             schedulePushPermissionRequest()
         }
+        activatePendingDeepLinkRouteIfNeeded()
+    }
+
+    private func activatePendingDeepLinkRouteIfNeeded() {
+        guard let pendingDeepLinkRequest else { return }
+        activeDeepLinkRequest = pendingDeepLinkRequest
+        self.pendingDeepLinkRequest = nil
     }
 
     private func makeMainStartupPayload() async -> MainStartupPayload {

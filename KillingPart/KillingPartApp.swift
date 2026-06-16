@@ -22,17 +22,20 @@ struct KillingPartApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootFlowView()
-                .onOpenURL { url in
-                    if GIDSignIn.sharedInstance.handle(url) {
-                        return
-                    }
-
-                    if AuthApi.isKakaoTalkLoginUrl(url) {
-                        _ = AuthController.handleOpenUrl(url: url)
-                    }
-                }
+            RootFlowView(authURLHandler: handleAuthURL)
         }
+    }
+
+    private func handleAuthURL(_ url: URL) -> Bool {
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+
+        if AuthApi.isKakaoTalkLoginUrl(url) {
+            return AuthController.handleOpenUrl(url: url)
+        }
+
+        return false
     }
 
     private func configureKakaoSDK() {

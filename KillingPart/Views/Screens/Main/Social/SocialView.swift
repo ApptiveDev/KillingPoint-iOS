@@ -4,19 +4,26 @@ struct SocialView: View {
     let isRootTabSelected: Bool
     @ObservedObject var viewModel: SocialViewModel
     @ObservedObject var feedViewModel: FeedViewModel
+    let deepLinkRequest: DeepLinkRequest?
+    let onDeepLinkRequestConsumed: (DeepLinkRequest) -> Void
     @ObservedObject private var notificationListViewModel: NotificationListViewModel
     @State private var selectedTopTab: SocialTopTab = .feed
     @State private var isNotificationListActive = false
     @State private var friendSearchText: String
+    @State private var handledDeepLinkRequestID: UUID?
 
     init(
         isRootTabSelected: Bool,
         viewModel: SocialViewModel,
-        feedViewModel: FeedViewModel
+        feedViewModel: FeedViewModel,
+        deepLinkRequest: DeepLinkRequest? = nil,
+        onDeepLinkRequestConsumed: @escaping (DeepLinkRequest) -> Void = { _ in }
     ) {
         self.isRootTabSelected = isRootTabSelected
         self.viewModel = viewModel
         self.feedViewModel = feedViewModel
+        self.deepLinkRequest = deepLinkRequest
+        self.onDeepLinkRequestConsumed = onDeepLinkRequestConsumed
         _notificationListViewModel = ObservedObject(wrappedValue: viewModel.notificationListViewModel)
         _friendSearchText = State(initialValue: viewModel.currentSearchQuery)
     }
@@ -102,9 +109,13 @@ struct SocialView: View {
         }
         .task(id: isRootTabSelected) {
             guard isRootTabSelected else { return }
+            await handleDeepLinkRequestIfNeeded()
             async let refreshSocialList: Void = viewModel.refreshDefaultLists()
             async let refreshAlarmList: Void = notificationListViewModel.refreshAlarms()
             _ = await (refreshSocialList, refreshAlarmList)
+        }
+        .task(id: deepLinkRequest?.id) {
+            await handleDeepLinkRequestIfNeeded()
         }
         .onChange(of: notificationListViewModel.pendingExternalRoute) { pendingRoute in
             guard let pendingRoute else { return }
@@ -119,7 +130,7 @@ struct SocialView: View {
             notificationListViewModel.clearPendingExternalRoute()
         }
         .alert(
-            "알림 이동 실패",
+            "이동 실패",
             isPresented: routingErrorPresentedBinding
         ) {
             Button("확인", role: .cancel) {
@@ -262,6 +273,24 @@ struct SocialView: View {
                 notificationListViewModel.clearRoutingError()
             }
         )
+    }
+
+    @MainActor
+    private func handleDeepLinkRequestIfNeeded() async {
+        guard isRootTabSelected else { return }
+        guard let deepLinkRequest else { return }
+        guard handledDeepLinkRequestID != deepLinkRequest.id else { return }
+
+        handledDeepLinkRequestID = deepLinkRequest.id
+        selectedTopTab = .feed
+        isNotificationListActive = false
+
+        switch deepLinkRequest.route {
+        case .socialDiary(let diaryId):
+            await notificationListViewModel.handleUniversalLinkDiaryRoute(diaryId: diaryId)
+        }
+
+        onDeepLinkRequestConsumed(deepLinkRequest)
     }
 
     private func resolvedCollectionUser(from user: UserModel) -> UserModel {

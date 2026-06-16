@@ -5,6 +5,7 @@ import UIKit
 struct MyCollectionDiaryActivityShareItem: Identifiable {
     let id = UUID()
     let image: UIImage
+    let url: URL
 }
 
 struct MyCollectionDiaryActionAlert: Identifiable {
@@ -28,6 +29,7 @@ enum MyCollectionDiaryShareExportError: LocalizedError {
     case photoAccessDenied
     case photoSaveFailed
     case pngEncodingFailed
+    case shareURLUnavailable
     case instagramAppIDMissing
     case instagramUnavailable
 
@@ -41,6 +43,8 @@ enum MyCollectionDiaryShareExportError: LocalizedError {
             return "사진 보관함에 이미지를 저장하지 못했어요."
         case .pngEncodingFailed:
             return "공유 이미지를 PNG로 변환하지 못했어요."
+        case .shareURLUnavailable:
+            return "공유 링크를 만들지 못했어요."
         case .instagramAppIDMissing:
             return "Instagram Story 공유를 위해 FACEBOOK_APP_ID 설정이 필요해요."
         case .instagramUnavailable:

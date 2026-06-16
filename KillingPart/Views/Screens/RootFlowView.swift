@@ -3,6 +3,11 @@ import SwiftUI
 struct RootFlowView: View {
     @Environment(\.openURL) private var openURL
     @StateObject private var viewModel = AppViewModel()
+    let authURLHandler: (URL) -> Bool
+
+    init(authURLHandler: @escaping (URL) -> Bool = { _ in false }) {
+        self.authURLHandler = authURLHandler
+    }
 
     var body: some View {
         Group {
@@ -23,7 +28,9 @@ struct RootFlowView: View {
             case .main:
                 MainTabView(
                     onLogout: viewModel.logout,
-                    startupPayload: viewModel.mainStartupPayload
+                    startupPayload: viewModel.mainStartupPayload,
+                    deepLinkRequest: viewModel.activeDeepLinkRequest,
+                    onDeepLinkRequestConsumed: viewModel.consumeDeepLinkRequest
                 )
             }
         }
@@ -64,6 +71,17 @@ struct RootFlowView: View {
         }
         .task {
             viewModel.prepareSplashIfNeeded()
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+            guard let url = userActivity.webpageURL else { return }
+            _ = viewModel.handleDeepLink(url)
+        }
+        .onOpenURL { url in
+            if authURLHandler(url) {
+                return
+            }
+
+            _ = viewModel.handleDeepLink(url)
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.currentStep)
     }
