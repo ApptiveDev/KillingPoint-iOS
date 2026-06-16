@@ -1,4 +1,5 @@
 import Foundation
+import KakaoSDKTemplate
 import Testing
 @testable import KillingPart
 
@@ -7,6 +8,7 @@ struct MyCollectionDiaryShareTests {
     func kakaoPayloadUsesUniversalLinkAndUploadedImageMetadata() throws {
         let diary = DiaryFeedModel.kakaoShareFixture()
         let shareURL = try #require(DeepLinkURLBuilder.diaryURL(diaryId: 1665))
+        let kakaoExecutionParams = try #require(DeepLinkURLBuilder.kakaoDiaryExecutionParams(diaryId: 1665))
         let imageURL = try #require(URL(string: "https://k.kakaocdn.net/shared-image.png"))
 
         let payload = MyCollectionDiaryKakaoSharePayload.make(
@@ -15,7 +17,8 @@ struct MyCollectionDiaryShareTests {
             imageURL: imageURL,
             imageWidth: 1080,
             imageHeight: 1920,
-            shareURL: shareURL
+            shareURL: shareURL,
+            kakaoExecutionParams: kakaoExecutionParams
         )
 
         #expect(payload.title == "Song - Artist")
@@ -24,12 +27,20 @@ struct MyCollectionDiaryShareTests {
         #expect(payload.imageWidth == 1080)
         #expect(payload.imageHeight == 1920)
         #expect(payload.shareURL.absoluteString == "https://killingpart.com/diaries/1665")
+        #expect(payload.kakaoExecutionParams["route"] == "diary")
+        #expect(payload.kakaoExecutionParams["diaryId"] == "1665")
+
+        let template = payload.makeFeedTemplate()
+        let executionParams = try #require(template.content.link.iosExecutionParams)
+        #expect(executionParams.contains("route=diary"))
+        #expect(executionParams.contains("diaryId=1665"))
     }
 
     @Test
     func kakaoPayloadFallsBackWhenDiaryContentIsEmpty() throws {
         let diary = DiaryFeedModel.kakaoShareFixture()
         let shareURL = try #require(DeepLinkURLBuilder.diaryURL(diaryId: 1665))
+        let kakaoExecutionParams = try #require(DeepLinkURLBuilder.kakaoDiaryExecutionParams(diaryId: 1665))
         let imageURL = try #require(URL(string: "https://k.kakaocdn.net/shared-image.png"))
 
         let payload = MyCollectionDiaryKakaoSharePayload.make(
@@ -38,7 +49,8 @@ struct MyCollectionDiaryShareTests {
             imageURL: imageURL,
             imageWidth: 1080,
             imageHeight: 1920,
-            shareURL: shareURL
+            shareURL: shareURL,
+            kakaoExecutionParams: kakaoExecutionParams
         )
 
         #expect(payload.description == "킬링파트에서 다이어리를 확인해 보세요.")

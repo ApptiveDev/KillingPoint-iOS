@@ -18,6 +18,20 @@ struct DeepLinkRouteTests {
     }
 
     @Test
+    func parsesKakaoLinkDiaryExecutionParams() throws {
+        let url = try #require(URL(string: "kakao123456789://kakaolink?route=diary&diaryId=1665"))
+
+        #expect(DeepLinkRoute(url: url) == .socialDiary(diaryId: 1665))
+    }
+
+    @Test
+    func parsesNestedKakaoLinkDiaryExecutionParams() throws {
+        let url = try #require(URL(string: "kakao123456789://kakaolink?execution=route%3Ddiary%26diaryId%3D1665"))
+
+        #expect(DeepLinkRoute(url: url) == .socialDiary(diaryId: 1665))
+    }
+
+    @Test
     func rejectsNonKillingPartHost() throws {
         let url = try #require(URL(string: "https://example.com/diaries/123"))
 
@@ -53,7 +67,10 @@ struct DeepLinkRouteTests {
         #expect(
             DeepLinkURLBuilder.customDiaryURL(diaryId: 123)?.absoluteString == "killingpart://diaries/123"
         )
+        #expect(DeepLinkURLBuilder.kakaoDiaryExecutionParams(diaryId: 123)?["route"] == "diary")
+        #expect(DeepLinkURLBuilder.kakaoDiaryExecutionParams(diaryId: 123)?["diaryId"] == "123")
         #expect(DeepLinkURLBuilder.diaryURL(diaryId: 0) == nil)
         #expect(DeepLinkURLBuilder.customDiaryURL(diaryId: 0) == nil)
+        #expect(DeepLinkURLBuilder.kakaoDiaryExecutionParams(diaryId: 0) == nil)
     }
 }

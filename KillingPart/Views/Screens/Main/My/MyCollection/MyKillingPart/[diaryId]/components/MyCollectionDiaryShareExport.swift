@@ -191,6 +191,7 @@ struct MyCollectionDiaryKakaoSharePayload: Equatable {
     let imageWidth: Int
     let imageHeight: Int
     let shareURL: URL
+    let kakaoExecutionParams: [String: String]
 
     static func make(
         diary: DiaryFeedModel,
@@ -198,7 +199,8 @@ struct MyCollectionDiaryKakaoSharePayload: Equatable {
         imageURL: URL,
         imageWidth: Int,
         imageHeight: Int,
-        shareURL: URL
+        shareURL: URL,
+        kakaoExecutionParams: [String: String]
     ) -> MyCollectionDiaryKakaoSharePayload {
         let trackTitle = [diary.musicTitle, diary.artist]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -214,12 +216,17 @@ struct MyCollectionDiaryKakaoSharePayload: Equatable {
             imageURL: imageURL,
             imageWidth: imageWidth,
             imageHeight: imageHeight,
-            shareURL: shareURL
+            shareURL: shareURL,
+            kakaoExecutionParams: kakaoExecutionParams
         )
     }
 
     func makeFeedTemplate() -> FeedTemplate {
-        let link = Link(webUrl: shareURL, mobileWebUrl: shareURL)
+        let link = Link(
+            webUrl: shareURL,
+            mobileWebUrl: shareURL,
+            iosExecutionParams: kakaoExecutionParams
+        )
         let content = Content(
             title: title,
             imageUrl: imageURL,
@@ -252,6 +259,9 @@ enum MyCollectionDiaryKakaoSharer {
         guard let shareURL = DeepLinkURLBuilder.diaryURL(diaryId: diaryId) else {
             throw MyCollectionDiaryShareExportError.shareURLUnavailable
         }
+        guard let kakaoExecutionParams = DeepLinkURLBuilder.kakaoDiaryExecutionParams(diaryId: diaryId) else {
+            throw MyCollectionDiaryShareExportError.shareURLUnavailable
+        }
 
         let uploadedImage = try await uploadImage(image)
         let payload = MyCollectionDiaryKakaoSharePayload.make(
@@ -260,7 +270,8 @@ enum MyCollectionDiaryKakaoSharer {
             imageURL: uploadedImage.url,
             imageWidth: uploadedImage.width,
             imageHeight: uploadedImage.height,
-            shareURL: shareURL
+            shareURL: shareURL,
+            kakaoExecutionParams: kakaoExecutionParams
         )
         let kakaoShareURL = try await makeShareURL(template: payload.makeFeedTemplate())
         let didOpen = await open(kakaoShareURL)
