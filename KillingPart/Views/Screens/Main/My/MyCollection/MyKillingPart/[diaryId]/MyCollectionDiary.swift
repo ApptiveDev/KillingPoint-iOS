@@ -201,6 +201,11 @@ struct MyCollectionDiary: View {
             }
             .disabled(isExportingImage)
 
+            Button("카카오톡 공유") {
+                handleKakaoShareTap()
+            }
+            .disabled(isExportingImage)
+
             Button("인스타 스토리 공유") {
                 handleInstagramStoryShareTap()
             }
@@ -231,7 +236,7 @@ struct MyCollectionDiary: View {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
         }
         .sheet(item: $activityShareItem) { item in
-            MyCollectionDiaryActivityShareSheet(activityItems: [item.image])
+            MyCollectionDiaryActivityShareSheet(activityItems: [item.image, item.url])
         }
         .alert(item: $actionAlert) { alert in
             Alert(
@@ -388,7 +393,34 @@ struct MyCollectionDiary: View {
 
             do {
                 let image = try await renderShareImage()
-                try MyCollectionDiaryInstagramStorySharer.share(image)
+                guard let shareURL = DeepLinkURLBuilder.diaryURL(diaryId: diaryId) else {
+                    throw MyCollectionDiaryShareExportError.shareURLUnavailable
+                }
+                try MyCollectionDiaryInstagramStorySharer.share(image, url: shareURL)
+            } catch {
+                actionAlert = MyCollectionDiaryActionAlert(
+                    title: "공유 실패",
+                    message: exportErrorMessage(from: error)
+                )
+            }
+        }
+    }
+
+    private func handleKakaoShareTap() {
+        dismissKeyboard()
+        Task { @MainActor in
+            guard !isExportingImage else { return }
+            isExportingImage = true
+            defer { isExportingImage = false }
+
+            do {
+                let image = try await renderShareImage()
+                try await MyCollectionDiaryKakaoSharer.share(
+                    image: image,
+                    diary: viewModel.diary,
+                    displayedContent: viewModel.displayedContent,
+                    diaryId: diaryId
+                )
             } catch {
                 actionAlert = MyCollectionDiaryActionAlert(
                     title: "공유 실패",
@@ -407,7 +439,13 @@ struct MyCollectionDiary: View {
 
             do {
                 let image = try await renderShareImage()
-                activityShareItem = MyCollectionDiaryActivityShareItem(image: image)
+                guard let shareURL = DeepLinkURLBuilder.diaryURL(diaryId: diaryId) else {
+                    throw MyCollectionDiaryShareExportError.shareURLUnavailable
+                }
+                activityShareItem = MyCollectionDiaryActivityShareItem(
+                    image: image,
+                    url: shareURL
+                )
             } catch {
                 actionAlert = MyCollectionDiaryActionAlert(
                     title: "공유 실패",

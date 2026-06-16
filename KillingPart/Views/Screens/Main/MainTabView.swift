@@ -5,10 +5,13 @@ struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     let onLogout: () -> Void
     let startupPayload: MainStartupPayload?
+    var deepLinkRequest: DeepLinkRequest? = nil
+    var onDeepLinkRequestConsumed: (DeepLinkRequest) -> Void = { _ in }
     @State private var selectedTab: MainRootTab = .my
     @State private var randomRefreshTrigger = 0
     @StateObject private var socialViewModel = SocialViewModel()
     @StateObject private var socialFeedViewModel = FeedViewModel()
+    @State private var activeSocialDeepLinkRequest: DeepLinkRequest?
     @State private var activeTabForAnalytics: MainRootTab = .my
     @State private var activeTabEnteredAt = Date()
     @State private var hasTrackedInitialTabSelection = false
@@ -44,7 +47,9 @@ struct MainTabView: View {
             SocialView(
                 isRootTabSelected: selectedTab == .social,
                 viewModel: socialViewModel,
-                feedViewModel: socialFeedViewModel
+                feedViewModel: socialFeedViewModel,
+                deepLinkRequest: activeSocialDeepLinkRequest,
+                onDeepLinkRequestConsumed: handleSocialDeepLinkRequestConsumed
             )
                 .tabItem {
                     Label("소셜", systemImage: "person.2")
@@ -99,6 +104,10 @@ struct MainTabView: View {
             guard let pendingRoute = FCMManager.shared.consumePendingAlarmRoute() else { return }
             routeByPushAlarm(pendingRoute)
         }
+        .task(id: deepLinkRequest?.id) {
+            guard let deepLinkRequest else { return }
+            routeByDeepLink(deepLinkRequest)
+        }
     }
 
     private func routeByPushAlarm(_ route: PushAlarmRoute) {
@@ -112,6 +121,21 @@ struct MainTabView: View {
         Task { @MainActor in
             await socialViewModel.notificationListViewModel.handlePushAlarmRoute(route)
         }
+    }
+
+    private func routeByDeepLink(_ request: DeepLinkRequest) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedTab = .social
+        }
+
+        activeSocialDeepLinkRequest = request
+    }
+
+    private func handleSocialDeepLinkRequestConsumed(_ request: DeepLinkRequest) {
+        if activeSocialDeepLinkRequest == request {
+            activeSocialDeepLinkRequest = nil
+        }
+        onDeepLinkRequestConsumed(request)
     }
 
     private func trackInitialMainTabSelectionIfNeeded() {

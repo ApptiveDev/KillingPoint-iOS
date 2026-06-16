@@ -308,6 +308,31 @@ final class NotificationListViewModel: ObservableObject {
         )
     }
 
+    func handleUniversalLinkDiaryRoute(diaryId: Int) async {
+        routingErrorMessage = nil
+        pendingExternalRoute = nil
+        print("[NotificationRoute][UniversalLink] diaryId=\(diaryId)")
+
+        do {
+            let diary = try await diaryService.fetchDiary(diaryId: diaryId)
+            print(
+                "[NotificationRoute][UniversalLink] diaryId=\(diaryId) userId=\(diary.userId) -> SocialMyCollectionDiary"
+            )
+            clearNavigationDestinations()
+            activeSocialDiaryDestination = AlarmSocialDiaryDestination(
+                diary: diary,
+                displayTag: resolvedDisplayTag(from: diary.tag),
+                user: makeUser(from: diary)
+            )
+        } catch {
+            if isRequestCancelled(error) { return }
+            print(
+                "[NotificationRoute][UniversalLink] failed diaryId=\(diaryId) error=\(error.localizedDescription)"
+            )
+            routingErrorMessage = resolveRoutingErrorMessage(from: error)
+        }
+    }
+
     private func executeRoute(
         type: AlarmType,
         deepLink: String,
@@ -343,7 +368,6 @@ final class NotificationListViewModel: ObservableObject {
             case .diary:
                 if let diaryId = resolveDiaryIDIfPresent(from: deepLink) {
                     let diary = try await diaryService.fetchDiary(diaryId: diaryId)
-                    guard diary.userId > 0 else { throw NotificationRoutingError.missingUserID }
                     print(
                         "[NotificationRoute] DIARY_ALARM diaryId=\(diaryId) userId=\(diary.userId) -> SocialMyCollectionDiary"
                     )
