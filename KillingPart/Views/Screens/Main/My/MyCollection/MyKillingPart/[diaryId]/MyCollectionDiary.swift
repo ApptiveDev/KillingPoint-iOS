@@ -236,7 +236,7 @@ struct MyCollectionDiary: View {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
         }
         .sheet(item: $activityShareItem) { item in
-            MyCollectionDiaryActivityShareSheet(activityItems: [item.image, item.url])
+            MyCollectionDiaryActivityShareSheet(item: item)
         }
         .alert(item: $actionAlert) { alert in
             Alert(
