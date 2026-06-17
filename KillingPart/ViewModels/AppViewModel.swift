@@ -1,5 +1,9 @@
 import Foundation
 
+struct MainStartupPayload {
+    let playCollectionViewModel: MyCollectionViewModel
+}
+
 @MainActor
 final class AppViewModel: ObservableObject {
     enum UpdatePrompt: Identifiable, Equatable {
@@ -38,16 +42,24 @@ final class AppViewModel: ObservableObject {
     @Published var updatePrompt: UpdatePrompt?
     @Published var setupFlowViewModel: InitialSetupFlowViewModel?
     @Published var isResolvingPostLoginFlow = false
+    @Published private(set) var isSplashReadyToFinish = false
+    @Published private(set) var mainStartupPayload: MainStartupPayload?
+    @Published private(set) var activeDeepLinkRequest: DeepLinkRequest?
 
     let loginViewModel: LoginViewModel
 
+    private let authenticationService: AuthenticationServicing
     private let tokenStore: TokenStoring
     private let userService: UserServicing
     private let diaryService: DiaryServicing
     private let calendarService: CalendarServicing
+    private let subscribeService: SubscribeServicing
     private let notificationCenter: NotificationCenter
     private let appStoreURL: URL?
     private var sessionExpiredObserver: NSObjectProtocol?
+    private var splashPreparationTask: Task<Void, Never>?
+    private var preparedPostSplashStep: AppFlowStep?
+    private var pendingDeepLinkRequest: DeepLinkRequest?
 
     init(
         authenticationService: AuthenticationServicing = AuthenticationService(),
@@ -55,13 +67,16 @@ final class AppViewModel: ObservableObject {
         userService: UserServicing = UserService(),
         diaryService: DiaryServicing = DiaryService(),
         calendarService: CalendarServicing = CalendarService(),
+        subscribeService: SubscribeServicing = SubscribeService(),
         tokenStore: TokenStoring = TokenStore.shared,
         notificationCenter: NotificationCenter = .default
     ) {
+        self.authenticationService = authenticationService
         self.tokenStore = tokenStore
         self.userService = userService
         self.diaryService = diaryService
         self.calendarService = calendarService
+        self.subscribeService = subscribeService
         self.notificationCenter = notificationCenter
         self.appStoreURL = Self.resolveAppStoreURL()
 
@@ -84,29 +99,103 @@ final class AppViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.logout()
+                self?.resetSession(preservePendingDeepLink: self?.pendingDeepLinkRequest != nil)
             }
         }
     }
 
     deinit {
+        splashPreparationTask?.cancel()
         if let sessionExpiredObserver {
             notificationCenter.removeObserver(sessionExpiredObserver)
         }
     }
 
-    func completeSplash() {
-        guard tokenStore.hasSessionTokens else {
-            currentStep = .login
-            return
-        }
+    func prepareSplashIfNeeded() {
+        guard currentStep == .splash else { return }
+        guard !isSplashReadyToFinish else { return }
+        guard splashPreparationTask == nil else { return }
 
-        Task {
-            await resolvePostLoginFlow()
+        splashPreparationTask = Task { @MainActor [weak self] in
+            await self?.prepareSplash()
         }
     }
 
+    func completeSplash() {
+        guard let preparedPostSplashStep else {
+            prepareSplashIfNeeded()
+            return
+        }
+
+        currentStep = preparedPostSplashStep
+        if case .main = preparedPostSplashStep {
+            schedulePushPermissionRequest()
+        }
+        self.preparedPostSplashStep = nil
+    }
+
     func resolvePostLoginFlow() async {
+        await resolvePostLoginFlow(
+            deferStepUntilSplash: false,
+            shouldPreloadMain: false
+        )
+    }
+
+    func handleDeepLink(_ url: URL) -> Bool {
+        guard let route = DeepLinkRoute(url: url) else {
+            return false
+        }
+
+        pendingDeepLinkRequest = DeepLinkRequest(route: route)
+        activeDeepLinkRequest = nil
+
+        if currentStep == .splash {
+            prepareSplashIfNeeded()
+            return true
+        }
+
+        guard tokenStore.hasSessionTokens else {
+            currentStep = .login
+            return true
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.resolvePostLoginFlow()
+        }
+        return true
+    }
+
+    func consumeDeepLinkRequest(_ request: DeepLinkRequest) {
+        guard activeDeepLinkRequest == request else { return }
+        activeDeepLinkRequest = nil
+    }
+
+    private func prepareSplash() async {
+        defer { splashPreparationTask = nil }
+
+        guard tokenStore.hasSessionTokens else {
+            preparedPostSplashStep = .login
+            setupFlowViewModel = nil
+            mainStartupPayload = nil
+            isSplashReadyToFinish = true
+            return
+        }
+
+        await resolvePostLoginFlow(
+            deferStepUntilSplash: true,
+            shouldPreloadMain: true
+        )
+
+        if preparedPostSplashStep == nil {
+            preparedPostSplashStep = .login
+        }
+        isSplashReadyToFinish = true
+    }
+
+    private func resolvePostLoginFlow(
+        deferStepUntilSplash: Bool,
+        shouldPreloadMain: Bool
+    ) async {
         guard !isResolvingPostLoginFlow else { return }
 
         isResolvingPostLoginFlow = true
@@ -116,9 +205,11 @@ final class AppViewModel: ObservableObject {
         do {
             let settings = try await userService.fetchInitSettings()
             let shouldSkipNameSetupForAppleLogin = await resolveShouldSkipNameSetupForAppleLogin(with: settings)
-            applyRoute(
+            await applyRoute(
                 for: settings,
-                shouldSkipNameSetupForAppleLogin: shouldSkipNameSetupForAppleLogin
+                shouldSkipNameSetupForAppleLogin: shouldSkipNameSetupForAppleLogin,
+                deferStepUntilSplash: deferStepUntilSplash,
+                shouldPreloadMain: shouldPreloadMain
             )
 
             if settings.app.needsForceUpdate {
@@ -128,8 +219,13 @@ final class AppViewModel: ObservableObject {
             }
         } catch {
             if isRequestCancelled(error) { return }
-            currentStep = .login
+            if deferStepUntilSplash {
+                preparedPostSplashStep = .login
+            } else {
+                currentStep = .login
+            }
             setupFlowViewModel = nil
+            mainStartupPayload = nil
             loginViewModel.loginErrorMessage = resolveErrorMessage(from: error)
         }
     }
@@ -144,16 +240,31 @@ final class AppViewModel: ObservableObject {
     }
 
     func logout() {
+        resetSession(preservePendingDeepLink: false)
+    }
+
+    private func resetSession(preservePendingDeepLink: Bool) {
+        splashPreparationTask?.cancel()
+        splashPreparationTask = nil
+        preparedPostSplashStep = nil
+        isSplashReadyToFinish = false
         loginViewModel.resetState()
         setupFlowViewModel = nil
+        mainStartupPayload = nil
+        activeDeepLinkRequest = nil
+        if !preservePendingDeepLink {
+            pendingDeepLinkRequest = nil
+        }
         updatePrompt = nil
         currentStep = .login
     }
 
     private func applyRoute(
         for settings: UserInitSettingsResponse,
-        shouldSkipNameSetupForAppleLogin: Bool
-    ) {
+        shouldSkipNameSetupForAppleLogin: Bool,
+        deferStepUntilSplash: Bool,
+        shouldPreloadMain: Bool
+    ) async {
         if settings.needsPolicyAgreement || settings.needsTagSetup {
             let setupViewModel = InitialSetupFlowViewModel(
                 settings: settings,
@@ -166,11 +277,20 @@ final class AppViewModel: ObservableObject {
                 self?.enterMainFlow()
             }
             setupFlowViewModel = setupViewModel
-            currentStep = .setup
+            mainStartupPayload = nil
+            if deferStepUntilSplash {
+                preparedPostSplashStep = .setup
+            } else {
+                currentStep = .setup
+            }
             return
         }
 
-        enterMainFlow()
+        let startupPayload = shouldPreloadMain ? await makeMainStartupPayload() : nil
+        enterMainFlow(
+            startupPayload: startupPayload,
+            deferStepUntilSplash: deferStepUntilSplash
+        )
     }
 
     private func resolveShouldSkipNameSetupForAppleLogin(with settings: UserInitSettingsResponse) async -> Bool {
@@ -201,9 +321,40 @@ final class AppViewModel: ObservableObject {
             .uppercased() == "APPLE"
     }
 
-    private func enterMainFlow() {
+    private func enterMainFlow(
+        startupPayload: MainStartupPayload? = nil,
+        deferStepUntilSplash: Bool = false
+    ) {
         setupFlowViewModel = nil
-        currentStep = .main
+        mainStartupPayload = startupPayload
+
+        if deferStepUntilSplash {
+            preparedPostSplashStep = .main
+        } else {
+            currentStep = .main
+            schedulePushPermissionRequest()
+        }
+        activatePendingDeepLinkRouteIfNeeded()
+    }
+
+    private func activatePendingDeepLinkRouteIfNeeded() {
+        guard let pendingDeepLinkRequest else { return }
+        activeDeepLinkRequest = pendingDeepLinkRequest
+        self.pendingDeepLinkRequest = nil
+    }
+
+    private func makeMainStartupPayload() async -> MainStartupPayload {
+        let playCollectionViewModel = MyCollectionViewModel(
+            authenticationService: authenticationService,
+            userService: userService,
+            diaryService: diaryService,
+            subscribeService: subscribeService
+        )
+        await playCollectionViewModel.preloadPlaybackFeeds()
+        return MainStartupPayload(playCollectionViewModel: playCollectionViewModel)
+    }
+
+    private func schedulePushPermissionRequest() {
         DispatchQueue.main.async {
             PushNotificationPermissionManager.handleAuthorizationAfterEnteringMain()
         }

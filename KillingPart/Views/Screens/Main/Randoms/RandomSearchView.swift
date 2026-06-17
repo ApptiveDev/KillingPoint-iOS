@@ -8,6 +8,7 @@ struct RandomSearchView: View {
     @State private var isRefreshingFromTabEvent = false
     @State private var refreshErrorMessage: String?
     @State private var lastTabEventRefreshAt: Date = .distantPast
+    @State private var exploreSwipeCountInSession = 0
     private let tabEventRefreshDebounceInterval: TimeInterval = 3
 
     var body: some View {
@@ -31,6 +32,18 @@ struct RandomSearchView: View {
                             makeCollectionViewModel: { user in
                                 socialViewModel.makeSocialMyCollectionViewModel(
                                     for: resolvedCollectionUser(from: user)
+                                )
+                            },
+                            onPageChanged: { oldIndex, newIndex, diaryId in
+                                exploreSwipeCountInSession += 1
+                                AmplitudeClient.shared.track(
+                                    eventType: "explore_feed_card_viewed",
+                                    properties: [
+                                        "from_index": oldIndex,
+                                        "to_index": newIndex,
+                                        "swipe_count_in_session": exploreSwipeCountInSession,
+                                        "diary_id": diaryId
+                                    ]
                                 )
                             }
                         )

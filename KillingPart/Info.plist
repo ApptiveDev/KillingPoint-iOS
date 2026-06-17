@@ -4,6 +4,8 @@
 <dict>
 	<key>APP_STORE_URL</key>
 	<string>$(APP_STORE_URL)</string>
+	<key>AMPLITUDE_API_KEY</key>
+	<string>$(AMPLITUDE_API_KEY)</string>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
 	<key>CFBundleURLTypes</key>
@@ -13,19 +15,26 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>killingpart</string>
 				<string>kakao$(KAKAO_NATIVE_APP_KEY)</string>
 				<string>com.googleusercontent.apps.619615909665-c9j3gs1vqmvi64rhb9i9ikg6dnpdghc0</string>
 			</array>
 		</dict>
 	</array>
+	<key>FACEBOOK_APP_ID</key>
+	<string>$(FACEBOOK_APP_ID)</string>
 	<key>KAKAO_NATIVE_APP_KEY</key>
 	<string>$(KAKAO_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
+		<string>instagram-stories</string>
 		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
 	</array>
 	<key>MUSIC_BASE_URL</key>
 	<string>$(MUSIC_BASE_URL)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>공유 이미지를 사진 보관함에 저장하기 위해 접근 권한이 필요합니다.</string>
 	<key>SPOTIFY_BASIC_AUTH</key>
 	<string>$(SPOTIFY_BASIC_AUTH)</string>
 	<key>UIAppFonts</key>

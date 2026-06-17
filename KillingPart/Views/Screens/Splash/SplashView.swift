@@ -8,10 +8,13 @@ import AppKit
 #endif
 
 struct SplashView: View {
+    let isReadyToFinish: Bool
     let onFinished: () -> Void
 
     @StateObject private var splashVideoPlayer = SplashVideoPlayer()
-    @State private var isReadyToNavigate = false
+    @State private var hasStartedPlaybackWait = false
+    @State private var isPlaybackWaitFinished = false
+    @State private var hasFinished = false
     @State private var navigationTask: Task<Void, Never>?
 
     var body: some View {
@@ -35,31 +38,61 @@ struct SplashView: View {
             )
             .ignoresSafeArea()
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            finishPlaybackWait()
+        }
         .onAppear {
-            guard !isReadyToNavigate else { return }
-            isReadyToNavigate = true
-
-            navigationTask?.cancel()
-            navigationTask = Task { @MainActor in
-                let fallbackDuration: TimeInterval = 1.8
-
-                if splashVideoPlayer.isConfigured {
-                    splashVideoPlayer.playFromStart()
-                    let duration = await splashVideoPlayer.loadPlaybackDuration()
-                    try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-                } else {
-                    try? await Task.sleep(nanoseconds: UInt64(fallbackDuration * 1_000_000_000))
-                }
-
-                guard !Task.isCancelled else { return }
-                onFinished()
-            }
+            startPlaybackWaitIfNeeded()
+        }
+        .onChange(of: isReadyToFinish) { _ in
+            finishIfPossible()
+        }
+        .onChange(of: isPlaybackWaitFinished) { _ in
+            finishIfPossible()
         }
         .onDisappear {
             navigationTask?.cancel()
             navigationTask = nil
             splashVideoPlayer.pause()
         }
+    }
+
+    private func startPlaybackWaitIfNeeded() {
+        guard !hasStartedPlaybackWait else { return }
+        hasStartedPlaybackWait = true
+
+        navigationTask?.cancel()
+        navigationTask = Task { @MainActor in
+            let fallbackDuration: TimeInterval = 1.8
+
+            if splashVideoPlayer.isConfigured {
+                splashVideoPlayer.playFromStart()
+                let duration = await splashVideoPlayer.loadPlaybackDuration()
+                try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            } else {
+                try? await Task.sleep(nanoseconds: UInt64(fallbackDuration * 1_000_000_000))
+            }
+
+            guard !Task.isCancelled else { return }
+            finishPlaybackWait()
+        }
+    }
+
+    private func finishPlaybackWait() {
+        guard !isPlaybackWaitFinished else { return }
+        navigationTask?.cancel()
+        navigationTask = nil
+        splashVideoPlayer.pause()
+        isPlaybackWaitFinished = true
+        finishIfPossible()
+    }
+
+    private func finishIfPossible() {
+        guard isPlaybackWaitFinished, isReadyToFinish else { return }
+        guard !hasFinished else { return }
+        hasFinished = true
+        onFinished()
     }
 }
 

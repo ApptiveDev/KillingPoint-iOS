@@ -39,6 +39,7 @@ final class NotificationListViewModel: ObservableObject {
     @Published private(set) var subscribeFansErrorMessage: String?
     @Published private(set) var pendingExternalRoute: NotificationListExternalRoute?
     @Published private(set) var routingErrorMessage: String?
+    @Published private(set) var isDeletingAlarms = false
 
     private let userService: UserServicing
     private let diaryService: DiaryServicing
@@ -54,9 +55,13 @@ final class NotificationListViewModel: ObservableObject {
     private var subscribeFansNextPage = SubscribeService.defaultPage
     private var hasNextSubscribeFansPage = true
     private var readAlarmIDs: Set<Int> = []
+    private var deletedAlarmIDs: Set<Int> = []
+    private var deletedAlarmsBeforeDate: Date?
     private let alarmPageSize = 20
     private let subscribeFansPageSize = 20
     private let alarmReadIDStorageKeyPrefix = "social.readAlarmIDs.user"
+    private let alarmDeletedIDStorageKeyPrefix = "social.deletedAlarmIDs.user"
+    private let alarmDeletedBeforeStorageKeyPrefix = "social.deletedAlarmsBefore.user"
 
     init(
         userService: UserServicing = UserService(),
@@ -72,6 +77,19 @@ final class NotificationListViewModel: ObservableObject {
         self.userDefaults = userDefaults
     }
 
+    func enterList() async {
+        if hasLoadedInitialAlarms {
+            return
+        }
+
+        await refreshAlarms()
+    }
+
+    func exitList() {
+        markLoadedAlarmsAsRead()
+        setAlarmSelectionMode(false)
+    }
+
     func refreshAlarms() async {
         guard !isLoadingAlarms else { return }
         isLoadingAlarms = true
@@ -84,12 +102,13 @@ final class NotificationListViewModel: ObservableObject {
         do {
             try await ensureMyUserID()
             loadReadAlarmIDsFromStorage()
+            loadDeletedAlarmStateFromStorage()
 
             let response = try await notificationService.fetchAlarmHistory(
                 page: 0,
                 size: alarmPageSize
             )
-            alarms = response.content.filter { $0.alarmId > 0 }
+            alarms = visibleAlarms(from: response.content)
             updateAlarmsPaging(from: response)
             hasLoadedInitialAlarms = true
             updateUnreadAlarmIndicator()
@@ -166,20 +185,33 @@ final class NotificationListViewModel: ObservableObject {
         }
     }
 
-    func markSelectedAlarmsAsRead() {
+    func deleteSelectedAlarms() {
         guard !selectedAlarmIDs.isEmpty else { return }
+        isDeletingAlarms = true
+        defer { isDeletingAlarms = false }
+
         readAlarmIDs.formUnion(selectedAlarmIDs)
+        deletedAlarmIDs.formUnion(selectedAlarmIDs)
+        alarms.removeAll { selectedAlarmIDs.contains($0.alarmId) }
         persistReadAlarmIDs()
+        persistDeletedAlarmState()
         updateUnreadAlarmIndicator()
         selectedAlarmIDs.removeAll()
         isAlarmSelectionMode = false
     }
 
-    func markAllAlarmsAsRead() {
+    func deleteAllAlarms() {
         let allIDs = Set(alarms.map(\.alarmId))
         guard !allIDs.isEmpty else { return }
+        isDeletingAlarms = true
+        defer { isDeletingAlarms = false }
+
         readAlarmIDs.formUnion(allIDs)
+        deletedAlarmIDs.formUnion(allIDs)
+        deletedAlarmsBeforeDate = Date()
+        alarms = []
         persistReadAlarmIDs()
+        persistDeletedAlarmState()
         updateUnreadAlarmIndicator()
         selectedAlarmIDs.removeAll()
         isAlarmSelectionMode = false
@@ -276,6 +308,31 @@ final class NotificationListViewModel: ObservableObject {
         )
     }
 
+    func handleUniversalLinkDiaryRoute(diaryId: Int) async {
+        routingErrorMessage = nil
+        pendingExternalRoute = nil
+        print("[NotificationRoute][UniversalLink] diaryId=\(diaryId)")
+
+        do {
+            let diary = try await diaryService.fetchDiary(diaryId: diaryId)
+            print(
+                "[NotificationRoute][UniversalLink] diaryId=\(diaryId) userId=\(diary.userId) -> SocialMyCollectionDiary"
+            )
+            clearNavigationDestinations()
+            activeSocialDiaryDestination = AlarmSocialDiaryDestination(
+                diary: diary,
+                displayTag: resolvedDisplayTag(from: diary.tag),
+                user: makeUser(from: diary)
+            )
+        } catch {
+            if isRequestCancelled(error) { return }
+            print(
+                "[NotificationRoute][UniversalLink] failed diaryId=\(diaryId) error=\(error.localizedDescription)"
+            )
+            routingErrorMessage = resolveRoutingErrorMessage(from: error)
+        }
+    }
+
     private func executeRoute(
         type: AlarmType,
         deepLink: String,
@@ -311,7 +368,6 @@ final class NotificationListViewModel: ObservableObject {
             case .diary:
                 if let diaryId = resolveDiaryIDIfPresent(from: deepLink) {
                     let diary = try await diaryService.fetchDiary(diaryId: diaryId)
-                    guard diary.userId > 0 else { throw NotificationRoutingError.missingUserID }
                     print(
                         "[NotificationRoute] DIARY_ALARM diaryId=\(diaryId) userId=\(diary.userId) -> SocialMyCollectionDiary"
                     )
@@ -371,6 +427,15 @@ final class NotificationListViewModel: ObservableObject {
 
     func clearPendingExternalRoute() {
         pendingExternalRoute = nil
+    }
+
+    func routeToSubscribeFan(_ user: SubscribeUserModel) {
+        dismissSubscribeFansSheet()
+        clearNavigationDestinations()
+        activeSocialCollectionDestination = AlarmSocialCollectionDestination(
+            user: UserModel(from: user),
+            initialUserFeedsResponse: nil
+        )
     }
 
     private func presentSubscribeFansSheet(for subscribedUserID: Int) async {
@@ -551,7 +616,8 @@ final class NotificationListViewModel: ObservableObject {
 
     private func appendAlarms(with newAlarms: [AlarmHistoryItem]) {
         let existingIDs = Set(alarms.map(\.alarmId))
-        let filtered = newAlarms.filter { $0.alarmId > 0 && !existingIDs.contains($0.alarmId) }
+        let filtered = visibleAlarms(from: newAlarms)
+            .filter { !existingIDs.contains($0.alarmId) }
         alarms.append(contentsOf: filtered)
     }
 
@@ -569,6 +635,39 @@ final class NotificationListViewModel: ObservableObject {
         hasNextAlarmsPage = true
         selectedAlarmIDs.removeAll()
         isAlarmSelectionMode = false
+    }
+
+    private func visibleAlarms(from source: [AlarmHistoryItem]) -> [AlarmHistoryItem] {
+        source.filter { alarm in
+            alarm.alarmId > 0 && !isAlarmDeleted(alarm)
+        }
+    }
+
+    private func isAlarmDeleted(_ alarm: AlarmHistoryItem) -> Bool {
+        if deletedAlarmIDs.contains(alarm.alarmId) {
+            return true
+        }
+
+        guard
+            let deletedAlarmsBeforeDate,
+            let createdDate = NotificationAlarmDateParser.date(from: alarm.createDate ?? "")
+        else {
+            return false
+        }
+
+        return createdDate <= deletedAlarmsBeforeDate
+    }
+
+    private func markLoadedAlarmsAsRead() {
+        let alarmIDs = Set(alarms.map(\.alarmId))
+        guard !alarmIDs.isEmpty else {
+            updateUnreadAlarmIndicator()
+            return
+        }
+
+        readAlarmIDs.formUnion(alarmIDs)
+        persistReadAlarmIDs()
+        updateUnreadAlarmIndicator()
     }
 
     private func ensureMyUserID() async throws {
@@ -598,6 +697,42 @@ final class NotificationListViewModel: ObservableObject {
         userDefaults.set(Array(readAlarmIDs), forKey: key)
     }
 
+    private func loadDeletedAlarmStateFromStorage() {
+        guard
+            let deletedIDKey = resolvedDeletedAlarmIDStorageKey(),
+            let deletedBeforeKey = resolvedDeletedAlarmsBeforeStorageKey()
+        else {
+            return
+        }
+
+        if let storedIDs = userDefaults.array(forKey: deletedIDKey) as? [Int] {
+            deletedAlarmIDs = Set(storedIDs)
+        } else if let storedStrings = userDefaults.array(forKey: deletedIDKey) as? [String] {
+            deletedAlarmIDs = Set(storedStrings.compactMap { Int($0) })
+        } else {
+            deletedAlarmIDs = []
+        }
+
+        let storedTimestamp = userDefaults.double(forKey: deletedBeforeKey)
+        deletedAlarmsBeforeDate = storedTimestamp > 0 ? Date(timeIntervalSince1970: storedTimestamp) : nil
+    }
+
+    private func persistDeletedAlarmState() {
+        guard
+            let deletedIDKey = resolvedDeletedAlarmIDStorageKey(),
+            let deletedBeforeKey = resolvedDeletedAlarmsBeforeStorageKey()
+        else {
+            return
+        }
+
+        userDefaults.set(Array(deletedAlarmIDs), forKey: deletedIDKey)
+        if let deletedAlarmsBeforeDate {
+            userDefaults.set(deletedAlarmsBeforeDate.timeIntervalSince1970, forKey: deletedBeforeKey)
+        } else {
+            userDefaults.removeObject(forKey: deletedBeforeKey)
+        }
+    }
+
     private func updateUnreadAlarmIndicator() {
         hasUnreadAlarms = alarms.contains { !readAlarmIDs.contains($0.alarmId) }
     }
@@ -605,6 +740,16 @@ final class NotificationListViewModel: ObservableObject {
     private func resolvedReadAlarmIDStorageKey() -> String? {
         guard let myUserID else { return nil }
         return "\(alarmReadIDStorageKeyPrefix).\(myUserID)"
+    }
+
+    private func resolvedDeletedAlarmIDStorageKey() -> String? {
+        guard let myUserID else { return nil }
+        return "\(alarmDeletedIDStorageKeyPrefix).\(myUserID)"
+    }
+
+    private func resolvedDeletedAlarmsBeforeStorageKey() -> String? {
+        guard let myUserID else { return nil }
+        return "\(alarmDeletedBeforeStorageKeyPrefix).\(myUserID)"
     }
 
     private func resolveRoutingErrorMessage(from error: Error) -> String {
@@ -671,5 +816,51 @@ private enum NotificationRoutingError: LocalizedError {
         case .unsupportedType:
             return "아직 지원하지 않는 알림 유형이에요."
         }
+    }
+}
+
+private enum NotificationAlarmDateParser {
+    private static let inputWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let inputWithoutFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let serverDateFormats: [String] = [
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss"
+    ]
+
+    static func date(from rawDate: String) -> Date? {
+        let trimmed = rawDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let date = inputWithFractionalSeconds.date(from: trimmed) {
+            return date
+        }
+
+        if let date = inputWithoutFractionalSeconds.date(from: trimmed) {
+            return date
+        }
+
+        for format in serverDateFormats {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = format
+            if let date = formatter.date(from: trimmed) {
+                return date
+            }
+        }
+
+        return nil
     }
 }

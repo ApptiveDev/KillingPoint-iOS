@@ -37,6 +37,7 @@ final class InitialSetupFlowViewModel: ObservableObject {
     private let diaryService: DiaryServicing
     private let calendarService: CalendarServicing
     private let shouldSkipNameSetupForAppleLogin: Bool
+    private var hasTrackedOnboardingTerminalEvent = false
 
     var onComplete: (() -> Void)?
 
@@ -153,6 +154,7 @@ final class InitialSetupFlowViewModel: ObservableObject {
     }
 
     func skipAllTutorialAndFinish() {
+        trackOnboardingSkippedIfNeeded()
         onComplete?()
     }
 
@@ -229,6 +231,7 @@ final class InitialSetupFlowViewModel: ObservableObject {
     }
 
     func finishTutorial() {
+        trackOnboardingCompletedIfNeeded()
         onComplete?()
     }
 
@@ -318,6 +321,42 @@ final class InitialSetupFlowViewModel: ObservableObject {
             return isServiceTermsAgreed
         case .privacy:
             return isPrivacyAgreed
+        }
+    }
+
+    private func trackOnboardingSkippedIfNeeded() {
+        guard !hasTrackedOnboardingTerminalEvent else { return }
+        hasTrackedOnboardingTerminalEvent = true
+
+        let properties: [String: Any] = [
+            "skip_step": skipStepName(for: step)
+        ]
+        AmplitudeClient.shared.track(eventType: "onboard_skipped", properties: properties)
+    }
+
+    private func trackOnboardingCompletedIfNeeded() {
+        guard !hasTrackedOnboardingTerminalEvent else { return }
+        hasTrackedOnboardingTerminalEvent = true
+
+        AmplitudeClient.shared.track(eventType: "onboard_completed")
+    }
+
+    private func skipStepName(for step: Step) -> String {
+        switch step {
+        case .tutorialChoice:
+            return "tutorial_choice"
+        case .tutorialTrackSearch:
+            return "tutorial_track_search"
+        case .tutorialTrim:
+            return "tutorial_trim"
+        case .tutorialHome:
+            return "tutorial_home"
+        case .tutorialDiaryDetail:
+            return "tutorial_diary_detail"
+        case .tutorialNotification:
+            return "tutorial_notification"
+        case .policyAgreement, .nameSetup, .tagSetup, .tutorialFinal:
+            return "unknown"
         }
     }
 

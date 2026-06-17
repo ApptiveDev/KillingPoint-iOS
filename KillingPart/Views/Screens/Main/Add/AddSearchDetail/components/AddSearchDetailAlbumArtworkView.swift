@@ -1,10 +1,12 @@
 import SwiftUI
+import UIKit
 
 struct AddSearchDetailAlbumArtworkView: View {
     let url: URL?
+    let preloadedImage: UIImage?
+    let coverSize: CGFloat
     @State private var isRotating = false
 
-    private let coverSize: CGFloat = 124
     private var fixedLayoutDiskSize: CGFloat { coverSize }
     private var diskSize: CGFloat { coverSize * 0.9 }
     private var centerLabelSize: CGFloat { diskSize * 0.34 }
@@ -13,6 +15,16 @@ struct AddSearchDetailAlbumArtworkView: View {
     private var grooveStepInset: CGFloat { diskSize * 0.04 }
     private var centerImageInset: CGFloat { centerLabelSize * 0.12 }
     private var centerHoleSize: CGFloat { max(diskSize * 0.05, 4) }
+
+    init(
+        url: URL?,
+        preloadedImage: UIImage? = nil,
+        coverSize: CGFloat = 124
+    ) {
+        self.url = url
+        self.preloadedImage = preloadedImage
+        self.coverSize = coverSize
+    }
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -41,7 +53,11 @@ struct AddSearchDetailAlbumArtworkView: View {
 
     private var albumCover: some View {
         Group {
-            if let url {
+            if let preloadedImage {
+                Image(uiImage: preloadedImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if let url {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -103,7 +119,11 @@ struct AddSearchDetailAlbumArtworkView: View {
                 .fill(Color.white.opacity(0.86))
 
             Group {
-                if let url {
+                if let preloadedImage {
+                    Image(uiImage: preloadedImage)
+                        .resizable()
+                        .scaledToFill()
+                } else if let url {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):

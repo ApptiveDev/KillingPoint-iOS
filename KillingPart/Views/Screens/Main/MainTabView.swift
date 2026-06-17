@@ -2,17 +2,27 @@ import SwiftUI
 import UIKit
 
 struct MainTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
     let onLogout: () -> Void
+    let startupPayload: MainStartupPayload?
+    var deepLinkRequest: DeepLinkRequest? = nil
+    var onDeepLinkRequestConsumed: (DeepLinkRequest) -> Void = { _ in }
     @State private var selectedTab: MainRootTab = .my
     @State private var randomRefreshTrigger = 0
     @StateObject private var socialViewModel = SocialViewModel()
     @StateObject private var socialFeedViewModel = FeedViewModel()
+    @State private var activeSocialDeepLinkRequest: DeepLinkRequest?
+    @State private var activeTabForAnalytics: MainRootTab = .my
+    @State private var activeTabEnteredAt = Date()
+    @State private var hasTrackedInitialTabSelection = false
+    @State private var hasTrackedInactivePhaseStay = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
             MyTabView(
                 onLogout: onLogout,
-                isRootTabSelected: selectedTab == .my
+                isRootTabSelected: selectedTab == .my,
+                startupPayload: startupPayload
             )
                 .tabItem {
                     Label("MY", systemImage: "house")
@@ -37,7 +47,9 @@ struct MainTabView: View {
             SocialView(
                 isRootTabSelected: selectedTab == .social,
                 viewModel: socialViewModel,
-                feedViewModel: socialFeedViewModel
+                feedViewModel: socialFeedViewModel,
+                deepLinkRequest: activeSocialDeepLinkRequest,
+                onDeepLinkRequestConsumed: handleSocialDeepLinkRequestConsumed
             )
                 .tabItem {
                     Label("소셜", systemImage: "person.2")
@@ -57,7 +69,24 @@ struct MainTabView: View {
         .toolbarColorScheme(.dark, for: .tabBar)
         .toolbarBackground(.black, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .onAppear {
+            trackInitialMainTabSelectionIfNeeded()
+        }
+        .onDisappear {
+            guard scenePhase == .active else { return }
+            trackMainTabStayedIfNeeded(endReason: "view_disappear")
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                hasTrackedInactivePhaseStay = false
+                return
+            }
+            guard !hasTrackedInactivePhaseStay else { return }
+            hasTrackedInactivePhaseStay = true
+            trackMainTabStayedIfNeeded(endReason: "app_background")
+        }
         .onChange(of: selectedTab) { tab in
+            handleMainTabSelectionChanged(to: tab)
             guard tab == .random else { return }
             randomRefreshTrigger &+= 1
         }
@@ -75,6 +104,10 @@ struct MainTabView: View {
             guard let pendingRoute = FCMManager.shared.consumePendingAlarmRoute() else { return }
             routeByPushAlarm(pendingRoute)
         }
+        .task(id: deepLinkRequest?.id) {
+            guard let deepLinkRequest else { return }
+            routeByDeepLink(deepLinkRequest)
+        }
     }
 
     private func routeByPushAlarm(_ route: PushAlarmRoute) {
@@ -88,6 +121,71 @@ struct MainTabView: View {
         Task { @MainActor in
             await socialViewModel.notificationListViewModel.handlePushAlarmRoute(route)
         }
+    }
+
+    private func routeByDeepLink(_ request: DeepLinkRequest) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedTab = .social
+        }
+
+        activeSocialDeepLinkRequest = request
+    }
+
+    private func handleSocialDeepLinkRequestConsumed(_ request: DeepLinkRequest) {
+        if activeSocialDeepLinkRequest == request {
+            activeSocialDeepLinkRequest = nil
+        }
+        onDeepLinkRequestConsumed(request)
+    }
+
+    private func trackInitialMainTabSelectionIfNeeded() {
+        guard !hasTrackedInitialTabSelection else { return }
+        hasTrackedInitialTabSelection = true
+        activeTabForAnalytics = selectedTab
+        activeTabEnteredAt = Date()
+
+        AmplitudeClient.shared.track(
+            eventType: "main_tab_selected",
+            properties: [
+                "tab": selectedTab.analyticsName,
+                "previous_tab": "none"
+            ]
+        )
+    }
+
+    private func handleMainTabSelectionChanged(to tab: MainRootTab) {
+        trackInitialMainTabSelectionIfNeeded()
+        guard activeTabForAnalytics != tab else { return }
+
+        let previousTab = activeTabForAnalytics
+        trackMainTabStayedIfNeeded(endReason: "tab_change")
+        AmplitudeClient.shared.track(
+            eventType: "main_tab_selected",
+            properties: [
+                "tab": tab.analyticsName,
+                "previous_tab": previousTab.analyticsName
+            ]
+        )
+
+        activeTabForAnalytics = tab
+        activeTabEnteredAt = Date()
+    }
+
+    private func trackMainTabStayedIfNeeded(endReason: String) {
+        guard hasTrackedInitialTabSelection else { return }
+        let stayDuration = Date().timeIntervalSince(activeTabEnteredAt)
+        guard stayDuration > 0 else { return }
+
+        let roundedDuration = (stayDuration * 100).rounded() / 100
+        AmplitudeClient.shared.track(
+            eventType: "main_tab_stayed",
+            properties: [
+                "tab": activeTabForAnalytics.analyticsName,
+                "stay_duration_sec": roundedDuration,
+                "end_reason": endReason
+            ]
+        )
+        activeTabEnteredAt = Date()
     }
 }
 
@@ -122,6 +220,19 @@ private enum MainRootTab: Hashable {
             self = .social
         default:
             return nil
+        }
+    }
+
+    var analyticsName: String {
+        switch self {
+        case .my:
+            return "my"
+        case .random:
+            return "explore"
+        case .social:
+            return "social"
+        case .add:
+            return "add"
         }
     }
 }

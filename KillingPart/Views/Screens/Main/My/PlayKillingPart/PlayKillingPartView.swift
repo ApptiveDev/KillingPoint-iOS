@@ -17,6 +17,7 @@ struct PlayKillingPartView: View {
     @State private var lastReorderDate = Date.distantPast
     @State private var hasCompletedInitialLoad = false
     @State private var lastTickDate = Date()
+    @State private var lastPlaybackProgressDate: Date?
     @State private var playerReloadToken = UUID()
     @State private var playbackFocusToken = 0
 
@@ -24,24 +25,29 @@ struct PlayKillingPartView: View {
     private let controlsHeight: CGFloat = 98
     private let reorderThrottleInterval: TimeInterval = 0.18
     private let reorderAnimationDuration: Double = 0.24
+    private let usesPreloadedPlaybackData: Bool
 
     init(
         isParentActive: Bool = true,
+        preloadedCollectionViewModel: MyCollectionViewModel? = nil,
         authenticationService: AuthenticationServicing = AuthenticationService(),
         userService: UserServicing = UserService(),
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.isParentActive = isParentActive
+        self.usesPreloadedPlaybackData = preloadedCollectionViewModel != nil
+        let resolvedCollectionViewModel = preloadedCollectionViewModel ?? MyCollectionViewModel(
+            authenticationService: authenticationService,
+            userService: userService,
+            diaryService: diaryService
+        )
         _viewModel = StateObject(
-            wrappedValue: MyCollectionViewModel(
-                authenticationService: authenticationService,
-                userService: userService,
-                diaryService: diaryService
-            )
+            wrappedValue: resolvedCollectionViewModel
         )
         _playViewModel = StateObject(
             wrappedValue: PlayKillingPartViewModel(diaryService: diaryService)
         )
+        _hasCompletedInitialLoad = State(initialValue: preloadedCollectionViewModel != nil)
     }
 
     var body: some View {
@@ -62,6 +68,12 @@ struct PlayKillingPartView: View {
             resetTickReference()
             bumpPlaybackFocusToken()
             Task {
+                if usesPreloadedPlaybackData && hasCompletedInitialLoad {
+                    reconcileOrderedDiaryIDsIfNeeded()
+                    synchronizeSelectedTrackIfNeeded()
+                    return
+                }
+
                 let refetchResult = await refreshPlaybackFeeds()
                 hasCompletedInitialLoad = true
                 reconcileOrderedDiaryIDsIfNeeded()
@@ -92,19 +104,15 @@ struct PlayKillingPartView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active && isParentActive {
-                elapsedInCurrentRange = 0
-                playerReloadToken = UUID()
                 bumpPlaybackFocusToken()
             }
             resetTickReference()
         }
         .onChange(of: isParentActive) { isParentActive in
             if isParentActive {
-                elapsedInCurrentRange = 0
                 if currentTrack != nil {
                     isPlaying = true
                 }
-                playerReloadToken = UUID()
                 bumpPlaybackFocusToken()
             }
             resetTickReference()
@@ -131,7 +139,13 @@ struct PlayKillingPartView: View {
                     track: currentTrack,
                     isPlaying: isPlaying,
                     playbackFocusToken: playbackFocusToken,
-                    playerReloadToken: playerReloadToken
+                    playerReloadToken: playerReloadToken,
+                    onPlaybackEnded: {
+                        handleCurrentTrackPlaybackEnded(trackID: currentTrack.id)
+                    },
+                    onPlaybackProgressChanged: { progress in
+                        handlePlaybackProgress(progress, trackID: currentTrack.id)
+                    }
                 )
             } else if hasCompletedInitialLoad {
                 PlayKillingPartEmptyStateCard()
@@ -451,6 +465,7 @@ struct PlayKillingPartView: View {
         guard playlistTracks.indices.contains(nextIndex) else {
             isPlaying = false
             elapsedInCurrentRange = 0
+            resetPlaybackProgressTracking()
             return
         }
         selectTrack(at: nextIndex)
@@ -461,6 +476,7 @@ struct PlayKillingPartView: View {
         let selectedTrack = playlistTracks[index]
         guard selectedTrackID != selectedTrack.id else {
             elapsedInCurrentRange = 0
+            resetPlaybackProgressTracking()
             resetTickReference()
             return
         }
@@ -468,6 +484,7 @@ struct PlayKillingPartView: View {
         selectedTrackID = selectedTrack.id
         isPlaying = true
         elapsedInCurrentRange = 0
+        resetPlaybackProgressTracking()
         playerReloadToken = UUID()
         bumpPlaybackFocusToken()
         resetTickReference()
@@ -478,6 +495,7 @@ struct PlayKillingPartView: View {
             selectedTrackID = nil
             elapsedInCurrentRange = 0
             isPlaying = false
+            resetPlaybackProgressTracking()
             return
         }
 
@@ -492,12 +510,14 @@ struct PlayKillingPartView: View {
         {
             if elapsedInCurrentRange > selectedTrack.rangeDuration {
                 elapsedInCurrentRange = 0
+                resetPlaybackProgressTracking()
             }
             return
         }
 
         selectedTrackID = playlistTracks[0].id
         elapsedInCurrentRange = 0
+        resetPlaybackProgressTracking()
         playerReloadToken = UUID()
         bumpPlaybackFocusToken()
         resetTickReference()
@@ -511,6 +531,7 @@ struct PlayKillingPartView: View {
         guard isPlaybackActive else { return }
         guard isPlaying else { return }
         guard let currentTrack else { return }
+        guard !hasRecentPlaybackProgress(now: now) else { return }
 
         let delta = now.timeIntervalSince(lastTickDate)
         guard delta > 0 else { return }
@@ -525,8 +546,48 @@ struct PlayKillingPartView: View {
         moveToNextTrack()
     }
 
+    private func handlePlaybackProgress(_ progress: YoutubePlaybackProgress, trackID: Int) {
+        guard let currentTrack, currentTrack.id == trackID else { return }
+        guard progress.matchesRange(
+            startSeconds: currentTrack.startSeconds,
+            endSeconds: currentTrack.endSeconds
+        ) else {
+            return
+        }
+
+        elapsedInCurrentRange = clampedElapsed(
+            currentSeconds: progress.currentSeconds,
+            startSeconds: currentTrack.startSeconds,
+            duration: currentTrack.rangeDuration
+        )
+        lastPlaybackProgressDate = Date()
+    }
+
+    private func handleCurrentTrackPlaybackEnded(trackID: Int) {
+        guard currentTrack?.id == trackID else { return }
+        elapsedInCurrentRange = 0
+        moveToNextTrack()
+    }
+
+    private func hasRecentPlaybackProgress(now: Date) -> Bool {
+        guard let lastPlaybackProgressDate else { return false }
+        return now.timeIntervalSince(lastPlaybackProgressDate) < 1.0
+    }
+
     private func resetTickReference() {
         lastTickDate = Date()
+    }
+
+    private func resetPlaybackProgressTracking() {
+        lastPlaybackProgressDate = nil
+    }
+
+    private func clampedElapsed(
+        currentSeconds: Double,
+        startSeconds: Double,
+        duration: Double
+    ) -> TimeInterval {
+        min(max(currentSeconds - startSeconds, 0), max(duration, 0))
     }
 
     private var isPlaybackActive: Bool {
@@ -557,6 +618,7 @@ struct PlayKillingPartView: View {
     private func restartPlaybackFromFirstTrack() {
         selectedTrackID = nil
         elapsedInCurrentRange = 0
+        resetPlaybackProgressTracking()
         isPlaying = true
         playerReloadToken = UUID()
         bumpPlaybackFocusToken()
@@ -690,16 +752,21 @@ struct PlayKillingPartTrack: Identifiable {
     }
 
     var startProgress: CGFloat {
-        CGFloat(min(max(startSeconds / totalSeconds, 0), 1))
+        CGFloat(min(max(startSeconds / safeTotalSeconds, 0), 1))
     }
 
     var endProgress: CGFloat {
-        CGFloat(min(max(endSeconds / totalSeconds, startSeconds / totalSeconds), 1))
+        CGFloat(min(max(endSeconds / safeTotalSeconds, startSeconds / safeTotalSeconds), 1))
     }
 
     func playheadProgress(elapsedInCurrentRange: TimeInterval) -> CGFloat {
-        let absoluteSeconds = min(startSeconds + elapsedInCurrentRange, endSeconds)
-        return CGFloat(min(max(absoluteSeconds / totalSeconds, 0), 1))
+        let clampedElapsed = min(max(elapsedInCurrentRange, 0), rangeDuration)
+        let absoluteSeconds = min(startSeconds + clampedElapsed, endSeconds)
+        return CGFloat(min(max(absoluteSeconds / safeTotalSeconds, 0), 1))
+    }
+
+    private var safeTotalSeconds: Double {
+        max(totalSeconds, endSeconds, startSeconds + 0.1, 0.1)
     }
 }
 

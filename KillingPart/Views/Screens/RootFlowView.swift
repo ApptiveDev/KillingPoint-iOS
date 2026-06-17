@@ -3,12 +3,20 @@ import SwiftUI
 struct RootFlowView: View {
     @Environment(\.openURL) private var openURL
     @StateObject private var viewModel = AppViewModel()
+    let authURLHandler: (URL) -> Bool
+
+    init(authURLHandler: @escaping (URL) -> Bool = { _ in false }) {
+        self.authURLHandler = authURLHandler
+    }
 
     var body: some View {
         Group {
             switch viewModel.currentStep {
             case .splash:
-                SplashView(onFinished: viewModel.completeSplash)
+                SplashView(
+                    isReadyToFinish: viewModel.isSplashReadyToFinish,
+                    onFinished: viewModel.completeSplash
+                )
             case .login:
                 LoginView(viewModel: viewModel.loginViewModel)
             case .setup:
@@ -18,11 +26,16 @@ struct RootFlowView: View {
                     LoginView(viewModel: viewModel.loginViewModel)
                 }
             case .main:
-                MainTabView(onLogout: viewModel.logout)
+                MainTabView(
+                    onLogout: viewModel.logout,
+                    startupPayload: viewModel.mainStartupPayload,
+                    deepLinkRequest: viewModel.activeDeepLinkRequest,
+                    onDeepLinkRequestConsumed: viewModel.consumeDeepLinkRequest
+                )
             }
         }
         .overlay {
-            if viewModel.isResolvingPostLoginFlow {
+            if viewModel.isResolvingPostLoginFlow && viewModel.currentStep != .splash {
                 ZStack {
                     Color.black.opacity(0.35).ignoresSafeArea()
                     ProgressView()
@@ -55,6 +68,20 @@ struct RootFlowView: View {
             }
         } message: { prompt in
             Text(prompt.message)
+        }
+        .task {
+            viewModel.prepareSplashIfNeeded()
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+            guard let url = userActivity.webpageURL else { return }
+            _ = viewModel.handleDeepLink(url)
+        }
+        .onOpenURL { url in
+            if authURLHandler(url) {
+                return
+            }
+
+            _ = viewModel.handleDeepLink(url)
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.currentStep)
     }

@@ -37,13 +37,13 @@ struct NotificationListView: View {
         .navigationBarBackButtonHidden()
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            await viewModel.loadAlarmHistoryIfNeeded()
+            await viewModel.enterList()
         }
         .refreshable {
             await viewModel.refreshAlarms()
         }
         .onDisappear {
-            viewModel.setAlarmSelectionMode(false)
+            viewModel.exitList()
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isAlarmSelectionMode)
         .alert(
@@ -71,6 +71,9 @@ struct NotificationListView: View {
                     Task {
                         await viewModel.loadMoreSubscribeFansIfNeeded(currentUserId: userId)
                     }
+                },
+                onUserTap: { user in
+                    viewModel.routeToSubscribeFan(user)
                 }
             )
         }
@@ -119,7 +122,11 @@ struct NotificationListView: View {
             Button {
                 viewModel.toggleSelectAllAlarms()
             } label: {
-                Text(viewModel.selectedAlarmIDs.count == viewModel.alarms.count ? "전체 해제" : "전체 선택")
+                Text(
+                    !viewModel.alarms.isEmpty && viewModel.selectedAlarmIDs.count == viewModel.alarms.count
+                        ? "전체 해제"
+                        : "전체 선택"
+                )
                     .font(AppFont.paperlogy5Medium(size: 12))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, AppSpacing.s)
@@ -134,9 +141,9 @@ struct NotificationListView: View {
             Spacer()
 
             Button {
-                viewModel.markSelectedAlarmsAsRead()
+                viewModel.deleteSelectedAlarms()
             } label: {
-                Text("선택 읽기")
+                Text(viewModel.isDeletingAlarms ? "삭제 중" : "선택 삭제")
                     .font(AppFont.paperlogy5Medium(size: 12))
                     .foregroundStyle(Color.black)
                     .padding(.horizontal, AppSpacing.s)
@@ -147,12 +154,12 @@ struct NotificationListView: View {
                     )
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.selectedAlarmIDs.isEmpty)
+            .disabled(viewModel.selectedAlarmIDs.isEmpty || viewModel.isDeletingAlarms)
 
             Button {
-                viewModel.markAllAlarmsAsRead()
+                viewModel.deleteAllAlarms()
             } label: {
-                Text("모두 읽기")
+                Text("모두 삭제")
                     .font(AppFont.paperlogy5Medium(size: 12))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, AppSpacing.s)
@@ -163,6 +170,7 @@ struct NotificationListView: View {
                     )
             }
             .buttonStyle(.plain)
+            .disabled(viewModel.alarms.isEmpty || viewModel.isDeletingAlarms)
         }
     }
 
@@ -493,6 +501,7 @@ private struct NotificationSubscribeFansSheet: View {
     let errorMessage: String?
     let onRetry: () -> Void
     let onUserAppear: (Int) -> Void
+    let onUserTap: (SubscribeUserModel) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.m) {
@@ -534,10 +543,15 @@ private struct NotificationSubscribeFansSheet: View {
                 ScrollView {
                     LazyVStack(spacing: AppSpacing.s) {
                         ForEach(users) { user in
-                            SocialFriendRowView(user: .subscribed(user))
-                                .onAppear {
-                                    onUserAppear(user.userId)
-                                }
+                            Button {
+                                onUserTap(user)
+                            } label: {
+                                SocialFriendRowView(user: .subscribed(user))
+                            }
+                            .buttonStyle(.plain)
+                            .onAppear {
+                                onUserAppear(user.userId)
+                            }
                         }
 
                         if isLoadingMore {
