@@ -144,7 +144,11 @@ struct SocialView: View {
     private var navigationLinks: some View {
         ZStack {
             notificationNavigationLink
-            alarmRouteNavigationLinks
+
+            // NotificationListView owns these routes while it is on the stack.
+            if !isNotificationListActive {
+                alarmRouteNavigationLinks
+            }
         }
     }
 
