@@ -120,7 +120,7 @@ enum MyCollectionDiaryShareExportError: LocalizedError {
 }
 
 enum MyCollectionDiaryShareImageRenderer {
-    private static let canvasSize = CGSize(width: 360, height: 640)
+    private static let canvasSize = MyCollectionDiaryShareImageLayout.canvasSize
     private static let canvasScale: CGFloat = 3
 
     @MainActor
@@ -176,6 +176,12 @@ enum MyCollectionDiaryShareImageRenderer {
             return nil
         }
     }
+}
+
+private enum MyCollectionDiaryShareImageLayout {
+    static let canvasSize = CGSize(width: 360, height: 640)
+    static let contentHorizontalPadding: CGFloat = 32
+    static let metadataColor = Color.kpGray300
 }
 
 enum MyCollectionDiaryPhotoSaver {
@@ -391,28 +397,40 @@ private struct MyCollectionDiaryShareImageView: View {
     let endProgress: CGFloat
 
     var body: some View {
-        ZStack {
-            Image("my_background")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 360, height: 640)
-                .clipped()
+        backgroundLayer
+            .overlay(alignment: .top) {
+                VStack(spacing: 18) {
+                    trackCard
+                        .frame(height: 292)
 
-            Color.black.opacity(0.48)
-
-            VStack(spacing: 18) {
-                trackCard
-                    .frame(height: 292)
-
-                commentCard
-                    .frame(height: 238)
+                    commentCard
+                        .frame(height: 238)
+                }
+                .padding(.horizontal, MyCollectionDiaryShareImageLayout.contentHorizontalPadding)
+                .padding(.top, 38)
+                .frame(
+                    width: MyCollectionDiaryShareImageLayout.canvasSize.width,
+                    height: MyCollectionDiaryShareImageLayout.canvasSize.height,
+                    alignment: .top
+                )
             }
-            .padding(.horizontal, 21)
-            .padding(.top, 38)
-            .frame(width: 360, height: 640, alignment: .top)
-        }
-        .frame(width: 360, height: 640)
-        .clipped()
+            .frame(
+                width: MyCollectionDiaryShareImageLayout.canvasSize.width,
+                height: MyCollectionDiaryShareImageLayout.canvasSize.height
+            )
+            .clipped()
+    }
+
+    private var backgroundLayer: some View {
+        Image("my_background")
+            .resizable()
+            .scaledToFill()
+            .frame(
+                width: MyCollectionDiaryShareImageLayout.canvasSize.width,
+                height: MyCollectionDiaryShareImageLayout.canvasSize.height
+            )
+            .overlay(Color.black.opacity(0.48))
+            .clipped()
     }
 
     private var trackCard: some View {
@@ -491,10 +509,10 @@ private struct MyCollectionDiaryShareImageView: View {
                 }
 
             Text(displayedContent.isEmpty ? "작성된 코멘트가 없어요." : displayedContent)
-                .font(AppFont.paperlogy4Regular(size: 13))
+                .font(AppFont.paperlogy4Regular(size: 12))
                 .foregroundStyle(.white.opacity(0.92))
                 .multilineTextAlignment(.leading)
-                .lineSpacing(3)
+                .lineSpacing(2.5)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.horizontal, 22)
                 .padding(.top, 24)
@@ -503,12 +521,12 @@ private struct MyCollectionDiaryShareImageView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(createdDateText)
-                        .font(AppFont.paperlogy4Regular(size: 10.5))
-                        .foregroundStyle(.white.opacity(0.52))
+                        .font(AppFont.paperlogy4Regular(size: 9.5))
+                        .foregroundStyle(MyCollectionDiaryShareImageLayout.metadataColor)
 
                     Text(tagText)
-                        .font(AppFont.paperlogy5Medium(size: 11.5))
-                        .foregroundStyle(.white.opacity(0.70))
+                        .font(AppFont.paperlogy5Medium(size: 9.5))
+                        .foregroundStyle(MyCollectionDiaryShareImageLayout.metadataColor)
                 }
 
                 Spacer()
