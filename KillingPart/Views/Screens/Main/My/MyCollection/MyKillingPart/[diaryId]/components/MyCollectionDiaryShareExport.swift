@@ -17,13 +17,65 @@ struct MyCollectionDiaryActionAlert: Identifiable {
 }
 
 struct MyCollectionDiaryActivityShareSheet: UIViewControllerRepresentable {
-    let activityItems: [Any]
+    let item: MyCollectionDiaryActivityShareItem
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        UIActivityViewController(
+            activityItems: [
+                MyCollectionDiaryShareURLActivityItemSource(url: item.url),
+                MyCollectionDiaryShareImageActivityItemSource(image: item.image)
+            ],
+            applicationActivities: nil
+        )
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+final class MyCollectionDiaryShareURLActivityItemSource: NSObject, UIActivityItemSource {
+    private let url: URL
+
+    init(url: URL) {
+        self.url = url
+    }
+
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        url
+    }
+
+    func activityViewController(
+        _ activityViewController: UIActivityViewController,
+        itemForActivityType activityType: UIActivity.ActivityType?
+    ) -> Any? {
+        if activityType == .copyToPasteboard {
+            return url.absoluteString
+        }
+
+        return url
+    }
+}
+
+final class MyCollectionDiaryShareImageActivityItemSource: NSObject, UIActivityItemSource {
+    private let image: UIImage
+
+    init(image: UIImage) {
+        self.image = image
+    }
+
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        image
+    }
+
+    func activityViewController(
+        _ activityViewController: UIActivityViewController,
+        itemForActivityType activityType: UIActivity.ActivityType?
+    ) -> Any? {
+        if activityType == .copyToPasteboard {
+            return nil
+        }
+
+        return image
+    }
 }
 
 enum MyCollectionDiaryShareExportError: LocalizedError {
