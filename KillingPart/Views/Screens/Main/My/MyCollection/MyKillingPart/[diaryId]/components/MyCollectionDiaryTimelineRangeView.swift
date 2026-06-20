@@ -17,6 +17,8 @@ struct MyCollectionDiaryTimelineRangeView: View {
     var segmentColor: Color = AppColors.primary600.opacity(0.95)
     var startLabelColor: Color = AppColors.primary600.opacity(0.98)
     var endLabelColor: Color = AppColors.primary600.opacity(0.9)
+    var usesSegmentEllipticalGradient = false
+    var segmentCornerRadius: CGFloat?
 
     var body: some View {
         GeometryReader { proxy in
@@ -55,8 +57,25 @@ struct MyCollectionDiaryTimelineRangeView: View {
                     .frame(width: width, height: trackHeight)
                     .offset(y: 5)
 
-                Capsule()
+                RoundedRectangle(cornerRadius: segmentCornerRadius ?? segmentHeight / 2)
                     .fill(segmentColor)
+                    .overlay {
+                        if usesSegmentEllipticalGradient {
+                            EllipticalGradient(
+                                stops: [
+                                    .init(
+                                        color: Color(red: 0.4, green: 0.4, blue: 0.4).opacity(0),
+                                        location: 0
+                                    ),
+                                    .init(color: .black, location: 1)
+                                ],
+                                center: UnitPoint(x: 0.5, y: 0.5)
+                            )
+                            .clipShape(
+                                RoundedRectangle(cornerRadius: segmentCornerRadius ?? segmentHeight / 2)
+                            )
+                        }
+                    }
                     .frame(width: segmentWidth, height: segmentHeight)
                     .offset(x: startX, y: 3)
 

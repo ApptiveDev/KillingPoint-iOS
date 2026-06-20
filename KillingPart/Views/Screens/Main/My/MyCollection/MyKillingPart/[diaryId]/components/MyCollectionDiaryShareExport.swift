@@ -184,19 +184,51 @@ private enum MyCollectionDiaryShareImageLayout {
     static let contentTopPadding: CGFloat = 90 / renderScale
     static let contentHorizontalPadding: CGFloat = 132 / renderScale
     static let cardSpacing: CGFloat = 35 / renderScale
+    static let trackCardHeight: CGFloat = 942 / renderScale
+    static let trackCardCornerRadius: CGFloat = 72.52941 / renderScale
+    static let trackCardShadowRadius: CGFloat = 2 / renderScale
+    static let trackCardShadowY: CGFloat = 4 / renderScale
+    static let trackCardBlurRadius: CGFloat = 19.0115 / renderScale
+    static let commentCardHeight: CGFloat = 728.22681 / renderScale
+    static let commentCardCornerRadius: CGFloat = 45.58705 / renderScale
     static let albumArtworkSize = CGSize(
         width: 428.416748046875 / renderScale,
         height: 427.9999694824219 / renderScale
     )
     static let albumArtworkCornerRadius: CGFloat = 17.23639 / renderScale
+    static let musicTitleFontSize: CGFloat = 48 / renderScale
+    static let artistFontSize: CGFloat = 38 / renderScale
+    static let artistTextWidth: CGFloat = 377.04599 / renderScale
+    static let timelineWidth: CGFloat = 632 / renderScale
+    static let timelineHorizontalPadding = (
+        canvasSize.width - contentHorizontalPadding * 2 - timelineWidth
+    ) / 2
+    static let timelineTrackHeight: CGFloat = 12 / renderScale
+    static let timelineSegmentHeight: CGFloat = 24 / renderScale
+    static let timelineSegmentCornerRadius: CGFloat = 13.91979 / renderScale
+    static let timelineLabelFontSize: CGFloat = 32 / renderScale
+    static let commentFontSize: CGFloat = 32 / renderScale
+    static let commentTextSize = CGSize(
+        width: 704 / renderScale,
+        height: 488 / renderScale
+    )
+    static let commentHorizontalInset = (
+        canvasSize.width - contentHorizontalPadding * 2 - commentTextSize.width
+    ) / 2
+    static let metadataFontSize: CGFloat = 26 / renderScale
+    static let dateTextSize = CGSize(
+        width: 167.01755 / renderScale,
+        height: 37.4258 / renderScale
+    )
     static let appIconSize = CGSize(
         width: 108.8 / renderScale,
         height: 112 / renderScale
     )
+    static let appIconCornerRadius: CGFloat = 8
     static let appIconShadowRadius: CGFloat = 1.96087 / renderScale
     static let appIconShadowY: CGFloat = 3.92174 / renderScale
     static let appIconStrokeWidth: CGFloat = 1.96087 / renderScale
-    static let metadataColor = Color.kpGray300
+    static let metadataColor = Color(red: 0.48, green: 0.48, blue: 0.48)
 }
 
 enum MyCollectionDiaryPhotoSaver {
@@ -416,10 +448,10 @@ private struct MyCollectionDiaryShareImageView: View {
             .overlay(alignment: .top) {
                 VStack(spacing: MyCollectionDiaryShareImageLayout.cardSpacing) {
                     trackCard
-                        .frame(height: 292)
+                        .frame(height: MyCollectionDiaryShareImageLayout.trackCardHeight)
 
                     commentCard
-                        .frame(height: 238)
+                        .frame(height: MyCollectionDiaryShareImageLayout.commentCardHeight)
                 }
                 .padding(.horizontal, MyCollectionDiaryShareImageLayout.contentHorizontalPadding)
                 .padding(.top, MyCollectionDiaryShareImageLayout.contentTopPadding)
@@ -450,12 +482,18 @@ private struct MyCollectionDiaryShareImageView: View {
 
     private var trackCard: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                }
+            RoundedRectangle(
+                cornerRadius: MyCollectionDiaryShareImageLayout.trackCardCornerRadius,
+                style: .continuous
+            )
+            .fill(Color.black.opacity(0.34))
+            .shadow(
+                color: .black.opacity(0.25),
+                radius: MyCollectionDiaryShareImageLayout.trackCardShadowRadius,
+                x: 0,
+                y: MyCollectionDiaryShareImageLayout.trackCardShadowY
+            )
+            .blur(radius: MyCollectionDiaryShareImageLayout.trackCardBlurRadius)
 
             VStack(spacing: 0) {
                 AddSearchDetailAlbumArtworkView(
@@ -478,19 +516,21 @@ private struct MyCollectionDiaryShareImageView: View {
                     endMinuteSecondText: endMinuteSecondText,
                     startProgress: startProgress,
                     endProgress: endProgress,
-                    trackHeight: 2.5,
-                    segmentHeight: 6,
+                    trackHeight: MyCollectionDiaryShareImageLayout.timelineTrackHeight,
+                    segmentHeight: MyCollectionDiaryShareImageLayout.timelineSegmentHeight,
                     labelWidth: 40,
                     labelY: 24,
                     height: 38,
-                    startFontSize: 10,
-                    endFontSize: 10,
-                    trackColor: Color.white.opacity(0.42),
+                    startFontSize: MyCollectionDiaryShareImageLayout.timelineLabelFontSize,
+                    endFontSize: MyCollectionDiaryShareImageLayout.timelineLabelFontSize,
+                    trackColor: Color(red: 0.42, green: 0.42, blue: 0.42),
                     segmentColor: AppColors.primary600,
-                    startLabelColor: Color.white.opacity(0.62),
-                    endLabelColor: Color.white.opacity(0.62)
+                    startLabelColor: .white,
+                    endLabelColor: .white,
+                    usesSegmentEllipticalGradient: true,
+                    segmentCornerRadius: MyCollectionDiaryShareImageLayout.timelineSegmentCornerRadius
                 )
-                .padding(.horizontal, 36)
+                .padding(.horizontal, MyCollectionDiaryShareImageLayout.timelineHorizontalPadding)
                 .padding(.top, 10)
 
                 Spacer(minLength: 12)
@@ -501,7 +541,7 @@ private struct MyCollectionDiaryShareImageView: View {
     private var trackTextSection: some View {
         VStack(spacing: 5) {
             Text(musicTitle)
-                .font(AppFont.paperlogy7Bold(size: 19))
+                .font(AppFont.paperlogy7Bold(size: MyCollectionDiaryShareImageLayout.musicTitleFontSize))
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.74)
@@ -509,42 +549,50 @@ private struct MyCollectionDiaryShareImageView: View {
                 .frame(maxWidth: 266)
 
             Text(artist)
-                .font(AppFont.paperlogy4Regular(size: 14))
-                .foregroundStyle(.white.opacity(0.82))
+                .font(AppFont.paperlogy4Regular(size: MyCollectionDiaryShareImageLayout.artistFontSize))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
-                .frame(maxWidth: 266)
+                .frame(width: MyCollectionDiaryShareImageLayout.artistTextWidth, alignment: .top)
         }
         .frame(maxWidth: .infinity)
     }
 
     private var commentCard: some View {
         ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.white.opacity(0.10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                }
+            RoundedRectangle(
+                cornerRadius: MyCollectionDiaryShareImageLayout.commentCardCornerRadius,
+                style: .continuous
+            )
+            .fill(Color(red: 0.11, green: 0.12, blue: 0.13))
 
             Text(displayedContent.isEmpty ? "작성된 코멘트가 없어요." : displayedContent)
-                .font(AppFont.paperlogy4Regular(size: 12))
-                .foregroundStyle(.white.opacity(0.92))
+                .font(AppFont.paperlogy4Regular(size: MyCollectionDiaryShareImageLayout.commentFontSize))
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.leading)
                 .lineSpacing(2.5)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 22)
-                .padding(.top, 24)
-                .padding(.bottom, 74)
+                .frame(
+                    width: MyCollectionDiaryShareImageLayout.commentTextSize.width,
+                    height: MyCollectionDiaryShareImageLayout.commentTextSize.height,
+                    alignment: .topLeading
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .offset(y: 24)
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(createdDateText)
-                        .font(AppFont.paperlogy4Regular(size: 9.5))
+                        .font(AppFont.paperlogy4Regular(size: MyCollectionDiaryShareImageLayout.metadataFontSize))
                         .foregroundStyle(MyCollectionDiaryShareImageLayout.metadataColor)
+                        .frame(
+                            width: MyCollectionDiaryShareImageLayout.dateTextSize.width,
+                            height: MyCollectionDiaryShareImageLayout.dateTextSize.height,
+                            alignment: .topLeading
+                        )
 
                     Text(tagText)
-                        .font(AppFont.paperlogy5Medium(size: 9.5))
+                        .font(AppFont.paperlogy5Medium(size: MyCollectionDiaryShareImageLayout.metadataFontSize))
                         .foregroundStyle(MyCollectionDiaryShareImageLayout.metadataColor)
                 }
 
@@ -552,8 +600,7 @@ private struct MyCollectionDiaryShareImageView: View {
 
                 appIcon
             }
-            .padding(.leading, 22)
-            .padding(.trailing, 18)
+            .padding(.horizontal, MyCollectionDiaryShareImageLayout.commentHorizontalInset)
             .padding(.bottom, 18)
         }
     }
@@ -570,6 +617,12 @@ private struct MyCollectionDiaryShareImageView: View {
                 )
                 .clipped()
                 .background(Color(red: 0.81, green: 1, blue: 0.26))
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: MyCollectionDiaryShareImageLayout.appIconCornerRadius,
+                        style: .continuous
+                    )
+                )
                 .shadow(
                     color: .black.opacity(0.25),
                     radius: MyCollectionDiaryShareImageLayout.appIconShadowRadius,
@@ -577,11 +630,17 @@ private struct MyCollectionDiaryShareImageView: View {
                     y: MyCollectionDiaryShareImageLayout.appIconShadowY
                 )
                 .overlay {
-                    Rectangle()
+                    RoundedRectangle(
+                        cornerRadius: MyCollectionDiaryShareImageLayout.appIconCornerRadius,
+                        style: .continuous
+                    )
                         .stroke(.black, lineWidth: MyCollectionDiaryShareImageLayout.appIconStrokeWidth)
                 }
         } else {
-            Rectangle()
+            RoundedRectangle(
+                cornerRadius: MyCollectionDiaryShareImageLayout.appIconCornerRadius,
+                style: .continuous
+            )
                 .fill(Color(red: 0.81, green: 1, blue: 0.26))
                 .frame(
                     width: MyCollectionDiaryShareImageLayout.appIconSize.width,
@@ -599,7 +658,10 @@ private struct MyCollectionDiaryShareImageView: View {
                     y: MyCollectionDiaryShareImageLayout.appIconShadowY
                 )
                 .overlay {
-                    Rectangle()
+                    RoundedRectangle(
+                        cornerRadius: MyCollectionDiaryShareImageLayout.appIconCornerRadius,
+                        style: .continuous
+                    )
                         .stroke(.black, lineWidth: MyCollectionDiaryShareImageLayout.appIconStrokeWidth)
                 }
         }
