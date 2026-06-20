@@ -18,12 +18,7 @@ struct RandomSearchView: View {
                 let extraBottomInset = AppSpacing.xl
 
                 ZStack {
-                    Image("my_background")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                        .ignoresSafeArea()
+                    KillingPartBackgroundView()
 
                     VStack(spacing: 0) {
                         FeedSectionView(

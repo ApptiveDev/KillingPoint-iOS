@@ -138,10 +138,7 @@ struct TutorialDiaryDetailScreen: View {
         }
         .scrollIndicators(.hidden)
         .background(
-            Image("my_background")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
+            KillingPartBackgroundView()
         )
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {

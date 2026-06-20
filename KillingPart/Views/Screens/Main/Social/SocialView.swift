@@ -35,12 +35,7 @@ struct SocialView: View {
                 let friendsBottomContentInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
 
                 ZStack {
-                    Image("my_background")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                        .ignoresSafeArea()
+                    KillingPartBackgroundView()
 
                     VStack(spacing: AppSpacing.m) {
                         HStack(spacing: AppSpacing.s) {

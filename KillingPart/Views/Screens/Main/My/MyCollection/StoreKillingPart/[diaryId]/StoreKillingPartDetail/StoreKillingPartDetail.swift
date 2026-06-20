@@ -44,12 +44,7 @@ struct StoreKillingPartDetail: View {
             let topContentInset = min(proxy.safeAreaInsets.top, AppSpacing.l) + AppSpacing.s
 
             ZStack {
-                Image("my_background")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .ignoresSafeArea(.container, edges: .all)
+                KillingPartBackgroundView()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppSpacing.m) {

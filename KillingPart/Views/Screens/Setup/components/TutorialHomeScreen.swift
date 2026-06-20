@@ -43,10 +43,7 @@ struct TutorialHomeScreen: View {
         .padding(.top, AppSpacing.l)
         .padding(.bottom, AppSpacing.l)
         .background(
-            Image("my_background")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
+            KillingPartBackgroundView()
         )
         .task {
             await viewModel.loadTutorialHomeData()

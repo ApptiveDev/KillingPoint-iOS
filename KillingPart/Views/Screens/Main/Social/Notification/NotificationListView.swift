@@ -10,10 +10,7 @@ struct NotificationListView: View {
             let listBottomInset = bottomInset + 56
 
             ZStack {
-                Image("my_background")
-                    .resizable()
-                    .scaledToFill()
-                    .ignoresSafeArea()
+                KillingPartBackgroundView()
 
                 VStack(spacing: 0) {
                     header
