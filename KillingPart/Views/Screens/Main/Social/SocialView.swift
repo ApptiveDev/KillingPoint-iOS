@@ -31,7 +31,6 @@ struct SocialView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
                 let friendsBottomContentInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
 
                 ZStack {
@@ -86,12 +85,10 @@ struct SocialView: View {
                     }
                     .padding(.horizontal, AppSpacing.m)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.bottom, bottomInset)
                     .background(navigationLinks)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .toolbar(.hidden, for: .navigationBar)
-                .padding(.bottom, bottomInset)
             }
         }
         .task(id: selectedTopTab) {

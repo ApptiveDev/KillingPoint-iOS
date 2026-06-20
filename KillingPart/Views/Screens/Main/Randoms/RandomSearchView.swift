@@ -13,55 +13,46 @@ struct RandomSearchView: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let bottomInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.xl
-                let extraBottomInset = AppSpacing.xl
+            ZStack {
+                KillingPartBackgroundView()
 
-                ZStack {
-                    KillingPartBackgroundView()
-
-                    VStack(spacing: 0) {
-                        FeedSectionView(
-                            viewModel: feedViewModel,
-                            isParentActive: isRootTabSelected,
-                            makeCollectionViewModel: { user in
-                                socialViewModel.makeSocialMyCollectionViewModel(
-                                    for: resolvedCollectionUser(from: user)
-                                )
-                            },
-                            onPageChanged: { oldIndex, newIndex, diaryId in
-                                exploreSwipeCountInSession += 1
-                                AmplitudeClient.shared.track(
-                                    eventType: "explore_feed_card_viewed",
-                                    properties: [
-                                        "from_index": oldIndex,
-                                        "to_index": newIndex,
-                                        "swipe_count_in_session": exploreSwipeCountInSession,
-                                        "diary_id": diaryId
-                                    ]
-                                )
-                            }
+                FeedSectionView(
+                    viewModel: feedViewModel,
+                    isParentActive: isRootTabSelected,
+                    makeCollectionViewModel: { user in
+                        socialViewModel.makeSocialMyCollectionViewModel(
+                            for: resolvedCollectionUser(from: user)
+                        )
+                    },
+                    onPageChanged: { oldIndex, newIndex, diaryId in
+                        exploreSwipeCountInSession += 1
+                        AmplitudeClient.shared.track(
+                            eventType: "explore_feed_card_viewed",
+                            properties: [
+                                "from_index": oldIndex,
+                                "to_index": newIndex,
+                                "swipe_count_in_session": exploreSwipeCountInSession,
+                                "diary_id": diaryId
+                            ]
                         )
                     }
-                    .padding(.top, AppSpacing.l)
-                    .padding(.horizontal, AppSpacing.m)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.bottom, bottomInset + extraBottomInset)
+                )
+                .padding(.top, AppSpacing.l)
+                .padding(.horizontal, AppSpacing.m)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                    if isRefreshingFromTabEvent {
-                        Color.black.opacity(0.28)
-                            .ignoresSafeArea()
+                if isRefreshingFromTabEvent {
+                    Color.black.opacity(0.28)
+                        .ignoresSafeArea()
 
-                        ProgressView()
-                            .tint(AppColors.primary600)
-                            .padding(AppSpacing.l)
-                            .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
-                    }
+                    ProgressView()
+                        .tint(AppColors.primary600)
+                        .padding(AppSpacing.l)
+                        .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .toolbar(.hidden, for: .navigationBar)
-                .padding(.bottom, bottomInset)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task {
             async let loadFeedTask: Void = feedViewModel.loadInitialDataIfNeeded()

@@ -8,7 +8,7 @@ struct KillingPartBackgroundView: View {
             let artworkHeight = geometry.size.width / Self.artworkAspectRatio
 
             ZStack(alignment: .top) {
-                Color.black
+                Color(hex: "#060606")
 
                 Image("my_background_v2")
                     .resizable()
