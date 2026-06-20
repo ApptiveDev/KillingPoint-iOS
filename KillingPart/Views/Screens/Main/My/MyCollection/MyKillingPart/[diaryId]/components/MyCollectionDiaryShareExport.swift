@@ -187,7 +187,11 @@ private enum MyCollectionDiaryShareImageLayout {
     static let cardSpacing: CGFloat = 35 / renderScale
     static let trackCardHeight: CGFloat = 942 / renderScale
     static let trackCardCornerRadius: CGFloat = 72.52941 / renderScale
-    static let trackCardBackgroundOpacity: CGFloat = 0.3
+    static let trackCardBackgroundOpacity: CGFloat = 0.4
+    static let trackCardBackdropBlurRadius: CGFloat = 2
+    static let trackCardBackdropOffsetY = (
+        canvasSize.height - trackCardHeight
+    ) / 2 - contentTopPadding
     static let trackCardShadowRadius: CGFloat = 2 / renderScale
     static let trackCardShadowY: CGFloat = 4 / renderScale
     static let commentCardHeight: CGFloat = 728.22681 / renderScale
@@ -464,6 +468,11 @@ private struct MyCollectionDiaryShareImageView: View {
     }
 
     private var backgroundLayer: some View {
+        backgroundArtwork
+            .overlay(Color.black.opacity(0.30))
+    }
+
+    private var backgroundArtwork: some View {
         Image("my_background")
             .resizable()
             .scaledToFill()
@@ -477,18 +486,11 @@ private struct MyCollectionDiaryShareImageView: View {
                 height: MyCollectionDiaryShareImageLayout.canvasSize.height
             )
             .clipped()
-            .overlay(Color.black.opacity(0.30))
     }
 
     private var trackCard: some View {
         ZStack {
-            RoundedRectangle(
-                cornerRadius: MyCollectionDiaryShareImageLayout.trackCardCornerRadius,
-                style: .continuous
-            )
-            .fill(Color.black.opacity(0.34))
-            
-            
+            trackCardBackground
 
             VStack(spacing: 0) {
                 AddSearchDetailAlbumArtworkView(
@@ -530,6 +532,37 @@ private struct MyCollectionDiaryShareImageView: View {
                 Spacer(minLength: 12)
             }
         }
+    }
+
+    private var trackCardBackground: some View {
+        let shape = RoundedRectangle(
+            cornerRadius: MyCollectionDiaryShareImageLayout.trackCardCornerRadius,
+            style: .continuous
+        )
+
+        return shape
+            .fill(Color.clear)
+            .overlay {
+                backgroundArtwork
+                    .offset(y: MyCollectionDiaryShareImageLayout.trackCardBackdropOffsetY)
+                    .compositingGroup()
+                    .blur(
+                        radius: MyCollectionDiaryShareImageLayout.trackCardBackdropBlurRadius,
+                        opaque: true
+                    )
+            }
+            .clipShape(shape)
+            .overlay {
+                shape.fill(
+                    Color.black.opacity(MyCollectionDiaryShareImageLayout.trackCardBackgroundOpacity)
+                )
+            }
+            .shadow(
+                color: .black.opacity(0.25),
+                radius: MyCollectionDiaryShareImageLayout.trackCardShadowRadius,
+                x: 0,
+                y: MyCollectionDiaryShareImageLayout.trackCardShadowY
+            )
     }
 
     private var trackTextSection: some View {
