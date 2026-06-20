@@ -181,14 +181,13 @@ enum MyCollectionDiaryShareImageRenderer {
 private enum MyCollectionDiaryShareImageLayout {
     static let renderScale: CGFloat = 3
     static let canvasSize = CGSize(width: 360, height: 640)
-    static let backgroundScale: CGFloat = 1.12
     static let contentTopPadding: CGFloat = 90 / renderScale
     static let contentHorizontalPadding: CGFloat = 132 / renderScale
     static let cardSpacing: CGFloat = 35 / renderScale
     static let trackCardHeight: CGFloat = 942 / renderScale
     static let trackCardCornerRadius: CGFloat = 72.52941 / renderScale
     static let trackCardBackgroundOpacity: CGFloat = 0.4
-    static let trackCardBackdropBlurRadius: CGFloat = 2
+    static let trackCardBackdropBlurRadius: CGFloat = 4
     static let trackCardBackdropOffsetY = (
         canvasSize.height - trackCardHeight
     ) / 2 - contentTopPadding
@@ -473,14 +472,9 @@ private struct MyCollectionDiaryShareImageView: View {
     }
 
     private var backgroundArtwork: some View {
-        Image("my_background")
+        Image("my_background_v2")
             .resizable()
             .scaledToFill()
-            .frame(
-                width: MyCollectionDiaryShareImageLayout.canvasSize.width,
-                height: MyCollectionDiaryShareImageLayout.canvasSize.height
-            )
-            .scaleEffect(MyCollectionDiaryShareImageLayout.backgroundScale, anchor: .center)
             .frame(
                 width: MyCollectionDiaryShareImageLayout.canvasSize.width,
                 height: MyCollectionDiaryShareImageLayout.canvasSize.height
