@@ -121,7 +121,7 @@ enum MyCollectionDiaryShareExportError: LocalizedError {
 
 enum MyCollectionDiaryShareImageRenderer {
     private static let canvasSize = MyCollectionDiaryShareImageLayout.canvasSize
-    private static let canvasScale: CGFloat = 3
+    private static let canvasScale = MyCollectionDiaryShareImageLayout.renderScale
 
     @MainActor
     static func render(
@@ -179,8 +179,23 @@ enum MyCollectionDiaryShareImageRenderer {
 }
 
 private enum MyCollectionDiaryShareImageLayout {
+    static let renderScale: CGFloat = 3
     static let canvasSize = CGSize(width: 360, height: 640)
-    static let contentHorizontalPadding: CGFloat = 32
+    static let contentTopPadding: CGFloat = 90 / renderScale
+    static let contentHorizontalPadding: CGFloat = 132 / renderScale
+    static let cardSpacing: CGFloat = 35 / renderScale
+    static let albumArtworkSize = CGSize(
+        width: 428.416748046875 / renderScale,
+        height: 427.9999694824219 / renderScale
+    )
+    static let albumArtworkCornerRadius: CGFloat = 17.23639 / renderScale
+    static let appIconSize = CGSize(
+        width: 108.8 / renderScale,
+        height: 112 / renderScale
+    )
+    static let appIconShadowRadius: CGFloat = 1.96087 / renderScale
+    static let appIconShadowY: CGFloat = 3.92174 / renderScale
+    static let appIconStrokeWidth: CGFloat = 1.96087 / renderScale
     static let metadataColor = Color.kpGray300
 }
 
@@ -399,7 +414,7 @@ private struct MyCollectionDiaryShareImageView: View {
     var body: some View {
         backgroundLayer
             .overlay(alignment: .top) {
-                VStack(spacing: 18) {
+                VStack(spacing: MyCollectionDiaryShareImageLayout.cardSpacing) {
                     trackCard
                         .frame(height: 292)
 
@@ -407,7 +422,7 @@ private struct MyCollectionDiaryShareImageView: View {
                         .frame(height: 238)
                 }
                 .padding(.horizontal, MyCollectionDiaryShareImageLayout.contentHorizontalPadding)
-                .padding(.top, 38)
+                .padding(.top, MyCollectionDiaryShareImageLayout.contentTopPadding)
                 .frame(
                     width: MyCollectionDiaryShareImageLayout.canvasSize.width,
                     height: MyCollectionDiaryShareImageLayout.canvasSize.height,
@@ -436,19 +451,23 @@ private struct MyCollectionDiaryShareImageView: View {
     private var trackCard: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.black.opacity(0.72))
+                .fill(Color.white.opacity(0.10))
                 .overlay {
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
                 }
 
             VStack(spacing: 0) {
                 AddSearchDetailAlbumArtworkView(
                     url: artworkURL,
                     preloadedImage: artworkImage,
-                    coverSize: 160
+                    coverSize: MyCollectionDiaryShareImageLayout.albumArtworkSize,
+                    coverCornerRadius: MyCollectionDiaryShareImageLayout.albumArtworkCornerRadius
                 )
-                .frame(width: 238, height: 160, alignment: .center)
+                .frame(
+                    height: MyCollectionDiaryShareImageLayout.albumArtworkSize.height,
+                    alignment: .center
+                )
                 .padding(.top, 24)
 
                 trackTextSection
@@ -544,17 +563,44 @@ private struct MyCollectionDiaryShareImageView: View {
         if let image = MyCollectionDiaryAppIconImageProvider.image {
             Image(uiImage: image)
                 .resizable()
-                .scaledToFit()
-                .frame(width: 46, height: 46)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .scaledToFill()
+                .frame(
+                    width: MyCollectionDiaryShareImageLayout.appIconSize.width,
+                    height: MyCollectionDiaryShareImageLayout.appIconSize.height
+                )
+                .clipped()
+                .background(Color(red: 0.81, green: 1, blue: 0.26))
+                .shadow(
+                    color: .black.opacity(0.25),
+                    radius: MyCollectionDiaryShareImageLayout.appIconShadowRadius,
+                    x: 0,
+                    y: MyCollectionDiaryShareImageLayout.appIconShadowY
+                )
+                .overlay {
+                    Rectangle()
+                        .stroke(.black, lineWidth: MyCollectionDiaryShareImageLayout.appIconStrokeWidth)
+                }
         } else {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(AppColors.primary600)
-                .frame(width: 46, height: 46)
+            Rectangle()
+                .fill(Color(red: 0.81, green: 1, blue: 0.26))
+                .frame(
+                    width: MyCollectionDiaryShareImageLayout.appIconSize.width,
+                    height: MyCollectionDiaryShareImageLayout.appIconSize.height
+                )
                 .overlay {
                     Text("KP")
-                        .font(AppFont.paperlogy8ExtraBold(size: 18))
+                        .font(AppFont.paperlogy8ExtraBold(size: 14))
                         .foregroundStyle(.black)
+                }
+                .shadow(
+                    color: .black.opacity(0.25),
+                    radius: MyCollectionDiaryShareImageLayout.appIconShadowRadius,
+                    x: 0,
+                    y: MyCollectionDiaryShareImageLayout.appIconShadowY
+                )
+                .overlay {
+                    Rectangle()
+                        .stroke(.black, lineWidth: MyCollectionDiaryShareImageLayout.appIconStrokeWidth)
                 }
         }
     }
