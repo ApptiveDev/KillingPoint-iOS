@@ -199,6 +199,7 @@ private enum MyCollectionDiaryShareImageLayout {
     static let musicTitleFontSize: CGFloat = 48 / renderScale
     static let artistFontSize: CGFloat = 38 / renderScale
     static let artistTextWidth: CGFloat = 377.04599 / renderScale
+    static let timelineTopSpacing: CGFloat = 84 / renderScale
     static let timelineLabelFontSize: CGFloat = 32 / renderScale
     static let commentFontSize: CGFloat = 32 / renderScale
     static let commentTextSize = CGSize(
@@ -518,7 +519,7 @@ private struct MyCollectionDiaryShareImageView: View {
                     usesThinLabelFont: true
                 )
                 .padding(.horizontal, 36)
-                .padding(.top, 10)
+                .padding(.top, MyCollectionDiaryShareImageLayout.timelineTopSpacing)
 
                 Spacer(minLength: 12)
             }
