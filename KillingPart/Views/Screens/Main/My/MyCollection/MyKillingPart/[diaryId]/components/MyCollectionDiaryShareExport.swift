@@ -181,6 +181,7 @@ enum MyCollectionDiaryShareImageRenderer {
 private enum MyCollectionDiaryShareImageLayout {
     static let renderScale: CGFloat = 3
     static let canvasSize = CGSize(width: 360, height: 640)
+    static let backgroundScale: CGFloat = 1.12
     static let contentTopPadding: CGFloat = 90 / renderScale
     static let contentHorizontalPadding: CGFloat = 132 / renderScale
     static let cardSpacing: CGFloat = 35 / renderScale
@@ -470,8 +471,13 @@ private struct MyCollectionDiaryShareImageView: View {
                 width: MyCollectionDiaryShareImageLayout.canvasSize.width,
                 height: MyCollectionDiaryShareImageLayout.canvasSize.height
             )
-            .overlay(Color.black.opacity(0.30))
+            .scaleEffect(MyCollectionDiaryShareImageLayout.backgroundScale, anchor: .center)
+            .frame(
+                width: MyCollectionDiaryShareImageLayout.canvasSize.width,
+                height: MyCollectionDiaryShareImageLayout.canvasSize.height
+            )
             .clipped()
+            .overlay(Color.black.opacity(0.30))
     }
 
     private var trackCard: some View {
