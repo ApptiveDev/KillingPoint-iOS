@@ -103,7 +103,7 @@ private final class SplashVideoPlayer: ObservableObject {
     private let fallbackDuration: TimeInterval = 1.8
 
     init() {
-        guard let videoURL = Bundle.main.url(forResource: "sc 9-16", withExtension: "mp4") else {
+        guard let videoURL = Bundle.main.url(forResource: "sc 9-16 v2", withExtension: "mp4") else {
             isConfigured = false
             return
         }

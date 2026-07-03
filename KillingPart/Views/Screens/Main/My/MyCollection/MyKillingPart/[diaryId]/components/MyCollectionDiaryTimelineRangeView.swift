@@ -17,6 +17,7 @@ struct MyCollectionDiaryTimelineRangeView: View {
     var segmentColor: Color = AppColors.primary600.opacity(0.95)
     var startLabelColor: Color = AppColors.primary600.opacity(0.98)
     var endLabelColor: Color = AppColors.primary600.opacity(0.9)
+    var usesThinLabelFont = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -61,13 +62,21 @@ struct MyCollectionDiaryTimelineRangeView: View {
                     .offset(x: startX, y: 3)
 
                 Text(startMinuteSecondText)
-                    .font(AppFont.paperlogy6SemiBold(size: startFontSize))
+                    .font(
+                        usesThinLabelFont
+                        ? AppFont.paperlogy3Light(size: startFontSize)
+                            : AppFont.paperlogy6SemiBold(size: startFontSize)
+                    )
                     .foregroundStyle(startLabelColor)
                     .frame(width: labelWidth, alignment: .center)
                     .position(x: startLabelX, y: labelY)
 
                 Text(endMinuteSecondText)
-                    .font(AppFont.paperlogy5Medium(size: endFontSize))
+                    .font(
+                        usesThinLabelFont
+                            ? AppFont.paperlogy3Light(size: endFontSize)
+                            : AppFont.paperlogy5Medium(size: endFontSize)
+                    )
                     .foregroundStyle(endLabelColor)
                     .frame(width: labelWidth, alignment: .center)
                     .position(x: endLabelX, y: labelY)

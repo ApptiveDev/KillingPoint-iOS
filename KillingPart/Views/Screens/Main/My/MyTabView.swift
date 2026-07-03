@@ -16,47 +16,35 @@ struct MyTabView: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let bottomContentInset = min(geometry.safeAreaInsets.bottom, AppSpacing.xl) + AppSpacing.l
+            ZStack {
+                KillingPartBackgroundView()
 
-                ZStack {
-                    Image("my_background")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                        .ignoresSafeArea()
+                VStack(spacing: AppSpacing.m) {
+                    topToggleTabs
 
-                    VStack(spacing: AppSpacing.m) {
-                        topToggleTabs
-
-                        ZStack {
-                            if selectedTab == .myCollection {
-                                MyCollectionView(onSessionEnded: onLogout)
-                                    .transition(tabContentTransition)
-                            } else if selectedTab == .playKillingPart {
-                                PlayKillingPartView(
-                                    isParentActive: isRootTabSelected && selectedTab == .playKillingPart,
-                                    preloadedCollectionViewModel: startupPayload?.playCollectionViewModel
-                                )
-                                    .transition(tabContentTransition)
-                            } else {
-                                MusicCalendarView()
-                                    .transition(tabContentTransition)
-                            }
+                    ZStack {
+                        if selectedTab == .myCollection {
+                            MyCollectionView(onSessionEnded: onLogout)
+                                .transition(tabContentTransition)
+                        } else if selectedTab == .playKillingPart {
+                            PlayKillingPartView(
+                                isParentActive: isRootTabSelected && selectedTab == .playKillingPart,
+                                preloadedCollectionViewModel: startupPayload?.playCollectionViewModel
+                            )
+                                .transition(tabContentTransition)
+                        } else {
+                            MusicCalendarView()
+                                .transition(tabContentTransition)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .clipped()
-                        .padding(.bottom, bottomContentInset)
                     }
-                    .padding(.horizontal, AppSpacing.m)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.bottom, bottomContentInset)
+                    .clipped()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .toolbar(.hidden, for: .navigationBar)
-                .padding(.bottom, bottomContentInset)
+                .padding(.horizontal, AppSpacing.m)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToPlayKillingPart)) { _ in
             selectTab(.playKillingPart)

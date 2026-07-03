@@ -4,11 +4,12 @@ import UIKit
 struct AddSearchDetailAlbumArtworkView: View {
     let url: URL?
     let preloadedImage: UIImage?
-    let coverSize: CGFloat
+    let coverSize: CGSize
+    let coverCornerRadius: CGFloat
     @State private var isRotating = false
 
-    private var fixedLayoutDiskSize: CGFloat { coverSize }
-    private var diskSize: CGFloat { coverSize * 0.9 }
+    private var fixedLayoutDiskSize: CGFloat { coverSize.width }
+    private var diskSize: CGFloat { coverSize.width * 0.9 }
     private var centerLabelSize: CGFloat { diskSize * 0.34 }
     private var grooveCount: Int { 9 }
     private var grooveBaseInset: CGFloat { diskSize * 0.08 }
@@ -19,11 +20,25 @@ struct AddSearchDetailAlbumArtworkView: View {
     init(
         url: URL?,
         preloadedImage: UIImage? = nil,
-        coverSize: CGFloat = 124
+        coverSize: CGFloat = 124,
+        coverCornerRadius: CGFloat = 16
+    ) {
+        self.url = url
+        self.preloadedImage = preloadedImage
+        self.coverSize = CGSize(width: coverSize, height: coverSize)
+        self.coverCornerRadius = coverCornerRadius
+    }
+
+    init(
+        url: URL?,
+        preloadedImage: UIImage? = nil,
+        coverSize: CGSize,
+        coverCornerRadius: CGFloat = 16
     ) {
         self.url = url
         self.preloadedImage = preloadedImage
         self.coverSize = coverSize
+        self.coverCornerRadius = coverCornerRadius
     }
 
     var body: some View {
@@ -35,20 +50,23 @@ struct AddSearchDetailAlbumArtworkView: View {
                 .onAppear {
                     isRotating = true
                 }
-                .offset(x: coverSize * 0.55)
+                .offset(x: coverSize.width * 0.55)
                 .zIndex(0)
 
             albumCover
-                .frame(width: coverSize, height: coverSize)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    }
+                .frame(width: coverSize.width, height: coverSize.height)
+                .clipShape(RoundedRectangle(cornerRadius: coverCornerRadius))
+                .overlay {
+                    RoundedRectangle(cornerRadius: coverCornerRadius)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                }
                 .zIndex(2)
         }
-        .frame(width: coverSize + fixedLayoutDiskSize * 0.48, height: coverSize, alignment: .leading)
-        
+        .frame(
+            width: coverSize.width + fixedLayoutDiskSize * 0.48,
+            height: coverSize.height,
+            alignment: .leading
+        )
     }
 
     private var albumCover: some View {

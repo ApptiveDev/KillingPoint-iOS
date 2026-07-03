@@ -55,12 +55,7 @@ struct SocialMyCollectionDiary: View {
             let bottomContentInset = proxy.safeAreaInsets.bottom + keyboardCompensation + extraBottomInset
 
             ZStack {
-                Image("my_background")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .ignoresSafeArea(.container, edges: .all)
+                KillingPartBackgroundView()
 
                 if viewModel.isDeleted {
                     MyCollectionDiaryDeletedPlaceholder()

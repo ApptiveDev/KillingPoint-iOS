@@ -40,44 +40,40 @@ struct FeedSectionView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let bottomInset = max(geometry.safeAreaInsets.bottom, AppSpacing.m) + AppSpacing.xl
-            Group {
-                if viewModel.isLoadingInitial {
-                    ProgressView()
-                        .tint(AppColors.primary600)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, AppSpacing.xl)
-                } else if let errorMessage = viewModel.errorMessage, viewModel.feeds.isEmpty {
-                    VStack(spacing: AppSpacing.s) {
-                        Text(errorMessage)
-                            .font(AppFont.paperlogy4Regular(size: 13))
-                            .foregroundStyle(Color.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-
-                        Button("다시 시도") {
-                            Task { await viewModel.refresh() }
-                        }
-                        .font(AppFont.paperlogy5Medium(size: 13))
-                        .foregroundStyle(AppColors.primary600)
-                    }
+        Group {
+            if viewModel.isLoadingInitial {
+                ProgressView()
+                    .tint(AppColors.primary600)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.top, AppSpacing.xl)
-                } else if viewModel.feeds.isEmpty {
-                    Text("표시할 피드가 없어요.")
+            } else if let errorMessage = viewModel.errorMessage, viewModel.feeds.isEmpty {
+                VStack(spacing: AppSpacing.s) {
+                    Text(errorMessage)
                         .font(AppFont.paperlogy4Regular(size: 13))
-                        .foregroundStyle(Color.white.opacity(0.7))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, AppSpacing.xl)
-                } else {
-                    feedPager
+                        .foregroundStyle(Color.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+
+                    Button("다시 시도") {
+                        Task { await viewModel.refresh() }
+                    }
+                    .font(AppFont.paperlogy5Medium(size: 13))
+                    .foregroundStyle(AppColors.primary600)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, AppSpacing.xl)
+            } else if viewModel.feeds.isEmpty {
+                Text("표시할 피드가 없어요.")
+                    .font(AppFont.paperlogy4Regular(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, AppSpacing.xl)
+            } else {
+                feedPager
             }
-            .padding(.bottom, bottomInset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .center) {
-                SocialInteractionFeedbackOverlay(feedback: interactionFeedbackPresenter.activeFeedback)
-            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .center) {
+            SocialInteractionFeedbackOverlay(feedback: interactionFeedbackPresenter.activeFeedback)
         }
         .onAppear {
             isViewActive = true
