@@ -82,6 +82,8 @@ struct YoutubePlayerView: UIViewRepresentable {
     let endSeconds: Double
     let isPlaying: Bool
     let playbackFocusToken: Int
+    let seekSeconds: Double?
+    let seekToken: Int
     let shouldLoopPlayback: Bool
     let allowsMutedAutoplayFallback: Bool
     let respectsUserInteraction: Bool
@@ -96,6 +98,8 @@ struct YoutubePlayerView: UIViewRepresentable {
         endSeconds: Double,
         isPlaying: Bool = true,
         playbackFocusToken: Int = 0,
+        seekSeconds: Double? = nil,
+        seekToken: Int = 0,
         shouldLoopPlayback: Bool = true,
         allowsMutedAutoplayFallback: Bool = true,
         respectsUserInteraction: Bool = true,
@@ -109,6 +113,8 @@ struct YoutubePlayerView: UIViewRepresentable {
         self.endSeconds = endSeconds
         self.isPlaying = isPlaying
         self.playbackFocusToken = playbackFocusToken
+        self.seekSeconds = seekSeconds
+        self.seekToken = seekToken
         self.shouldLoopPlayback = shouldLoopPlayback
         self.allowsMutedAutoplayFallback = allowsMutedAutoplayFallback
         self.respectsUserInteraction = respectsUserInteraction
@@ -175,6 +181,7 @@ struct YoutubePlayerView: UIViewRepresentable {
             context.coordinator.lastSyncedRespectsUserInteraction = respectsUserInteraction
             context.coordinator.lastSyncedShowsMutedFallbackControl = showsMutedFallbackControl
             context.coordinator.lastSyncedPlaybackFocusToken = playbackFocusToken
+            context.coordinator.lastSyncedSeekToken = seekToken
             context.coordinator.hasDispatchedEnded = false
             webView.loadHTMLString(
                 makePlayerHTML(
@@ -192,6 +199,21 @@ struct YoutubePlayerView: UIViewRepresentable {
                 baseURL: appRefererURL
             )
             return
+        }
+
+        if context.coordinator.lastSyncedSeekToken != seekToken {
+            context.coordinator.lastSyncedSeekToken = seekToken
+            if let seekSeconds {
+                context.coordinator.hasDispatchedEnded = false
+                webView.evaluateJavaScript(
+                    """
+                    if (window.kpSeekTo) {
+                        window.kpSeekTo(\(jsNumber(seekSeconds)), true);
+                    }
+                    """,
+                    completionHandler: nil
+                )
+            }
         }
 
         let isSameStart = isApproximatelyEqual(
@@ -312,6 +334,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         var lastSyncedRespectsUserInteraction: Bool?
         var lastSyncedShowsMutedFallbackControl: Bool?
         var lastSyncedPlaybackFocusToken: Int?
+        var lastSyncedSeekToken: Int?
         var redirectURL: URL?
         var openExternalURL: ((URL) -> Void)?
         var onPlaybackEnded: (() -> Void)?
@@ -927,6 +950,27 @@ struct YoutubePlayerView: UIViewRepresentable {
                         window.kpPlayer.playVideo();
                     }
                 }
+
+                window.kpSeekTo = function(seconds, shouldPlay) {
+                    if (!window.kpPlayerReady || !window.kpPlayer) {
+                        return;
+                    }
+
+                    var target = Number(seconds);
+                    if (isNaN(target) || target < 0) {
+                        return;
+                    }
+
+                    window.kpHasDispatchedEnded = false;
+                    window.kpStallStartedAt = 0;
+                    if (window.kpPlayer.seekTo) {
+                        window.kpPlayer.seekTo(target, true);
+                    }
+                    if (shouldPlay && window.kpPlayer.playVideo) {
+                        window.kpPlayer.playVideo();
+                    }
+                    kpPostProgress();
+                };
 
                 function kpPostProgress() {
                     if (!window.kpPlayerReady || !window.kpPlayer) {

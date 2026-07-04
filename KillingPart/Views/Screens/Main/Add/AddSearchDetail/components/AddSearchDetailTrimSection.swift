@@ -30,12 +30,16 @@ struct AddSearchDetailTrimSection: View {
                         set: { viewModel.updateEnd($0) }
                     ),
                     duration: viewModel.maxDuration,
+                    playbackSeconds: viewModel.playbackSeconds,
                     startTimeText: startDisplayTimeText,
                     endTimeText: endDisplayTimeText,
                     onTrimInteracted: onTrimInteracted,
                     onInteractionEnded: onTrimInteractionEnded,
                     onUpdateRange: { start, end in
                         viewModel.updateRange(start: start, end: end)
+                    },
+                    onSeekRequested: { seconds in
+                        viewModel.requestPlayback(from: seconds)
                     }
                 )
                 .frame(height: 160)

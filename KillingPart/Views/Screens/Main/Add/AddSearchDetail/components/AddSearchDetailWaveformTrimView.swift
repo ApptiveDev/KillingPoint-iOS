@@ -5,17 +5,21 @@ enum AddSearchDetailTrimInteractionControl: String {
     case left
     case right
     case spectrumBar = "spectrum_bar"
+    case minusOneSecond = "minus_1s"
+    case plusOneSecond = "plus_1s"
 }
 
 struct AddSearchDetailWaveformTrimView: View {
     @Binding var startSeconds: Double
     @Binding var endSeconds: Double
     let duration: Double
+    let playbackSeconds: Double
     let startTimeText: String
     let endTimeText: String
     let onTrimInteracted: () -> Void
     let onInteractionEnded: (_ control: AddSearchDetailTrimInteractionControl) -> Void
     let onUpdateRange: (_ start: Double, _ end: Double) -> Void
+    let onSeekRequested: (_ seconds: Double) -> Void
 
     private let horizontalPadding: CGFloat = 18
     private let pointsPerSecond: CGFloat = 8
@@ -32,6 +36,10 @@ struct AddSearchDetailWaveformTrimView: View {
     private let autoScrollMaxVelocity: CGFloat = 260
     private let followButtonSize: CGFloat = 30
     private let followButtonInset: CGFloat = 10
+    private let nudgeButtonSize: CGFloat = 30
+    private let playheadWidth: CGFloat = 3
+    private let handleTapMaxTranslation: CGFloat = 4
+    private let selectionBorderLineWidth: CGFloat = 1.5
     private let offscreenFollowThreshold: CGFloat = 6
     private let timelineCoordinateSpaceName = "addSearchDetailTimeline"
 
@@ -88,6 +96,16 @@ struct AddSearchDetailWaveformTrimView: View {
                         timelineContentWidth = scrollView.contentSize.width
                     }
                 }
+                .overlay(alignment: .bottomLeading) {
+                    secondNudgeButton(title: "-1s") {
+                        nudgeSelection(by: -1)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    secondNudgeButton(title: "+1s") {
+                        nudgeSelection(by: 1)
+                    }
+                }
 
                 overviewBar(width: viewportWidth)
             }
@@ -104,6 +122,7 @@ struct AddSearchDetailWaveformTrimView: View {
         let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
         let selectedWidth = max(endX - startX, 1)
         let trailingWidth = max(contentWidth - endX, 0)
+        let playheadX = playheadXPosition(startX: startX, endX: endX, contentWidth: contentWidth)
         let visibleRange = timelineVisibleRange(
             contentWidth: contentWidth,
             fallbackViewportWidth: viewportWidth
@@ -112,8 +131,13 @@ struct AddSearchDetailWaveformTrimView: View {
         let isEndOffscreen = endX > visibleRange.upperBound + offscreenFollowThreshold
 
         return ZStack(alignment: .leading) {
-            waveformBars(contentWidth: contentWidth)
-                .zIndex(0)
+            waveformBars(
+                contentWidth: contentWidth,
+                startX: startX,
+                endX: endX,
+                playheadX: playheadX
+            )
+            .zIndex(0)
 
             HStack(spacing: 0) {
                 Rectangle()
@@ -121,7 +145,7 @@ struct AddSearchDetailWaveformTrimView: View {
                     .frame(width: max(startX, 0))
 
                 Rectangle()
-                    .fill(AppColors.primary600.opacity(0.25))
+                    .fill(Color.clear)
                     .frame(width: selectedWidth)
 
                 Rectangle()
@@ -130,6 +154,27 @@ struct AddSearchDetailWaveformTrimView: View {
             }
             .allowsHitTesting(false)
             .zIndex(1)
+
+            RoundedRectangle(cornerRadius: handleCornerRadius)
+                .stroke(AppColors.primary600, lineWidth: selectionBorderLineWidth)
+                .frame(
+                    width: max(endX - startX + handleWidth, handleWidth),
+                    height: trackHeight - selectionBorderLineWidth
+                )
+                .position(x: (startX + endX) / 2, y: trackHeight / 2)
+                .allowsHitTesting(false)
+                .zIndex(2)
+
+            if let playheadX {
+                RoundedRectangle(cornerRadius: playheadWidth / 2)
+                    .fill(Color.white)
+                    .frame(width: playheadWidth, height: trackHeight - 10)
+                    .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 0)
+                    .position(x: playheadX, y: trackHeight / 2)
+                    .animation(.linear(duration: 0.25), value: playheadX)
+                    .allowsHitTesting(false)
+                    .zIndex(3)
+            }
 
             trimHandle(direction: .left)
                 .position(x: startX, y: trackHeight / 2)
@@ -186,6 +231,33 @@ struct AddSearchDetailWaveformTrimView: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(Rectangle())
+        .onTapGesture { location in
+            onTrimInteracted()
+            onSeekRequested(timeForContentX(location.x, contentWidth: contentWidth))
+        }
+    }
+
+    private func playheadXPosition(
+        startX: CGFloat,
+        endX: CGFloat,
+        contentWidth: CGFloat
+    ) -> CGFloat? {
+        guard
+            duration > 0,
+            playbackSeconds >= startSeconds - 0.2,
+            playbackSeconds <= endSeconds + 0.2
+        else {
+            return nil
+        }
+
+        let innerStartX = startX + handleWidth / 2 + playheadWidth / 2
+        let innerEndX = endX - handleWidth / 2 - playheadWidth / 2
+        guard innerEndX > innerStartX else { return nil }
+
+        let clipDuration = max(endSeconds - startSeconds, 0.0001)
+        let ratio = min(max((playbackSeconds - startSeconds) / clipDuration, 0), 1)
+        return innerStartX + CGFloat(ratio) * (innerEndX - innerStartX)
     }
 
     private func handleTimeLabels(contentWidth: CGFloat) -> some View {
@@ -292,20 +364,53 @@ struct AddSearchDetailWaveformTrimView: View {
         .frame(width: width, height: overviewHeight - 4, alignment: .leading)
     }
 
-    private func waveformBars(contentWidth: CGFloat) -> some View {
+    private func waveformBars(
+        contentWidth: CGFloat,
+        startX: CGFloat,
+        endX: CGFloat,
+        playheadX: CGFloat?
+    ) -> some View {
         let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
         let totalBarWidth = barWidth + barSpacing
         let barCount = max(Int(usableWidth / totalBarWidth), 1)
 
         return HStack(alignment: .center, spacing: barSpacing) {
             ForEach(0..<barCount, id: \.self) { index in
+                let barCenterX = horizontalPadding + CGFloat(index) * totalBarWidth + barWidth / 2
+
                 Capsule()
-                    .fill(Color.white.opacity(barOpacity(for: index)))
+                    .fill(
+                        barColor(
+                            centerX: barCenterX,
+                            index: index,
+                            startX: startX,
+                            endX: endX,
+                            playheadX: playheadX
+                        )
+                    )
                     .frame(width: barWidth, height: barHeight(for: index))
             }
         }
         .frame(width: usableWidth, height: trackHeight, alignment: .leading)
         .padding(.horizontal, horizontalPadding)
+    }
+
+    private func barColor(
+        centerX: CGFloat,
+        index: Int,
+        startX: CGFloat,
+        endX: CGFloat,
+        playheadX: CGFloat?
+    ) -> Color {
+        guard centerX >= startX, centerX <= endX else {
+            return Color.white.opacity(barOpacity(for: index))
+        }
+
+        if let playheadX, centerX <= playheadX {
+            return AppColors.primary600
+        }
+
+        return Color.white.opacity(0.95)
     }
 
     private func trimHandle(direction: HandleDirection) -> some View {
@@ -334,6 +439,42 @@ struct AddSearchDetailWaveformTrimView: View {
             .stroke(Color.white.opacity(0.82), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.35), radius: 5, x: 0, y: 2)
+    }
+
+    private func secondNudgeButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(AppFont.paperlogy6SemiBold(size: 11))
+                .foregroundStyle(.black.opacity(0.92))
+                .frame(width: nudgeButtonSize, height: nudgeButtonSize)
+                .background(
+                    Circle()
+                        .fill(AppColors.primary600)
+                )
+                .shadow(color: .black.opacity(0.35), radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func nudgeSelection(by delta: Double) {
+        guard duration > 0 else { return }
+
+        onTrimInteracted()
+        let clipDuration = min(max(currentClipDuration, 1), duration)
+        var newStart = startSeconds + delta
+        var newEnd = newStart + clipDuration
+
+        if newStart < 0 {
+            newStart = 0
+            newEnd = clipDuration
+        }
+        if newEnd > duration {
+            newEnd = duration
+            newStart = max(duration - clipDuration, 0)
+        }
+
+        onUpdateRange(newStart, newEnd)
+        onInteractionEnded(delta < 0 ? .minusOneSecond : .plusOneSecond)
     }
 
     private func followScrollButton(direction: HandleDirection) -> some View {
@@ -436,10 +577,15 @@ struct AddSearchDetailWaveformTrimView: View {
                 updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
             }
-            .onEnded { _ in
+            .onEnded { value in
+                let isTap = abs(value.translation.width) < handleTapMaxTranslation
+                    && abs(value.translation.height) < handleTapMaxTranslation
                 startDragBase = nil
                 onInteractionEnded(.left)
                 endActiveHandleDrag()
+                if isTap {
+                    onSeekRequested(startSeconds)
+                }
             }
     }
 
@@ -608,6 +754,13 @@ struct AddSearchDetailWaveformTrimView: View {
 
     private var currentClipDuration: Double {
         max(endSeconds - startSeconds, 0)
+    }
+
+    private func timeForContentX(_ x: CGFloat, contentWidth: CGFloat) -> Double {
+        guard duration > 0 else { return 0 }
+        let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
+        let clamped = min(max(x - horizontalPadding, 0), usableWidth)
+        return Double(clamped / usableWidth) * duration
     }
 
     private func timeForOverviewX(_ x: CGFloat, width: CGFloat) -> Double {

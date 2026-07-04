@@ -18,7 +18,12 @@ struct AddSearchDetailVideoSection: View {
                             videoURL: video.embedURL,
                             startSeconds: viewModel.startSeconds,
                             endSeconds: viewModel.endSeconds,
-                            playbackFocusToken: playerReloadToken.hashValue
+                            playbackFocusToken: playerReloadToken.hashValue,
+                            seekSeconds: viewModel.playbackSeekRequest?.seconds,
+                            seekToken: viewModel.playbackSeekRequest?.token ?? 0,
+                            onPlaybackProgressChanged: { progress in
+                                viewModel.updatePlaybackSeconds(progress.currentSeconds)
+                            }
                         )
                             .id(playerReloadToken)
                             .frame(maxWidth: .infinity)

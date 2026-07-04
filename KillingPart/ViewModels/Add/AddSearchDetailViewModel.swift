@@ -27,6 +27,11 @@ struct AddSearchDetailPrefill {
     }
 }
 
+struct AddSearchDetailPlaybackSeekRequest: Equatable {
+    let seconds: Double
+    let token: Int
+}
+
 @MainActor
 final class AddSearchDetailViewModel: ObservableObject {
     @Published private(set) var videos: [YoutubeVideo] = []
@@ -35,6 +40,8 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var startSeconds: Double = 0
     @Published var endSeconds: Double = 0
+    @Published private(set) var playbackSeconds: Double = 0
+    @Published private(set) var playbackSeekRequest: AddSearchDetailPlaybackSeekRequest?
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
     @Published var selectedScope: DiaryScope = .public
@@ -178,6 +185,20 @@ final class AddSearchDetailViewModel: ObservableObject {
 
         startSeconds = clampedStart
         endSeconds = clampedEnd
+    }
+
+    func updatePlaybackSeconds(_ seconds: Double) {
+        playbackSeconds = seconds
+    }
+
+    func requestPlayback(from seconds: Double) {
+        guard hasPlayableVideo else { return }
+        let upperBound = max(endSeconds - 0.3, startSeconds)
+        let clampedSeconds = min(max(seconds, startSeconds), upperBound)
+        playbackSeekRequest = AddSearchDetailPlaybackSeekRequest(
+            seconds: clampedSeconds,
+            token: (playbackSeekRequest?.token ?? 0) + 1
+        )
     }
 
     @discardableResult
