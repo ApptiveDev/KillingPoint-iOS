@@ -27,6 +27,11 @@ struct AddSearchDetailPrefill {
     }
 }
 
+struct AddSearchDetailPlaybackSeekRequest: Equatable {
+    let seconds: Double
+    let token: Int
+}
+
 @MainActor
 final class AddSearchDetailViewModel: ObservableObject {
     @Published private(set) var videos: [YoutubeVideo] = []
@@ -35,6 +40,11 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var startSeconds: Double = 0
     @Published var endSeconds: Double = 0
+    @Published private(set) var playbackSeconds: Double = 0
+    @Published private(set) var playbackSeekRequest: AddSearchDetailPlaybackSeekRequest?
+    @Published private(set) var boundaryLoopRange: ClosedRange<Double>?
+    @Published private(set) var isHandleDragging = false
+    @Published private(set) var shouldShowBoundaryLoopHint: Bool
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
     @Published var selectedScope: DiaryScope = .public
@@ -48,6 +58,8 @@ final class AddSearchDetailViewModel: ObservableObject {
     private var hasLoaded = false
     private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
+    private let boundaryLoopDuration: Double = 2
+    private static let boundaryLoopHintDismissedKey = "add_search_detail_boundary_loop_hint_dismissed_v2"
 
     init(
         track: SpotifySimpleTrack,
@@ -58,6 +70,9 @@ final class AddSearchDetailViewModel: ObservableObject {
         self.track = track
         self.youtubeService = youtubeService
         self.diaryService = diaryService
+        self.shouldShowBoundaryLoopHint = !UserDefaults.standard.bool(
+            forKey: Self.boundaryLoopHintDismissedKey
+        )
 
         if let prefill, applyPrefill(prefill) {
             hasLoaded = true
@@ -178,6 +193,60 @@ final class AddSearchDetailViewModel: ObservableObject {
 
         startSeconds = clampedStart
         endSeconds = clampedEnd
+    }
+
+    var effectivePlaybackStartSeconds: Double {
+        boundaryLoopRange?.lowerBound ?? startSeconds
+    }
+
+    var effectivePlaybackEndSeconds: Double {
+        boundaryLoopRange?.upperBound ?? endSeconds
+    }
+
+    func updatePlaybackSeconds(_ seconds: Double) {
+        playbackSeconds = seconds
+    }
+
+    func activateBoundaryLoop(for control: AddSearchDetailTrimInteractionControl) {
+        guard hasPlayableVideo else { return }
+
+        switch control {
+        case .left:
+            let upperBound = min(startSeconds + boundaryLoopDuration, endSeconds)
+            guard upperBound > startSeconds else { return }
+            boundaryLoopRange = startSeconds...upperBound
+        case .right:
+            let lowerBound = max(endSeconds - boundaryLoopDuration, startSeconds)
+            guard endSeconds > lowerBound else { return }
+            boundaryLoopRange = lowerBound...endSeconds
+        default:
+            break
+        }
+    }
+
+    func deactivateBoundaryLoop() {
+        boundaryLoopRange = nil
+    }
+
+    func setHandleDragging(_ isDragging: Bool) {
+        guard isHandleDragging != isDragging else { return }
+        isHandleDragging = isDragging
+    }
+
+    func dismissBoundaryLoopHint() {
+        guard shouldShowBoundaryLoopHint else { return }
+        shouldShowBoundaryLoopHint = false
+        UserDefaults.standard.set(true, forKey: Self.boundaryLoopHintDismissedKey)
+    }
+
+    func requestPlayback(from seconds: Double) {
+        guard hasPlayableVideo else { return }
+        let upperBound = max(endSeconds - 0.3, startSeconds)
+        let clampedSeconds = min(max(seconds, startSeconds), upperBound)
+        playbackSeekRequest = AddSearchDetailPlaybackSeekRequest(
+            seconds: clampedSeconds,
+            token: (playbackSeekRequest?.token ?? 0) + 1
+        )
     }
 
     @discardableResult

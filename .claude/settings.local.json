@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(awk '/private struct TutorialDiaryDetailScreen/,/private struct TutorialNotificationScreen/' /Users/ibyeongchan/Desktop/KillingPart/KillingPoint-iOS/KillingPart/Views/Screens/Setup/InitialSetupFlowView.swift)"
+      "Bash(awk '/private struct TutorialDiaryDetailScreen/,/private struct TutorialNotificationScreen/' /Users/ibyeongchan/Desktop/KillingPart/KillingPoint-iOS/KillingPart/Views/Screens/Setup/InitialSetupFlowView.swift)",
+      "Bash(xcodebuild -list)",
+      "Bash(sed -n '/Schemes:/,$p')",
+      "Bash(xcrun simctl *)",
+      "Bash(xcodebuild -scheme KillingPart -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -configuration Debug build)",
+      "Bash(xcodebuild -scheme KillingPart -destination 'id=F8EF57C6-FEF3-4767-897D-C56BADD80E69' -configuration Debug build)"
     ]
   }
 }

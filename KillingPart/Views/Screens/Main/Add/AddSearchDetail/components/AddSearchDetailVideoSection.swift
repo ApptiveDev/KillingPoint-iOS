@@ -16,9 +16,15 @@ struct AddSearchDetailVideoSection: View {
                     VStack(alignment: .leading, spacing: AppSpacing.s) {
                         YoutubePlayerView(
                             videoURL: video.embedURL,
-                            startSeconds: viewModel.startSeconds,
-                            endSeconds: viewModel.endSeconds,
-                            playbackFocusToken: playerReloadToken.hashValue
+                            startSeconds: viewModel.effectivePlaybackStartSeconds,
+                            endSeconds: viewModel.effectivePlaybackEndSeconds,
+                            isPlaying: !viewModel.isHandleDragging,
+                            playbackFocusToken: playerReloadToken.hashValue,
+                            seekSeconds: viewModel.playbackSeekRequest?.seconds,
+                            seekToken: viewModel.playbackSeekRequest?.token ?? 0,
+                            onPlaybackProgressChanged: { progress in
+                                viewModel.updatePlaybackSeconds(progress.currentSeconds)
+                            }
                         )
                             .id(playerReloadToken)
                             .frame(maxWidth: .infinity)
