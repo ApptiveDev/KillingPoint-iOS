@@ -142,7 +142,13 @@ struct AddSearchDetailWaveformTrimView: View {
         let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
         let selectedWidth = max(endX - startX, 1)
         let trailingWidth = max(contentWidth - endX, 0)
-        let playheadX = playheadXPosition(startX: startX, endX: endX, contentWidth: contentWidth)
+        let loopBandRange = loopBandXRange(startX: startX, endX: endX, contentWidth: contentWidth)
+        let playheadX = playheadXPosition(
+            startX: startX,
+            endX: endX,
+            contentWidth: contentWidth,
+            loopBandRange: loopBandRange
+        )
         let visibleRange = timelineVisibleRange(
             contentWidth: contentWidth,
             fallbackViewportWidth: viewportWidth
@@ -150,12 +156,10 @@ struct AddSearchDetailWaveformTrimView: View {
         let isStartOffscreen = startX < visibleRange.lowerBound - offscreenFollowThreshold
         let isEndOffscreen = endX > visibleRange.upperBound + offscreenFollowThreshold
 
-        let loopBandRange = loopBandXRange(startX: startX, endX: endX, contentWidth: contentWidth)
-
         return ZStack(alignment: .leading) {
             if let loopBandRange {
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(AppColors.primary600.opacity(0.9))
+                    .fill(AppColors.primary600.opacity(0.28))
                     .frame(
                         width: loopBandRange.upperBound - loopBandRange.lowerBound,
                         height: trackHeight - handleVerticalInset * 2
@@ -314,10 +318,26 @@ struct AddSearchDetailWaveformTrimView: View {
     private func playheadXPosition(
         startX: CGFloat,
         endX: CGFloat,
-        contentWidth: CGFloat
+        contentWidth: CGFloat,
+        loopBandRange: ClosedRange<CGFloat>?
     ) -> CGFloat? {
+        guard duration > 0 else { return nil }
+
+        if let loopBandRange, let loopRange = boundaryLoopSecondsRange() {
+            guard
+                playbackSeconds >= loopRange.lowerBound - 0.2,
+                playbackSeconds <= loopRange.upperBound + 0.2
+            else {
+                return nil
+            }
+
+            let loopDuration = max(loopRange.upperBound - loopRange.lowerBound, 0.0001)
+            let ratio = min(max((playbackSeconds - loopRange.lowerBound) / loopDuration, 0), 1)
+            return loopBandRange.lowerBound
+                + CGFloat(ratio) * (loopBandRange.upperBound - loopBandRange.lowerBound)
+        }
+
         guard
-            duration > 0,
             playbackSeconds >= startSeconds - 0.2,
             playbackSeconds <= endSeconds + 0.2
         else {
@@ -331,6 +351,21 @@ struct AddSearchDetailWaveformTrimView: View {
         let clipDuration = max(endSeconds - startSeconds, 0.0001)
         let ratio = min(max((playbackSeconds - startSeconds) / clipDuration, 0), 1)
         return innerStartX + CGFloat(ratio) * (innerEndX - innerStartX)
+    }
+
+    private func boundaryLoopSecondsRange() -> ClosedRange<Double>? {
+        guard let loopDirection = activeLoopDirection else { return nil }
+
+        switch loopDirection {
+        case .left:
+            let upperBound = min(startSeconds + boundaryLoopDuration, endSeconds)
+            guard upperBound > startSeconds else { return nil }
+            return startSeconds...upperBound
+        case .right:
+            let lowerBound = max(endSeconds - boundaryLoopDuration, startSeconds)
+            guard endSeconds > lowerBound else { return nil }
+            return lowerBound...endSeconds
+        }
     }
 
     private func handleTimeLabels(contentWidth: CGFloat) -> some View {
@@ -482,8 +517,15 @@ struct AddSearchDetailWaveformTrimView: View {
             return Color.white.opacity(barOpacity(for: index))
         }
 
-        if let loopBandRange, loopBandRange.contains(centerX) {
-            return Color.black.opacity(0.82)
+        if let loopBandRange {
+            guard loopBandRange.contains(centerX) else {
+                return Color.white.opacity(barOpacity(for: index))
+            }
+
+            if let playheadX, centerX <= playheadX {
+                return AppColors.primary600
+            }
+            return Color.white.opacity(0.95)
         }
 
         if let playheadX, centerX <= playheadX {
