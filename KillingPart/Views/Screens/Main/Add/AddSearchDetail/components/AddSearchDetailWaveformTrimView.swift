@@ -37,7 +37,7 @@ struct AddSearchDetailWaveformTrimView: View {
     private let handleCornerRadius: CGFloat = 14
     private let handleBodyCornerRadius: CGFloat = 7
     private let handleVerticalInset: CGFloat = 8
-    private let handleEdgeInset: CGFloat = 3
+    private let handleEdgeInset: CGFloat = 0
     private let autoScrollEdgeThreshold: CGFloat = 52
     private let autoScrollMaxVelocity: CGFloat = 260
     private let followButtonSize: CGFloat = 30
@@ -451,6 +451,7 @@ struct AddSearchDetailWaveformTrimView: View {
                 }
                 .onEnded { _ in
                     onInteractionEnded(.spectrumBar)
+                    scrollTimelineToCenterSelection(animated: true)
                 }
         )
     }
@@ -813,10 +814,14 @@ struct AddSearchDetailWaveformTrimView: View {
     }
 
     private func scrollTimelineToCenterSelection(animated: Bool) {
+        scrollTimelineToCenter(start: startSeconds, end: endSeconds, animated: animated)
+    }
+
+    private func scrollTimelineToCenter(start: Double, end: Double, animated: Bool) {
         guard let scrollView = timelineScrollView else { return }
         let contentWidth = resolvedTimelineContentWidth(for: scrollView)
-        let startX = xPosition(for: startSeconds, contentWidth: contentWidth)
-        let endX = xPosition(for: endSeconds, contentWidth: contentWidth)
+        let startX = xPosition(for: start, contentWidth: contentWidth)
+        let endX = xPosition(for: end, contentWidth: contentWidth)
         let offsetX = (startX + endX) / 2 - scrollView.bounds.width / 2
         setTimelineOffset(offsetX, in: scrollView, animated: animated)
     }
@@ -991,7 +996,7 @@ struct AddSearchDetailWaveformTrimView: View {
         }
 
         onUpdateRange(newStart, newEnd)
-        scrollTimelineToStart(newStart, animated: false)
+        scrollTimelineToCenter(start: newStart, end: newEnd, animated: false)
     }
 
     private func scrollTimelineToStart(_ seconds: Double, animated: Bool) {
