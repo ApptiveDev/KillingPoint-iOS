@@ -42,6 +42,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published var endSeconds: Double = 0
     @Published private(set) var playbackSeconds: Double = 0
     @Published private(set) var playbackSeekRequest: AddSearchDetailPlaybackSeekRequest?
+    @Published private(set) var boundaryLoopRange: ClosedRange<Double>?
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
     @Published var selectedScope: DiaryScope = .public
@@ -55,6 +56,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     private var hasLoaded = false
     private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
+    private let boundaryLoopDuration: Double = 2
 
     init(
         track: SpotifySimpleTrack,
@@ -187,8 +189,37 @@ final class AddSearchDetailViewModel: ObservableObject {
         endSeconds = clampedEnd
     }
 
+    var effectivePlaybackStartSeconds: Double {
+        boundaryLoopRange?.lowerBound ?? startSeconds
+    }
+
+    var effectivePlaybackEndSeconds: Double {
+        boundaryLoopRange?.upperBound ?? endSeconds
+    }
+
     func updatePlaybackSeconds(_ seconds: Double) {
         playbackSeconds = seconds
+    }
+
+    func activateBoundaryLoop(for control: AddSearchDetailTrimInteractionControl) {
+        guard hasPlayableVideo else { return }
+
+        switch control {
+        case .left:
+            let upperBound = min(startSeconds + boundaryLoopDuration, endSeconds)
+            guard upperBound > startSeconds else { return }
+            boundaryLoopRange = startSeconds...upperBound
+        case .right:
+            let lowerBound = max(endSeconds - boundaryLoopDuration, startSeconds)
+            guard endSeconds > lowerBound else { return }
+            boundaryLoopRange = lowerBound...endSeconds
+        default:
+            break
+        }
+    }
+
+    func deactivateBoundaryLoop() {
+        boundaryLoopRange = nil
     }
 
     func requestPlayback(from seconds: Double) {

@@ -16,8 +16,8 @@ struct AddSearchDetailVideoSection: View {
                     VStack(alignment: .leading, spacing: AppSpacing.s) {
                         YoutubePlayerView(
                             videoURL: video.embedURL,
-                            startSeconds: viewModel.startSeconds,
-                            endSeconds: viewModel.endSeconds,
+                            startSeconds: viewModel.effectivePlaybackStartSeconds,
+                            endSeconds: viewModel.effectivePlaybackEndSeconds,
                             playbackFocusToken: playerReloadToken.hashValue,
                             seekSeconds: viewModel.playbackSeekRequest?.seconds,
                             seekToken: viewModel.playbackSeekRequest?.token ?? 0,

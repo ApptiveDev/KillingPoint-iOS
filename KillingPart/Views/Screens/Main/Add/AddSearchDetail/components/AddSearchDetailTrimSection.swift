@@ -40,9 +40,15 @@ struct AddSearchDetailTrimSection: View {
                     },
                     onSeekRequested: { seconds in
                         viewModel.requestPlayback(from: seconds)
+                    },
+                    onHandleLoopActivated: { control in
+                        viewModel.activateBoundaryLoop(for: control)
+                    },
+                    onHandleLoopDeactivated: {
+                        viewModel.deactivateBoundaryLoop()
                     }
                 )
-                .frame(height: 160)
+                .frame(height: 200)
 
                 HStack {
                     Text("선택 구간 \(startDisplayTimeText) ~ \(endDisplayTimeText)")
