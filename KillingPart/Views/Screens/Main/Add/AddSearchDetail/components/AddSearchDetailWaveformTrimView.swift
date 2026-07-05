@@ -71,6 +71,7 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var selectionRecenterWorkItem: DispatchWorkItem?
     @State private var handleLoopWorkItem: DispatchWorkItem?
     @State private var activeLoopDirection: HandleDirection?
+    @State private var leftDragClipDuration: Double?
 
     var body: some View {
         GeometryReader { proxy in
@@ -123,6 +124,7 @@ struct AddSearchDetailWaveformTrimView: View {
                 }
 
                 overviewBar(width: viewportWidth)
+                    .padding(.top, 10)
             }
         }
         .onDisappear {
@@ -393,6 +395,7 @@ struct AddSearchDetailWaveformTrimView: View {
             .foregroundStyle(.white.opacity(0.74))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
+            .contentTransition(.identity)
             .frame(width: handleLabelWidth)
     }
 
@@ -671,6 +674,7 @@ struct AddSearchDetailWaveformTrimView: View {
             .onChanged { value in
                 if startDragBase == nil {
                     startDragBase = startSeconds
+                    leftDragClipDuration = max(endSeconds - startSeconds, 0)
                     onTrimInteracted()
                     scheduleHandleLoopActivation(direction: .left)
                 }
@@ -693,7 +697,9 @@ struct AddSearchDetailWaveformTrimView: View {
                 onInteractionEnded(.left)
                 endActiveHandleDrag()
                 if isTap {
-                    if !didActivateLoop {
+                    if didActivateLoop {
+                        scheduleSelectionRecenter()
+                    } else {
                         onSeekRequested(startSeconds)
                     }
                 } else {
@@ -721,12 +727,13 @@ struct AddSearchDetailWaveformTrimView: View {
                 applyActiveHandleDrag()
             }
             .onEnded { value in
+                let didActivateLoop = activeLoopDirection == .right
                 cancelHandleLoop()
                 onHandleDragMovementChanged(false)
                 endDragBase = nil
                 onInteractionEnded(.right)
                 endActiveHandleDrag()
-                if isBeyondTapThreshold(value.translation) {
+                if isBeyondTapThreshold(value.translation) || didActivateLoop {
                     scheduleSelectionRecenter()
                 }
             }
@@ -747,7 +754,6 @@ struct AddSearchDetailWaveformTrimView: View {
             }
             onHandleLoopActivated(direction == .left ? .left : .right)
             stopAutoScrollTimer()
-            scrollTimelineToCenterSelection(animated: true)
         }
         handleLoopWorkItem = workItem
         DispatchQueue.main.asyncAfter(
@@ -832,6 +838,7 @@ struct AddSearchDetailWaveformTrimView: View {
         activeHandleDragDirection = nil
         activeHandleDragTranslation = 0
         autoScrollAdditionalSeconds = 0
+        leftDragClipDuration = nil
         stopAutoScrollTimer()
         setScrollLock(false)
     }
@@ -845,7 +852,11 @@ struct AddSearchDetailWaveformTrimView: View {
 
         switch direction {
         case .left:
-            startSeconds = (startDragBase ?? startSeconds) + deltaSeconds + autoScrollAdditionalSeconds
+            let clipDuration = leftDragClipDuration ?? currentClipDuration
+            let baseStart = startDragBase ?? startSeconds
+            var newStart = baseStart + deltaSeconds + autoScrollAdditionalSeconds
+            newStart = min(max(newStart, 0), max(duration - clipDuration, 0))
+            onUpdateRange(newStart, newStart + clipDuration)
         case .right:
             endSeconds = (endDragBase ?? endSeconds) + deltaSeconds + autoScrollAdditionalSeconds
         }

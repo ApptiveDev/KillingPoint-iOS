@@ -55,12 +55,13 @@ struct AddSearchDetailTrimSection: View {
                         viewModel.setHandleDragging(isDragging)
                     }
                 )
-                .frame(height: 176)
+                .frame(height: 186)
 
                 HStack {
                     Text("선택 구간 \(startDisplayTimeText) ~ \(endDisplayTimeText)")
                         .font(AppFont.paperlogy5Medium(size: 13))
                         .foregroundStyle(AppColors.primary600)
+                        .contentTransition(.identity)
 
                     Spacer()
 
