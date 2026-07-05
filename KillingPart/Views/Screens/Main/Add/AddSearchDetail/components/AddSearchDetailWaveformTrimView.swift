@@ -22,10 +22,11 @@ struct AddSearchDetailWaveformTrimView: View {
     let onSeekRequested: (_ seconds: Double) -> Void
     let onHandleLoopActivated: (_ control: AddSearchDetailTrimInteractionControl) -> Void
     let onHandleLoopDeactivated: () -> Void
+    let onHandleDragMovementChanged: (_ isDragging: Bool) -> Void
 
     private let horizontalPadding: CGFloat = 18
     private let pointsPerSecond: CGFloat = 8
-    private let trackHeight: CGFloat = 104
+    private let trackHeight: CGFloat = 84
     private let handleLabelHeight: CGFloat = 18
     private let handleLabelWidth: CGFloat = 76
     private let overviewHeight: CGFloat = 24
@@ -35,7 +36,7 @@ struct AddSearchDetailWaveformTrimView: View {
     private let handleWidth: CGFloat = 20
     private let handleCornerRadius: CGFloat = 14
     private let handleBodyCornerRadius: CGFloat = 7
-    private let handleVerticalInset: CGFloat = 4
+    private let handleVerticalInset: CGFloat = 8
     private let handleEdgeInset: CGFloat = 3
     private let autoScrollEdgeThreshold: CGFloat = 52
     private let autoScrollMaxVelocity: CGFloat = 260
@@ -132,6 +133,7 @@ struct AddSearchDetailWaveformTrimView: View {
             selectionRecenterWorkItem?.cancel()
             selectionRecenterWorkItem = nil
             cancelHandleLoop()
+            onHandleDragMovementChanged(false)
         }
     }
 
@@ -148,12 +150,31 @@ struct AddSearchDetailWaveformTrimView: View {
         let isStartOffscreen = startX < visibleRange.lowerBound - offscreenFollowThreshold
         let isEndOffscreen = endX > visibleRange.upperBound + offscreenFollowThreshold
 
+        let loopBandRange = loopBandXRange(startX: startX, endX: endX, contentWidth: contentWidth)
+
         return ZStack(alignment: .leading) {
+            if let loopBandRange {
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(AppColors.primary600.opacity(0.9))
+                    .frame(
+                        width: loopBandRange.upperBound - loopBandRange.lowerBound,
+                        height: trackHeight - handleVerticalInset * 2
+                    )
+                    .position(
+                        x: (loopBandRange.lowerBound + loopBandRange.upperBound) / 2,
+                        y: trackHeight / 2
+                    )
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .zIndex(0)
+            }
+
             waveformBars(
                 contentWidth: contentWidth,
                 startX: startX,
                 endX: endX,
-                playheadX: playheadX
+                playheadX: playheadX,
+                loopBandRange: loopBandRange
             )
             .zIndex(0)
 
@@ -182,28 +203,6 @@ struct AddSearchDetailWaveformTrimView: View {
                 .position(x: (startX + endX) / 2, y: trackHeight / 2)
                 .allowsHitTesting(false)
                 .zIndex(2)
-
-            if let loopDirection = activeLoopDirection {
-                let innerStartX = startX + handleEdgeInset + handleWidth
-                let innerEndX = endX - handleEdgeInset - handleWidth
-                let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
-                let rawLoopWidth = duration > 0
-                    ? CGFloat(boundaryLoopDuration / duration) * usableWidth
-                    : 0
-                let loopWidth = min(rawLoopWidth, max(innerEndX - innerStartX, 0))
-
-                if loopWidth > 0 {
-                    let bandStartX = loopDirection == .left ? innerStartX : innerEndX - loopWidth
-
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(AppColors.primary600.opacity(0.32))
-                        .frame(width: loopWidth, height: trackHeight - handleVerticalInset * 2)
-                        .position(x: bandStartX + loopWidth / 2, y: trackHeight / 2)
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                        .zIndex(2)
-                }
-            }
 
             if let playheadX {
                 RoundedRectangle(cornerRadius: playheadWidth / 2)
@@ -292,6 +291,24 @@ struct AddSearchDetailWaveformTrimView: View {
             onTrimInteracted()
             onSeekRequested(timeForContentX(location.x, contentWidth: contentWidth))
         }
+    }
+
+    private func loopBandXRange(
+        startX: CGFloat,
+        endX: CGFloat,
+        contentWidth: CGFloat
+    ) -> ClosedRange<CGFloat>? {
+        guard let loopDirection = activeLoopDirection, duration > 0 else { return nil }
+
+        let innerStartX = startX + handleEdgeInset + handleWidth
+        let innerEndX = endX - handleEdgeInset - handleWidth
+        let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
+        let rawLoopWidth = CGFloat(boundaryLoopDuration / duration) * usableWidth
+        let loopWidth = min(rawLoopWidth, max(innerEndX - innerStartX, 0))
+        guard loopWidth > 0 else { return nil }
+
+        let bandStartX = loopDirection == .left ? innerStartX : innerEndX - loopWidth
+        return bandStartX...(bandStartX + loopWidth)
     }
 
     private func playheadXPosition(
@@ -424,7 +441,8 @@ struct AddSearchDetailWaveformTrimView: View {
         contentWidth: CGFloat,
         startX: CGFloat,
         endX: CGFloat,
-        playheadX: CGFloat?
+        playheadX: CGFloat?,
+        loopBandRange: ClosedRange<CGFloat>?
     ) -> some View {
         let usableWidth = max(contentWidth - horizontalPadding * 2, 1)
         let totalBarWidth = barWidth + barSpacing
@@ -441,7 +459,8 @@ struct AddSearchDetailWaveformTrimView: View {
                             index: index,
                             startX: startX,
                             endX: endX,
-                            playheadX: playheadX
+                            playheadX: playheadX,
+                            loopBandRange: loopBandRange
                         )
                     )
                     .frame(width: barWidth, height: barHeight(for: index))
@@ -456,10 +475,15 @@ struct AddSearchDetailWaveformTrimView: View {
         index: Int,
         startX: CGFloat,
         endX: CGFloat,
-        playheadX: CGFloat?
+        playheadX: CGFloat?,
+        loopBandRange: ClosedRange<CGFloat>?
     ) -> Color {
         guard centerX >= startX, centerX <= endX else {
             return Color.white.opacity(barOpacity(for: index))
+        }
+
+        if let loopBandRange, loopBandRange.contains(centerX) {
+            return Color.black.opacity(0.82)
         }
 
         if let playheadX, centerX <= playheadX {
@@ -636,6 +660,7 @@ struct AddSearchDetailWaveformTrimView: View {
                 activeHandleDragTranslation = value.translation.width
                 if isBeyondTapThreshold(value.translation) {
                     cancelHandleLoop()
+                    onHandleDragMovementChanged(true)
                 }
                 updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
@@ -644,6 +669,7 @@ struct AddSearchDetailWaveformTrimView: View {
                 let didActivateLoop = activeLoopDirection == .left
                 let isTap = !isBeyondTapThreshold(value.translation)
                 cancelHandleLoop()
+                onHandleDragMovementChanged(false)
                 startDragBase = nil
                 onInteractionEnded(.left)
                 endActiveHandleDrag()
@@ -669,12 +695,14 @@ struct AddSearchDetailWaveformTrimView: View {
                 activeHandleDragTranslation = value.translation.width
                 if isBeyondTapThreshold(value.translation) {
                     cancelHandleLoop()
+                    onHandleDragMovementChanged(true)
                 }
                 updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
             }
             .onEnded { value in
                 cancelHandleLoop()
+                onHandleDragMovementChanged(false)
                 endDragBase = nil
                 onInteractionEnded(.right)
                 endActiveHandleDrag()

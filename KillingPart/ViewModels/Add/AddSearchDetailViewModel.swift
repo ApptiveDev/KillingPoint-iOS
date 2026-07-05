@@ -43,6 +43,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published private(set) var playbackSeconds: Double = 0
     @Published private(set) var playbackSeekRequest: AddSearchDetailPlaybackSeekRequest?
     @Published private(set) var boundaryLoopRange: ClosedRange<Double>?
+    @Published private(set) var isHandleDragging = false
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
     @Published var selectedScope: DiaryScope = .public
@@ -220,6 +221,11 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     func deactivateBoundaryLoop() {
         boundaryLoopRange = nil
+    }
+
+    func setHandleDragging(_ isDragging: Bool) {
+        guard isHandleDragging != isDragging else { return }
+        isHandleDragging = isDragging
     }
 
     func requestPlayback(from seconds: Double) {

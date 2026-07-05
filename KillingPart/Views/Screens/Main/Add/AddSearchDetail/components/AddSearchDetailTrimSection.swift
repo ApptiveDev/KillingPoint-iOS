@@ -46,9 +46,12 @@ struct AddSearchDetailTrimSection: View {
                     },
                     onHandleLoopDeactivated: {
                         viewModel.deactivateBoundaryLoop()
+                    },
+                    onHandleDragMovementChanged: { isDragging in
+                        viewModel.setHandleDragging(isDragging)
                     }
                 )
-                .frame(height: 200)
+                .frame(height: 176)
 
                 HStack {
                     Text("선택 구간 \(startDisplayTimeText) ~ \(endDisplayTimeText)")

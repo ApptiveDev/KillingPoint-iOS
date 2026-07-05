@@ -18,6 +18,7 @@ struct AddSearchDetailVideoSection: View {
                             videoURL: video.embedURL,
                             startSeconds: viewModel.effectivePlaybackStartSeconds,
                             endSeconds: viewModel.effectivePlaybackEndSeconds,
+                            isPlaying: !viewModel.isHandleDragging,
                             playbackFocusToken: playerReloadToken.hashValue,
                             seekSeconds: viewModel.playbackSeekRequest?.seconds,
                             seekToken: viewModel.playbackSeekRequest?.token ?? 0,
