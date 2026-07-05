@@ -290,7 +290,7 @@ struct YoutubePlayerView: UIViewRepresentable {
         let respectsUserInteractionJS = respectsUserInteraction ? "true" : "false"
         let showsMutedFallbackControlJS = showsMutedFallbackControl ? "true" : "false"
         let isLowPowerModeEnabledJS = isLowPowerModeEnabled ? "true" : "false"
-        let shouldResetControlModeJS = (isRangeChanged || (isPlayStateChanged && isPlaying)) ? "true" : "false"
+        let shouldResetControlModeJS = (isPlayStateChanged && isPlaying) ? "true" : "false"
 
         webView.evaluateJavaScript(
             """

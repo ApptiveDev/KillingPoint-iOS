@@ -46,7 +46,6 @@ struct AddSearchDetailWaveformTrimView: View {
     private let playheadWidth: CGFloat = 3
     private let handleTapMaxTranslation: CGFloat = 4
     private let selectionBorderLineWidth: CGFloat = 1.5
-    private let maximumClipDuration: Double = 30
     private let handlePressedScale: CGFloat = 1.12
     private let selectionRecenterDelay: TimeInterval = 0.4
     private let handleLoopActivationDelay: TimeInterval = 0.5
@@ -134,7 +133,7 @@ struct AddSearchDetailWaveformTrimView: View {
             selectionRecenterWorkItem = nil
             cancelHandleLoop()
             onHandleDragMovementChanged(false)
-            timelineScrollView?.isScrollEnabled = true
+            setScrollLock(false)
         }
     }
 
@@ -572,34 +571,9 @@ struct AddSearchDetailWaveformTrimView: View {
         guard duration > 0 else { return }
 
         onTrimInteracted()
-
-        if currentClipDuration >= maximumClipDuration - 0.001 {
-            let clipDuration = min(max(currentClipDuration, 1), duration)
-            var newStart = startSeconds + delta
-            var newEnd = newStart + clipDuration
-
-            if newStart < 0 {
-                newStart = 0
-                newEnd = clipDuration
-            }
-            if newEnd > duration {
-                newEnd = duration
-                newStart = max(duration - clipDuration, 0)
-            }
-
-            withAnimation(nudgeAnimation) {
-                onUpdateRange(newStart, newEnd)
-            }
-        } else if delta < 0 {
-            withAnimation(nudgeAnimation) {
-                startSeconds += delta
-            }
-        } else {
-            withAnimation(nudgeAnimation) {
-                endSeconds += delta
-            }
+        withAnimation(nudgeAnimation) {
+            endSeconds += delta
         }
-
         onInteractionEnded(delta < 0 ? .minusOneSecond : .plusOneSecond)
         scheduleSelectionRecenter()
     }
@@ -800,9 +774,31 @@ struct AddSearchDetailWaveformTrimView: View {
             autoScrollAdditionalSeconds = 0
             selectionRecenterWorkItem?.cancel()
             selectionRecenterWorkItem = nil
-            timelineScrollView?.isScrollEnabled = false
+            setScrollLock(true)
         }
         activeHandleContentWidth = contentWidth
+    }
+
+    private func setScrollLock(_ isLocked: Bool) {
+        applyScrollLock(isLocked, to: timelineScrollView)
+        applyScrollLock(isLocked, to: enclosingScrollView(of: timelineScrollView))
+    }
+
+    private func applyScrollLock(_ isLocked: Bool, to scrollView: UIScrollView?) {
+        guard let scrollView else { return }
+        scrollView.isScrollEnabled = !isLocked
+        scrollView.panGestureRecognizer.isEnabled = !isLocked
+    }
+
+    private func enclosingScrollView(of scrollView: UIScrollView?) -> UIScrollView? {
+        var current = scrollView?.superview
+        while let view = current {
+            if let outerScrollView = view as? UIScrollView {
+                return outerScrollView
+            }
+            current = view.superview
+        }
+        return nil
     }
 
     private func scheduleSelectionRecenter() {
@@ -837,7 +833,7 @@ struct AddSearchDetailWaveformTrimView: View {
         activeHandleDragTranslation = 0
         autoScrollAdditionalSeconds = 0
         stopAutoScrollTimer()
-        timelineScrollView?.isScrollEnabled = true
+        setScrollLock(false)
     }
 
     private func applyActiveHandleDrag() {
