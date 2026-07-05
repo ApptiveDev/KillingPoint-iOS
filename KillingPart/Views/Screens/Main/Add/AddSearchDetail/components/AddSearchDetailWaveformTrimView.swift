@@ -769,6 +769,9 @@ struct AddSearchDetailWaveformTrimView: View {
                 activeLoopDirection = direction
             }
             onHandleLoopActivated(direction == .left ? .left : .right)
+            stopAutoScrollTimer()
+            timelineScrollView?.isScrollEnabled = false
+            scrollTimelineToCenterSelection(animated: true)
         }
         handleLoopWorkItem = workItem
         DispatchQueue.main.asyncAfter(
@@ -784,6 +787,7 @@ struct AddSearchDetailWaveformTrimView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 activeLoopDirection = nil
             }
+            timelineScrollView?.isScrollEnabled = true
             onHandleLoopDeactivated()
         }
     }
@@ -849,6 +853,11 @@ struct AddSearchDetailWaveformTrimView: View {
     }
 
     private func updateAutoScrollVelocity(locationX: CGFloat, viewportWidth: CGFloat) {
+        guard activeLoopDirection == nil else {
+            stopAutoScrollTimer()
+            return
+        }
+
         autoScrollVelocity = autoScrollVelocityForEdge(
             locationX: locationX,
             viewportWidth: viewportWidth

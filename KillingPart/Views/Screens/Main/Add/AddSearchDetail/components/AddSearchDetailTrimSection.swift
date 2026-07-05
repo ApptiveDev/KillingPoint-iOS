@@ -20,6 +20,10 @@ struct AddSearchDetailTrimSection: View {
                 .foregroundStyle(.white.opacity(0.9))
 
             if viewModel.hasPlayableVideo {
+                if viewModel.shouldShowBoundaryLoopHint {
+                    boundaryLoopHint
+                }
+
                 AddSearchDetailWaveformTrimView(
                     startSeconds: Binding(
                         get: { viewModel.startSeconds },
@@ -33,7 +37,10 @@ struct AddSearchDetailTrimSection: View {
                     playbackSeconds: viewModel.playbackSeconds,
                     startTimeText: startDisplayTimeText,
                     endTimeText: endDisplayTimeText,
-                    onTrimInteracted: onTrimInteracted,
+                    onTrimInteracted: {
+                        viewModel.dismissBoundaryLoopHint()
+                        onTrimInteracted()
+                    },
                     onInteractionEnded: onTrimInteractionEnded,
                     onUpdateRange: { start, end in
                         viewModel.updateRange(start: start, end: end)
@@ -82,5 +89,29 @@ struct AddSearchDetailTrimSection: View {
             }
         }
         .padding(AppSpacing.m)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.shouldShowBoundaryLoopHint)
+    }
+
+    private var boundaryLoopHint: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "hand.tap.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppColors.primary600)
+
+            Text("꾹 눌러서 시작과 끝 구간 반복이 가능해요!")
+                .font(AppFont.paperlogy4Regular(size: 12))
+                .foregroundStyle(.white.opacity(0.88))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.07))
+        )
+        .overlay {
+            Capsule()
+                .stroke(AppColors.primary600.opacity(0.5), lineWidth: 1)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
 }

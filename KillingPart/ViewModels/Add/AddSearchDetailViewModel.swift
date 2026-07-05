@@ -44,6 +44,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     @Published private(set) var playbackSeekRequest: AddSearchDetailPlaybackSeekRequest?
     @Published private(set) var boundaryLoopRange: ClosedRange<Double>?
     @Published private(set) var isHandleDragging = false
+    @Published private(set) var shouldShowBoundaryLoopHint: Bool
     @Published private(set) var currentStep: AddSearchDetailStep = .trim
     @Published var diaryContent: String = ""
     @Published var selectedScope: DiaryScope = .public
@@ -58,6 +59,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
     private let boundaryLoopDuration: Double = 2
+    private static let boundaryLoopHintDismissedKey = "add_search_detail_boundary_loop_hint_dismissed"
 
     init(
         track: SpotifySimpleTrack,
@@ -68,6 +70,9 @@ final class AddSearchDetailViewModel: ObservableObject {
         self.track = track
         self.youtubeService = youtubeService
         self.diaryService = diaryService
+        self.shouldShowBoundaryLoopHint = !UserDefaults.standard.bool(
+            forKey: Self.boundaryLoopHintDismissedKey
+        )
 
         if let prefill, applyPrefill(prefill) {
             hasLoaded = true
@@ -226,6 +231,12 @@ final class AddSearchDetailViewModel: ObservableObject {
     func setHandleDragging(_ isDragging: Bool) {
         guard isHandleDragging != isDragging else { return }
         isHandleDragging = isDragging
+    }
+
+    func dismissBoundaryLoopHint() {
+        guard shouldShowBoundaryLoopHint else { return }
+        shouldShowBoundaryLoopHint = false
+        UserDefaults.standard.set(true, forKey: Self.boundaryLoopHintDismissedKey)
     }
 
     func requestPlayback(from seconds: Double) {
