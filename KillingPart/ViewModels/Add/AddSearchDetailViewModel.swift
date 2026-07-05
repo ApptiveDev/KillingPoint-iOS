@@ -59,7 +59,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
     private let boundaryLoopDuration: Double = 2
-    private static let boundaryLoopHintDismissedKey = "add_search_detail_boundary_loop_hint_dismissed"
+    private static let boundaryLoopHintDismissedKey = "add_search_detail_boundary_loop_hint_dismissed_v2"
 
     init(
         track: SpotifySimpleTrack,

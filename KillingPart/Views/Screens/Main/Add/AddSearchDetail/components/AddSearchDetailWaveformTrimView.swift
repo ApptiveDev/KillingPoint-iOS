@@ -134,6 +134,7 @@ struct AddSearchDetailWaveformTrimView: View {
             selectionRecenterWorkItem = nil
             cancelHandleLoop()
             onHandleDragMovementChanged(false)
+            timelineScrollView?.isScrollEnabled = true
         }
     }
 
@@ -699,6 +700,7 @@ struct AddSearchDetailWaveformTrimView: View {
                     onTrimInteracted()
                     scheduleHandleLoopActivation(direction: .left)
                 }
+                guard activeLoopDirection == nil else { return }
                 activateDrag(direction: .left, contentWidth: contentWidth)
                 activeHandleDragTranslation = value.translation.width
                 if isBeyondTapThreshold(value.translation) {
@@ -734,6 +736,7 @@ struct AddSearchDetailWaveformTrimView: View {
                     onTrimInteracted()
                     scheduleHandleLoopActivation(direction: .right)
                 }
+                guard activeLoopDirection == nil else { return }
                 activateDrag(direction: .right, contentWidth: contentWidth)
                 activeHandleDragTranslation = value.translation.width
                 if isBeyondTapThreshold(value.translation) {
@@ -770,7 +773,6 @@ struct AddSearchDetailWaveformTrimView: View {
             }
             onHandleLoopActivated(direction == .left ? .left : .right)
             stopAutoScrollTimer()
-            timelineScrollView?.isScrollEnabled = false
             scrollTimelineToCenterSelection(animated: true)
         }
         handleLoopWorkItem = workItem
@@ -787,7 +789,6 @@ struct AddSearchDetailWaveformTrimView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 activeLoopDirection = nil
             }
-            timelineScrollView?.isScrollEnabled = true
             onHandleLoopDeactivated()
         }
     }
@@ -799,6 +800,7 @@ struct AddSearchDetailWaveformTrimView: View {
             autoScrollAdditionalSeconds = 0
             selectionRecenterWorkItem?.cancel()
             selectionRecenterWorkItem = nil
+            timelineScrollView?.isScrollEnabled = false
         }
         activeHandleContentWidth = contentWidth
     }
@@ -835,6 +837,7 @@ struct AddSearchDetailWaveformTrimView: View {
         activeHandleDragTranslation = 0
         autoScrollAdditionalSeconds = 0
         stopAutoScrollTimer()
+        timelineScrollView?.isScrollEnabled = true
     }
 
     private func applyActiveHandleDrag() {

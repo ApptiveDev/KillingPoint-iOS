@@ -37,10 +37,7 @@ struct AddSearchDetailTrimSection: View {
                     playbackSeconds: viewModel.playbackSeconds,
                     startTimeText: startDisplayTimeText,
                     endTimeText: endDisplayTimeText,
-                    onTrimInteracted: {
-                        viewModel.dismissBoundaryLoopHint()
-                        onTrimInteracted()
-                    },
+                    onTrimInteracted: onTrimInteracted,
                     onInteractionEnded: onTrimInteractionEnded,
                     onUpdateRange: { start, end in
                         viewModel.updateRange(start: start, end: end)
@@ -101,6 +98,17 @@ struct AddSearchDetailTrimSection: View {
             Text("꾹 눌러서 시작과 끝 구간 반복이 가능해요!")
                 .font(AppFont.paperlogy4Regular(size: 12))
                 .foregroundStyle(.white.opacity(0.88))
+
+            Button {
+                viewModel.dismissBoundaryLoopHint()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
