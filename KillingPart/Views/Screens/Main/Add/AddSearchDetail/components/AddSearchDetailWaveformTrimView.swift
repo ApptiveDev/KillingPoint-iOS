@@ -24,8 +24,12 @@ struct AddSearchDetailWaveformTrimView: View {
     let onHandleLoopDeactivated: () -> Void
     let onHandleDragMovementChanged: (_ isDragging: Bool) -> Void
 
-    private let horizontalPadding: CGFloat = 18
+    private let baseHorizontalPadding: CGFloat = 18
     private let pointsPerSecond: CGFloat = 8
+
+    private var horizontalPadding: CGFloat {
+        max(baseHorizontalPadding, timelineViewportWidth / 2)
+    }
     private let trackHeight: CGFloat = 84
     private let handleLabelHeight: CGFloat = 18
     private let handleLabelWidth: CGFloat = 76
@@ -38,14 +42,13 @@ struct AddSearchDetailWaveformTrimView: View {
     private let handleBodyCornerRadius: CGFloat = 7
     private let handleVerticalInset: CGFloat = 8
     private let handleEdgeInset: CGFloat = 0
-    private let autoScrollEdgeThreshold: CGFloat = 52
-    private let autoScrollMaxVelocity: CGFloat = 260
     private let followButtonSize: CGFloat = 30
     private let followButtonInset: CGFloat = 10
     private let nudgeButtonSize: CGFloat = 30
     private let playheadWidth: CGFloat = 3
     private let handleTapMaxTranslation: CGFloat = 4
     private let selectionBorderLineWidth: CGFloat = 1.5
+    private let maximumClipDuration: Double = 30
     private let handlePressedScale: CGFloat = 1.12
     private let selectionRecenterDelay: TimeInterval = 0.4
     private let handleLoopActivationDelay: TimeInterval = 0.5
@@ -59,10 +62,6 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var activeHandleDragDirection: HandleDirection?
     @State private var activeHandleDragTranslation: CGFloat = 0
     @State private var activeHandleContentWidth: CGFloat = 1
-    @State private var autoScrollAdditionalSeconds: Double = 0
-    @State private var autoScrollVelocity: CGFloat = 0
-    @State private var autoScrollTimer: Timer?
-    @State private var autoScrollLastTick: CFTimeInterval?
     @State private var timelineScrollView: UIScrollView?
     @State private var timelineViewportOffsetX: CGFloat = 0
     @State private var timelineViewportWidth: CGFloat = 0
@@ -71,7 +70,7 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var selectionRecenterWorkItem: DispatchWorkItem?
     @State private var handleLoopWorkItem: DispatchWorkItem?
     @State private var activeLoopDirection: HandleDirection?
-    @State private var leftDragClipDuration: Double?
+    @State private var hasPerformedInitialCentering = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -122,13 +121,15 @@ struct AddSearchDetailWaveformTrimView: View {
                         nudgeSelection(by: 1)
                     }
                 }
+                .disabled(isNudgeDisabled)
+                .opacity(isNudgeDisabled ? 0.35 : 1)
+                .animation(.easeInOut(duration: 0.2), value: isNudgeDisabled)
 
                 overviewBar(width: viewportWidth)
                     .padding(.top, 10)
             }
         }
         .onDisappear {
-            stopAutoScrollTimer()
             timelineScrollEndWorkItem?.cancel()
             timelineScrollEndWorkItem = nil
             selectionRecenterWorkItem?.cancel()
@@ -570,12 +571,20 @@ struct AddSearchDetailWaveformTrimView: View {
         .buttonStyle(.plain)
     }
 
+    private var isNudgeDisabled: Bool {
+        currentClipDuration >= maximumClipDuration - 0.001
+    }
+
     private func nudgeSelection(by delta: Double) {
-        guard duration > 0 else { return }
+        guard duration > 0, !isNudgeDisabled else { return }
 
         onTrimInteracted()
         withAnimation(nudgeAnimation) {
-            endSeconds += delta
+            if delta < 0 {
+                startSeconds += delta
+            } else {
+                endSeconds += delta
+            }
         }
         onInteractionEnded(delta < 0 ? .minusOneSecond : .plusOneSecond)
         scheduleSelectionRecenter()
@@ -642,6 +651,8 @@ struct AddSearchDetailWaveformTrimView: View {
     }
 
     private func handleTimelineViewportChanged(_ viewport: AddSearchDetailTimelineViewport) {
+        performInitialCenteringIfNeeded(viewport: viewport)
+
         let previousOffset = timelineViewportOffsetX
         timelineViewportOffsetX = viewport.contentOffsetX
         timelineViewportWidth = viewport.viewportWidth
@@ -653,6 +664,22 @@ struct AddSearchDetailWaveformTrimView: View {
         guard viewport.isTracking || viewport.isDragging || viewport.isDecelerating else { return }
 
         scheduleTimelineScrollEndEvent()
+    }
+
+    private func performInitialCenteringIfNeeded(viewport: AddSearchDetailTimelineViewport) {
+        guard
+            !hasPerformedInitialCentering,
+            duration > 0,
+            viewport.viewportWidth > 0,
+            viewport.contentWidth > viewport.viewportWidth + 1
+        else {
+            return
+        }
+
+        hasPerformedInitialCentering = true
+        DispatchQueue.main.async {
+            scrollTimelineToCenterSelection(animated: false)
+        }
     }
 
     private func scheduleTimelineScrollEndEvent() {
@@ -674,7 +701,6 @@ struct AddSearchDetailWaveformTrimView: View {
             .onChanged { value in
                 if startDragBase == nil {
                     startDragBase = startSeconds
-                    leftDragClipDuration = max(endSeconds - startSeconds, 0)
                     onTrimInteracted()
                     scheduleHandleLoopActivation(direction: .left)
                 }
@@ -685,7 +711,6 @@ struct AddSearchDetailWaveformTrimView: View {
                     cancelHandleLoop()
                     onHandleDragMovementChanged(true)
                 }
-                updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
             }
             .onEnded { value in
@@ -723,7 +748,6 @@ struct AddSearchDetailWaveformTrimView: View {
                     cancelHandleLoop()
                     onHandleDragMovementChanged(true)
                 }
-                updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
             }
             .onEnded { value in
@@ -753,7 +777,6 @@ struct AddSearchDetailWaveformTrimView: View {
                 activeLoopDirection = direction
             }
             onHandleLoopActivated(direction == .left ? .left : .right)
-            stopAutoScrollTimer()
         }
         handleLoopWorkItem = workItem
         DispatchQueue.main.asyncAfter(
@@ -777,7 +800,6 @@ struct AddSearchDetailWaveformTrimView: View {
         if activeHandleDragDirection != direction {
             activeHandleDragDirection = direction
             activeHandleDragTranslation = 0
-            autoScrollAdditionalSeconds = 0
             selectionRecenterWorkItem?.cancel()
             selectionRecenterWorkItem = nil
             setScrollLock(true)
@@ -837,9 +859,6 @@ struct AddSearchDetailWaveformTrimView: View {
     private func endActiveHandleDrag() {
         activeHandleDragDirection = nil
         activeHandleDragTranslation = 0
-        autoScrollAdditionalSeconds = 0
-        leftDragClipDuration = nil
-        stopAutoScrollTimer()
         setScrollLock(false)
     }
 
@@ -852,105 +871,10 @@ struct AddSearchDetailWaveformTrimView: View {
 
         switch direction {
         case .left:
-            let clipDuration = leftDragClipDuration ?? currentClipDuration
-            let baseStart = startDragBase ?? startSeconds
-            var newStart = baseStart + deltaSeconds + autoScrollAdditionalSeconds
-            newStart = min(max(newStart, 0), max(duration - clipDuration, 0))
-            onUpdateRange(newStart, newStart + clipDuration)
+            startSeconds = (startDragBase ?? startSeconds) + deltaSeconds
         case .right:
-            endSeconds = (endDragBase ?? endSeconds) + deltaSeconds + autoScrollAdditionalSeconds
+            endSeconds = (endDragBase ?? endSeconds) + deltaSeconds
         }
-    }
-
-    private func updateAutoScrollVelocity(locationX: CGFloat, viewportWidth: CGFloat) {
-        guard activeLoopDirection == nil else {
-            stopAutoScrollTimer()
-            return
-        }
-
-        autoScrollVelocity = autoScrollVelocityForEdge(
-            locationX: locationX,
-            viewportWidth: viewportWidth
-        )
-
-        if abs(autoScrollVelocity) > 0.001 {
-            startAutoScrollTimerIfNeeded()
-        } else {
-            stopAutoScrollTimer()
-        }
-    }
-
-    private func autoScrollVelocityForEdge(locationX: CGFloat, viewportWidth: CGFloat) -> CGFloat {
-        guard viewportWidth > autoScrollEdgeThreshold * 2 else { return 0 }
-
-        if locationX < autoScrollEdgeThreshold {
-            let ratio = (autoScrollEdgeThreshold - locationX) / autoScrollEdgeThreshold
-            return -autoScrollMaxVelocity * ratio
-        }
-
-        let rightEdgeStart = viewportWidth - autoScrollEdgeThreshold
-        if locationX > rightEdgeStart {
-            let ratio = (locationX - rightEdgeStart) / autoScrollEdgeThreshold
-            return autoScrollMaxVelocity * ratio
-        }
-
-        return 0
-    }
-
-    private func startAutoScrollTimerIfNeeded() {
-        guard autoScrollTimer == nil else { return }
-
-        autoScrollLastTick = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1 / 60, repeats: true) { _ in
-            performAutoScrollTick()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        autoScrollTimer = timer
-    }
-
-    private func stopAutoScrollTimer() {
-        autoScrollTimer?.invalidate()
-        autoScrollTimer = nil
-        autoScrollVelocity = 0
-        autoScrollLastTick = nil
-    }
-
-    private func performAutoScrollTick() {
-        guard
-            abs(autoScrollVelocity) > 0.001,
-            activeHandleDragDirection != nil,
-            let scrollView = timelineScrollView
-        else {
-            return
-        }
-
-        let now = CACurrentMediaTime()
-        guard let lastTick = autoScrollLastTick else {
-            autoScrollLastTick = now
-            return
-        }
-        autoScrollLastTick = now
-
-        let deltaTime = min(max(now - lastTick, 0), 0.05)
-        let currentOffset = scrollView.contentOffset.x
-        let maxOffset = max(scrollView.contentSize.width - scrollView.bounds.width, 0)
-        let targetOffset = min(
-            max(currentOffset + autoScrollVelocity * CGFloat(deltaTime), 0),
-            maxOffset
-        )
-
-        let movedOffset = targetOffset - currentOffset
-        guard abs(movedOffset) > 0.0001 else { return }
-
-        scrollView.setContentOffset(CGPoint(x: targetOffset, y: scrollView.contentOffset.y), animated: false)
-        timelineViewportOffsetX = targetOffset
-        timelineViewportWidth = scrollView.bounds.width
-        timelineContentWidth = scrollView.contentSize.width
-        autoScrollAdditionalSeconds += seconds(
-            forTranslation: movedOffset,
-            contentWidth: activeHandleContentWidth
-        )
-        applyActiveHandleDrag()
     }
 
     private func seconds(forTranslation translation: CGFloat, contentWidth: CGFloat) -> Double {
