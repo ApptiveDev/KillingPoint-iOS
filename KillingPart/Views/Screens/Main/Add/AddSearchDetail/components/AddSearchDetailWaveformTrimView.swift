@@ -579,10 +579,13 @@ struct AddSearchDetailWaveformTrimView: View {
         guard duration > 0, !isNudgeDisabled else { return }
 
         onTrimInteracted()
-        withAnimation(nudgeAnimation) {
-            if delta < 0 {
+        if delta < 0 {
+            withAnimation(nudgeAnimation) {
                 startSeconds += delta
-            } else {
+            }
+            onSeekRequested(startSeconds)
+        } else {
+            withAnimation(nudgeAnimation) {
                 endSeconds += delta
             }
         }
