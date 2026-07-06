@@ -58,6 +58,7 @@ final class AddSearchDetailViewModel: ObservableObject {
     private var hasLoaded = false
     private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
+    private let defaultClipDuration: Double = 25
     private let boundaryLoopDuration: Double = 2
     private static let boundaryLoopHintDismissedKey = "add_search_detail_boundary_loop_hint_dismissed_v2"
 
@@ -380,7 +381,7 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     private func resetClipRange() {
         startSeconds = 0
-        endSeconds = min(maxDuration, maximumClipDurationLimit)
+        endSeconds = min(maxDuration, defaultClipDuration)
     }
 
     private func resolveErrorMessage(from error: Error) -> String {

@@ -24,8 +24,12 @@ struct AddSearchDetailWaveformTrimView: View {
     let onHandleLoopDeactivated: () -> Void
     let onHandleDragMovementChanged: (_ isDragging: Bool) -> Void
 
-    private let horizontalPadding: CGFloat = 18
+    private let baseHorizontalPadding: CGFloat = 18
     private let pointsPerSecond: CGFloat = 8
+
+    private var horizontalPadding: CGFloat {
+        max(baseHorizontalPadding, timelineViewportWidth / 2)
+    }
     private let trackHeight: CGFloat = 84
     private let handleLabelHeight: CGFloat = 18
     private let handleLabelWidth: CGFloat = 76
@@ -46,6 +50,7 @@ struct AddSearchDetailWaveformTrimView: View {
     private let playheadWidth: CGFloat = 3
     private let handleTapMaxTranslation: CGFloat = 4
     private let selectionBorderLineWidth: CGFloat = 1.5
+    private let maximumClipDuration: Double = 30
     private let handlePressedScale: CGFloat = 1.12
     private let selectionRecenterDelay: TimeInterval = 0.4
     private let handleLoopActivationDelay: TimeInterval = 0.5
@@ -71,7 +76,7 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var selectionRecenterWorkItem: DispatchWorkItem?
     @State private var handleLoopWorkItem: DispatchWorkItem?
     @State private var activeLoopDirection: HandleDirection?
-    @State private var leftDragClipDuration: Double?
+    @State private var hasPerformedInitialCentering = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -122,6 +127,9 @@ struct AddSearchDetailWaveformTrimView: View {
                         nudgeSelection(by: 1)
                     }
                 }
+                .disabled(isNudgeDisabled)
+                .opacity(isNudgeDisabled ? 0.35 : 1)
+                .animation(.easeInOut(duration: 0.2), value: isNudgeDisabled)
 
                 overviewBar(width: viewportWidth)
                     .padding(.top, 10)
@@ -570,12 +578,20 @@ struct AddSearchDetailWaveformTrimView: View {
         .buttonStyle(.plain)
     }
 
+    private var isNudgeDisabled: Bool {
+        currentClipDuration >= maximumClipDuration - 0.001
+    }
+
     private func nudgeSelection(by delta: Double) {
-        guard duration > 0 else { return }
+        guard duration > 0, !isNudgeDisabled else { return }
 
         onTrimInteracted()
         withAnimation(nudgeAnimation) {
-            endSeconds += delta
+            if delta < 0 {
+                startSeconds += delta
+            } else {
+                endSeconds += delta
+            }
         }
         onInteractionEnded(delta < 0 ? .minusOneSecond : .plusOneSecond)
         scheduleSelectionRecenter()
@@ -642,6 +658,8 @@ struct AddSearchDetailWaveformTrimView: View {
     }
 
     private func handleTimelineViewportChanged(_ viewport: AddSearchDetailTimelineViewport) {
+        performInitialCenteringIfNeeded(viewport: viewport)
+
         let previousOffset = timelineViewportOffsetX
         timelineViewportOffsetX = viewport.contentOffsetX
         timelineViewportWidth = viewport.viewportWidth
@@ -653,6 +671,22 @@ struct AddSearchDetailWaveformTrimView: View {
         guard viewport.isTracking || viewport.isDragging || viewport.isDecelerating else { return }
 
         scheduleTimelineScrollEndEvent()
+    }
+
+    private func performInitialCenteringIfNeeded(viewport: AddSearchDetailTimelineViewport) {
+        guard
+            !hasPerformedInitialCentering,
+            duration > 0,
+            viewport.viewportWidth > 0,
+            viewport.contentWidth > viewport.viewportWidth + 1
+        else {
+            return
+        }
+
+        hasPerformedInitialCentering = true
+        DispatchQueue.main.async {
+            scrollTimelineToCenterSelection(animated: false)
+        }
     }
 
     private func scheduleTimelineScrollEndEvent() {
@@ -674,7 +708,6 @@ struct AddSearchDetailWaveformTrimView: View {
             .onChanged { value in
                 if startDragBase == nil {
                     startDragBase = startSeconds
-                    leftDragClipDuration = max(endSeconds - startSeconds, 0)
                     onTrimInteracted()
                     scheduleHandleLoopActivation(direction: .left)
                 }
@@ -838,7 +871,6 @@ struct AddSearchDetailWaveformTrimView: View {
         activeHandleDragDirection = nil
         activeHandleDragTranslation = 0
         autoScrollAdditionalSeconds = 0
-        leftDragClipDuration = nil
         stopAutoScrollTimer()
         setScrollLock(false)
     }
@@ -852,11 +884,7 @@ struct AddSearchDetailWaveformTrimView: View {
 
         switch direction {
         case .left:
-            let clipDuration = leftDragClipDuration ?? currentClipDuration
-            let baseStart = startDragBase ?? startSeconds
-            var newStart = baseStart + deltaSeconds + autoScrollAdditionalSeconds
-            newStart = min(max(newStart, 0), max(duration - clipDuration, 0))
-            onUpdateRange(newStart, newStart + clipDuration)
+            startSeconds = (startDragBase ?? startSeconds) + deltaSeconds + autoScrollAdditionalSeconds
         case .right:
             endSeconds = (endDragBase ?? endSeconds) + deltaSeconds + autoScrollAdditionalSeconds
         }
