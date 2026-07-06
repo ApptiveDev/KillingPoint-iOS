@@ -42,8 +42,6 @@ struct AddSearchDetailWaveformTrimView: View {
     private let handleBodyCornerRadius: CGFloat = 7
     private let handleVerticalInset: CGFloat = 8
     private let handleEdgeInset: CGFloat = 0
-    private let autoScrollEdgeThreshold: CGFloat = 52
-    private let autoScrollMaxVelocity: CGFloat = 260
     private let followButtonSize: CGFloat = 30
     private let followButtonInset: CGFloat = 10
     private let nudgeButtonSize: CGFloat = 30
@@ -64,10 +62,6 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var activeHandleDragDirection: HandleDirection?
     @State private var activeHandleDragTranslation: CGFloat = 0
     @State private var activeHandleContentWidth: CGFloat = 1
-    @State private var autoScrollAdditionalSeconds: Double = 0
-    @State private var autoScrollVelocity: CGFloat = 0
-    @State private var autoScrollTimer: Timer?
-    @State private var autoScrollLastTick: CFTimeInterval?
     @State private var timelineScrollView: UIScrollView?
     @State private var timelineViewportOffsetX: CGFloat = 0
     @State private var timelineViewportWidth: CGFloat = 0
@@ -136,7 +130,6 @@ struct AddSearchDetailWaveformTrimView: View {
             }
         }
         .onDisappear {
-            stopAutoScrollTimer()
             timelineScrollEndWorkItem?.cancel()
             timelineScrollEndWorkItem = nil
             selectionRecenterWorkItem?.cancel()
@@ -718,7 +711,6 @@ struct AddSearchDetailWaveformTrimView: View {
                     cancelHandleLoop()
                     onHandleDragMovementChanged(true)
                 }
-                updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
             }
             .onEnded { value in
@@ -756,7 +748,6 @@ struct AddSearchDetailWaveformTrimView: View {
                     cancelHandleLoop()
                     onHandleDragMovementChanged(true)
                 }
-                updateAutoScrollVelocity(locationX: value.location.x, viewportWidth: viewportWidth)
                 applyActiveHandleDrag()
             }
             .onEnded { value in
@@ -786,7 +777,6 @@ struct AddSearchDetailWaveformTrimView: View {
                 activeLoopDirection = direction
             }
             onHandleLoopActivated(direction == .left ? .left : .right)
-            stopAutoScrollTimer()
         }
         handleLoopWorkItem = workItem
         DispatchQueue.main.asyncAfter(
@@ -810,7 +800,6 @@ struct AddSearchDetailWaveformTrimView: View {
         if activeHandleDragDirection != direction {
             activeHandleDragDirection = direction
             activeHandleDragTranslation = 0
-            autoScrollAdditionalSeconds = 0
             selectionRecenterWorkItem?.cancel()
             selectionRecenterWorkItem = nil
             setScrollLock(true)
@@ -870,8 +859,6 @@ struct AddSearchDetailWaveformTrimView: View {
     private func endActiveHandleDrag() {
         activeHandleDragDirection = nil
         activeHandleDragTranslation = 0
-        autoScrollAdditionalSeconds = 0
-        stopAutoScrollTimer()
         setScrollLock(false)
     }
 
@@ -884,101 +871,10 @@ struct AddSearchDetailWaveformTrimView: View {
 
         switch direction {
         case .left:
-            startSeconds = (startDragBase ?? startSeconds) + deltaSeconds + autoScrollAdditionalSeconds
+            startSeconds = (startDragBase ?? startSeconds) + deltaSeconds
         case .right:
-            endSeconds = (endDragBase ?? endSeconds) + deltaSeconds + autoScrollAdditionalSeconds
+            endSeconds = (endDragBase ?? endSeconds) + deltaSeconds
         }
-    }
-
-    private func updateAutoScrollVelocity(locationX: CGFloat, viewportWidth: CGFloat) {
-        guard activeLoopDirection == nil else {
-            stopAutoScrollTimer()
-            return
-        }
-
-        autoScrollVelocity = autoScrollVelocityForEdge(
-            locationX: locationX,
-            viewportWidth: viewportWidth
-        )
-
-        if abs(autoScrollVelocity) > 0.001 {
-            startAutoScrollTimerIfNeeded()
-        } else {
-            stopAutoScrollTimer()
-        }
-    }
-
-    private func autoScrollVelocityForEdge(locationX: CGFloat, viewportWidth: CGFloat) -> CGFloat {
-        guard viewportWidth > autoScrollEdgeThreshold * 2 else { return 0 }
-
-        if locationX < autoScrollEdgeThreshold {
-            let ratio = (autoScrollEdgeThreshold - locationX) / autoScrollEdgeThreshold
-            return -autoScrollMaxVelocity * ratio
-        }
-
-        let rightEdgeStart = viewportWidth - autoScrollEdgeThreshold
-        if locationX > rightEdgeStart {
-            let ratio = (locationX - rightEdgeStart) / autoScrollEdgeThreshold
-            return autoScrollMaxVelocity * ratio
-        }
-
-        return 0
-    }
-
-    private func startAutoScrollTimerIfNeeded() {
-        guard autoScrollTimer == nil else { return }
-
-        autoScrollLastTick = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1 / 60, repeats: true) { _ in
-            performAutoScrollTick()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        autoScrollTimer = timer
-    }
-
-    private func stopAutoScrollTimer() {
-        autoScrollTimer?.invalidate()
-        autoScrollTimer = nil
-        autoScrollVelocity = 0
-        autoScrollLastTick = nil
-    }
-
-    private func performAutoScrollTick() {
-        guard
-            abs(autoScrollVelocity) > 0.001,
-            activeHandleDragDirection != nil,
-            let scrollView = timelineScrollView
-        else {
-            return
-        }
-
-        let now = CACurrentMediaTime()
-        guard let lastTick = autoScrollLastTick else {
-            autoScrollLastTick = now
-            return
-        }
-        autoScrollLastTick = now
-
-        let deltaTime = min(max(now - lastTick, 0), 0.05)
-        let currentOffset = scrollView.contentOffset.x
-        let maxOffset = max(scrollView.contentSize.width - scrollView.bounds.width, 0)
-        let targetOffset = min(
-            max(currentOffset + autoScrollVelocity * CGFloat(deltaTime), 0),
-            maxOffset
-        )
-
-        let movedOffset = targetOffset - currentOffset
-        guard abs(movedOffset) > 0.0001 else { return }
-
-        scrollView.setContentOffset(CGPoint(x: targetOffset, y: scrollView.contentOffset.y), animated: false)
-        timelineViewportOffsetX = targetOffset
-        timelineViewportWidth = scrollView.bounds.width
-        timelineContentWidth = scrollView.contentSize.width
-        autoScrollAdditionalSeconds += seconds(
-            forTranslation: movedOffset,
-            contentWidth: activeHandleContentWidth
-        )
-        applyActiveHandleDrag()
     }
 
     private func seconds(forTranslation translation: CGFloat, contentWidth: CGFloat) -> Double {
