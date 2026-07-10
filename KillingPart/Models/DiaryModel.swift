@@ -277,6 +277,29 @@ struct DiaryCreateRequest: Encodable {
     let totalDuration: String
     let start: String
     let end: String
+    let musicMetadata: MusicMetadata?
+}
+
+struct MusicMetadata: Encodable, Equatable {
+    let sourceType: String?
+    let trackId: String?
+    let artistId: String?
+    let primaryGenreName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case sourceType
+        case trackId
+        case artistId
+        case primaryGenreName
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(sourceType, forKey: .sourceType)
+        try container.encodeIfPresent(trackId, forKey: .trackId)
+        try container.encodeIfPresent(artistId, forKey: .artistId)
+        try container.encodeIfPresent(primaryGenreName, forKey: .primaryGenreName)
+    }
 }
 
 struct DiaryReportRequest: Encodable {
@@ -299,6 +322,7 @@ struct DiaryUpdateRequest: Encodable {
     var totalDuration: String?
     var start: String?
     var end: String?
+    var musicMetadata: MusicMetadata?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -311,6 +335,7 @@ struct DiaryUpdateRequest: Encodable {
         case totalDuration
         case start
         case end
+        case musicMetadata
     }
 
     func encode(to encoder: Encoder) throws {
@@ -325,6 +350,7 @@ struct DiaryUpdateRequest: Encodable {
         try container.encodeIfPresent(totalDuration, forKey: .totalDuration)
         try container.encodeIfPresent(start, forKey: .start)
         try container.encodeIfPresent(end, forKey: .end)
+        try container.encodeIfPresent(musicMetadata, forKey: .musicMetadata)
     }
 }
 

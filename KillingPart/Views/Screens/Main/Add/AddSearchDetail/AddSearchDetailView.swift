@@ -350,7 +350,8 @@ private enum AddSearchDetailCutCounter {
             title: "Ditto",
             artist: "NewJeans",
             albumImageUrl: nil,
-            albumId: "preview-album-id"
+            albumId: "preview-album-id",
+            musicMetadata: nil
         ))
     }
 }

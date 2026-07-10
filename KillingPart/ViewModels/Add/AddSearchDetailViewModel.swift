@@ -55,6 +55,7 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     private let youtubeService: YoutubeServicing
     private let diaryService: DiaryServicing
+    private let itunesService: ITunesServicing
     private var hasLoaded = false
     private let minimumClipDuration: Double = 10
     private let maximumClipDurationLimit: Double = 30
@@ -66,11 +67,13 @@ final class AddSearchDetailViewModel: ObservableObject {
         track: SpotifySimpleTrack,
         prefill: AddSearchDetailPrefill? = nil,
         youtubeService: YoutubeServicing = YoutubeService(),
-        diaryService: DiaryServicing = DiaryService()
+        diaryService: DiaryServicing = DiaryService(),
+        itunesService: ITunesServicing = ITunesService()
     ) {
         self.track = track
         self.youtubeService = youtubeService
         self.diaryService = diaryService
+        self.itunesService = itunesService
         self.shouldShowBoundaryLoopHint = !UserDefaults.standard.bool(
             forKey: Self.boundaryLoopHintDismissedKey
         )
@@ -269,13 +272,15 @@ final class AddSearchDetailViewModel: ObservableObject {
 
     func submitDiary() async -> Bool {
         guard !isSavingDiary else { return false }
-        guard let request = buildDiaryCreateRequest() else {
-            return false
-        }
 
         isSavingDiary = true
         saveErrorMessage = nil
         defer { isSavingDiary = false }
+
+        let resolvedMetadata = await resolveMusicMetadata()
+        guard let request = buildDiaryCreateRequest(musicMetadata: resolvedMetadata) else {
+            return false
+        }
 
         do {
             _ = try await diaryService.createDiary(request: request)
@@ -408,7 +413,31 @@ final class AddSearchDetailViewModel: ObservableObject {
         return "일기 저장에 실패했어요."
     }
 
-    private func buildDiaryCreateRequest() -> DiaryCreateRequest? {
+    /// 선택한 곡에 추천용 metadata가 없으면(Spotify 출처 등) iTunes를 직접 조회해
+    /// "제목 아티스트" 상위 결과의 metadata를 사용한다. 문자열 매칭이 아니라 iTunes 랭킹을 신뢰한다.
+    private func resolveMusicMetadata() async -> MusicMetadata? {
+        if let metadata = track.musicMetadata {
+            print("[Diary][Metadata] 선택 곡에 metadata 존재 → 그대로 사용")
+            return metadata
+        }
+
+        let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let artist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = "\(title) \(artist)".trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return nil }
+
+        do {
+            let results = try await itunesService.searchTracks(query: query, limit: 1, offset: 0)
+            let metadata = results.first?.musicMetadata
+            print("[Diary][Metadata] iTunes 조회 query=\"\(query)\" → \(metadata == nil ? "매칭 실패(nil)" : "매칭 성공")")
+            return metadata
+        } catch {
+            print("[Diary][Metadata] iTunes 조회 실패: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func buildDiaryCreateRequest(musicMetadata: MusicMetadata?) -> DiaryCreateRequest? {
         let trimmedArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedMusicTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trackAlbumImageUrl = (track.albumImageUrl ?? "")
@@ -444,7 +473,8 @@ final class AddSearchDetailViewModel: ObservableObject {
             duration: clipDurationText,
             totalDuration: selectedVideoDurationText,
             start: startTimeText,
-            end: endTimeText
+            end: endTimeText,
+            musicMetadata: musicMetadata
         )
     }
 

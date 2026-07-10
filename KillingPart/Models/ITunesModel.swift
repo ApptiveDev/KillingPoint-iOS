@@ -9,6 +9,8 @@ struct ITunesTrackItem: Decodable {
     let trackId: Int?
     let trackName: String?
     let artistName: String?
+    let artistId: Int?
+    let primaryGenreName: String?
     let artworkUrl100: String?
     let collectionId: Int?
 }
