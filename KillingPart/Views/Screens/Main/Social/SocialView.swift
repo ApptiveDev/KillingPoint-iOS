@@ -11,6 +11,8 @@ struct SocialView: View {
     @State private var isNotificationListActive = false
     @State private var friendSearchText: String
     @State private var handledDeepLinkRequestID: UUID?
+    @State private var requestedFriendSection: SocialFriendSection?
+    @State private var friendsProfileAnalyticsEntryPoint: NotificationAnalyticsEntryPoint?
 
     init(
         isRootTabSelected: Bool,
@@ -42,6 +44,9 @@ struct SocialView: View {
                                 .frame(maxWidth: .infinity)
 
                             Button {
+                                NotificationAnalytics.trackNotificationListViewed(
+                                    unreadCount: notificationListViewModel.unreadAlarmCount
+                                )
                                 isNotificationListActive = true
                             } label: {
                                 ZStack(alignment: .topTrailing) {
@@ -69,7 +74,9 @@ struct SocialView: View {
                             FriendsSectionView(
                                 viewModel: viewModel,
                                 searchText: $friendSearchText,
-                                bottomContentInset: friendsBottomContentInset
+                                bottomContentInset: friendsBottomContentInset,
+                                requestedFriendSection: $requestedFriendSection,
+                                profileAnalyticsEntryPoint: $friendsProfileAnalyticsEntryPoint
                             )
                         } else {
                             FeedSectionView(
@@ -115,8 +122,11 @@ struct SocialView: View {
             switch pendingRoute {
             case .socialFriends:
                 print("[PushRoute] external route -> Social Friends Section")
+                requestedFriendSection = .myFandom
+                friendsProfileAnalyticsEntryPoint = .pickList
                 selectedTopTab = .friend
                 isNotificationListActive = false
+                NotificationAnalytics.trackPickListViewed(entryPoint: .push)
             }
 
             notificationListViewModel.clearPendingExternalRoute()
@@ -166,7 +176,8 @@ struct SocialView: View {
                         MyCollectionDiary(
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
-                            diary: destination.diary
+                            diary: destination.diary,
+                            analyticsEntryPoint: destination.analyticsEntryPoint
                         )
                     } else {
                         EmptyView()
@@ -186,6 +197,7 @@ struct SocialView: View {
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
                             diary: destination.diary,
+                            analyticsEntryPoint: destination.analyticsEntryPoint,
                             makeCollectionViewModel: { user in
                                 notificationListViewModel.makeSocialMyCollectionViewModel(for: user)
                             }
@@ -208,7 +220,8 @@ struct SocialView: View {
                             viewModel: notificationListViewModel.makeSocialMyCollectionViewModel(
                                 for: destination.user,
                                 initialUserFeedsResponse: destination.initialUserFeedsResponse
-                            )
+                            ),
+                            analyticsEntryPoint: destination.analyticsEntryPoint
                         )
                         .id(destination.user.userId)
                     } else {

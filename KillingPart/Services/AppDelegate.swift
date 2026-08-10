@@ -4,6 +4,8 @@ import FirebaseMessaging
 import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    private var hasBecomeActive = false
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -12,15 +14,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
-        if let remotePayload = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
-            FCMManager.shared.handleLaunchRemoteNotification(remotePayload)
-        }
         let amplitudeApiKey = (Bundle.main.object(forInfoDictionaryKey: "AMPLITUDE_API_KEY") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         AmplitudeClient.shared.configure(apiKey: amplitudeApiKey)
         AmplitudeClient.shared.track(eventType: "app_opened")
+        if let remotePayload = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
+            FCMManager.shared.handleLaunchRemoteNotification(remotePayload)
+        }
         print("[FCM][1] Firebase 초기화 완료")
         return true
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        hasBecomeActive = true
     }
 
     // APNs 토큰 수신 — swizzling 비활성화 시 필수, 활성화 시에도 명시적으로 처리
@@ -69,8 +75,15 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
+            completionHandler()
+            return
+        }
         print("[FCM][Tap] 알림 탭 감지")
-        FCMManager.shared.handleNotificationResponse(response)
+        FCMManager.shared.handleNotificationResponse(
+            response,
+            isColdStart: !hasBecomeActive
+        )
         completionHandler()
     }
 }

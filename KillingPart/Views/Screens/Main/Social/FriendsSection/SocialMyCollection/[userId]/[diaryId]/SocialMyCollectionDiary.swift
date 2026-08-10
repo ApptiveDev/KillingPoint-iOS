@@ -8,6 +8,7 @@ struct SocialMyCollectionDiary: View {
 
     let diaryId: Int
     let displayTag: String
+    let analyticsEntryPoint: NotificationAnalyticsEntryPoint?
     let onDiaryUpdated: (() -> Void)?
     let onDiaryDeleted: ((Int) -> Void)?
     let makeCollectionViewModel: ((UserModel) -> SocialMyCollectionViewModel)?
@@ -22,6 +23,7 @@ struct SocialMyCollectionDiary: View {
     @State private var selectedNavigationUser: UserModel?
     @State private var isUserCollectionNavigationActive = false
     @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
+    @State private var hasTrackedDetailView = false
 
     private let commentFocusAnchorID = "social-my-collection-diary-comment-focus-anchor"
 
@@ -29,6 +31,7 @@ struct SocialMyCollectionDiary: View {
         diaryId: Int,
         displayTag: String,
         diary: DiaryFeedModel,
+        analyticsEntryPoint: NotificationAnalyticsEntryPoint? = nil,
         onDiaryUpdated: (() -> Void)? = nil,
         onDiaryDeleted: ((Int) -> Void)? = nil,
         makeCollectionViewModel: ((UserModel) -> SocialMyCollectionViewModel)? = nil,
@@ -36,6 +39,7 @@ struct SocialMyCollectionDiary: View {
     ) {
         self.diaryId = diaryId
         self.displayTag = displayTag
+        self.analyticsEntryPoint = analyticsEntryPoint
         self.onDiaryUpdated = onDiaryUpdated
         self.onDiaryDeleted = onDiaryDeleted
         self.makeCollectionViewModel = makeCollectionViewModel
@@ -145,6 +149,13 @@ struct SocialMyCollectionDiary: View {
             updateKeyboardHeight(from: notification)
         }
         .onAppear {
+            if !hasTrackedDetailView {
+                hasTrackedDetailView = true
+                NotificationAnalytics.trackKillingPartDetailViewed(
+                    entryPoint: analyticsEntryPoint,
+                    diaryID: diaryId
+                )
+            }
             handleFocusActivated()
         }
         .onChange(of: scenePhase) { phase in

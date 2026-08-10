@@ -4,6 +4,8 @@ struct FriendsSectionView: View {
     @ObservedObject var viewModel: SocialViewModel
     @Binding var searchText: String
     let bottomContentInset: CGFloat
+    @Binding var requestedFriendSection: SocialFriendSection?
+    @Binding var profileAnalyticsEntryPoint: NotificationAnalyticsEntryPoint?
     @State private var selectedFriendSection: SocialFriendSection = .myPick
 
     var body: some View {
@@ -42,13 +44,33 @@ struct FriendsSectionView: View {
                 },
                 makeCollectionViewModel: { user, fallbackIsMyPick in
                     viewModel.makeSocialMyCollectionViewModel(for: user, fallbackIsMyPick: fallbackIsMyPick)
-                }
+                },
+                profileAnalyticsEntryPoint: profileAnalyticsEntryPoint
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .onChange(of: searchText) { query in
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                profileAnalyticsEntryPoint = nil
+            }
             Task {
                 await viewModel.searchUsers(with: query)
+            }
+        }
+        .onChange(of: requestedFriendSection) { section in
+            guard let section else { return }
+            selectedFriendSection = section
+            requestedFriendSection = nil
+        }
+        .onAppear {
+            if let requestedFriendSection {
+                selectedFriendSection = requestedFriendSection
+                self.requestedFriendSection = nil
+            }
+        }
+        .onChange(of: selectedFriendSection) { section in
+            if section != .myFandom {
+                profileAnalyticsEntryPoint = nil
             }
         }
     }

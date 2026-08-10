@@ -30,4 +30,17 @@ struct KillingPartTests {
         #expect(AddSearchDetailTrimInteractionControl.unknown.rawValue == "unknown")
     }
 
+    @Test func notificationAnalyticsValuesMatchContract() {
+        #expect(AlarmType.like.analyticsNotificationType == "like")
+        #expect(AlarmType.subscribe.analyticsNotificationType == "pick")
+        #expect(AlarmType.diary.analyticsNotificationType == "new_killingpart")
+        #expect(AlarmType(rawValue: "OTHER").analyticsNotificationType == "unknown")
+        #expect(NotificationAnalyticsEntryPoint.push.rawValue == "push")
+        #expect(
+            NotificationAnalyticsEntryPoint.notificationList.rawValue
+                == "notification_list"
+        )
+        #expect(NotificationAnalyticsEntryPoint.pickList.rawValue == "pick_list")
+    }
+
 }

@@ -204,11 +204,16 @@ struct NotificationListView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(viewModel.alarms) { alarm in
-                        alarmRow(for: alarm)
+                    ForEach(Array(viewModel.alarms.enumerated()), id: \.element.id) { indexedAlarm in
+                        alarmRow(
+                            for: indexedAlarm.element,
+                            listPosition: indexedAlarm.offset
+                        )
                             .onAppear {
                                 Task {
-                                    await viewModel.loadMoreAlarmHistoryIfNeeded(currentAlarmId: alarm.alarmId)
+                                    await viewModel.loadMoreAlarmHistoryIfNeeded(
+                                        currentAlarmId: indexedAlarm.element.alarmId
+                                    )
                                 }
                             }
                     }
@@ -226,7 +231,7 @@ struct NotificationListView: View {
     }
 
     @ViewBuilder
-    private func alarmRow(for alarm: AlarmHistoryItem) -> some View {
+    private func alarmRow(for alarm: AlarmHistoryItem, listPosition: Int) -> some View {
         let isSelected = viewModel.selectedAlarmIDs.contains(alarm.alarmId)
 
         if viewModel.isAlarmSelectionMode {
@@ -243,7 +248,7 @@ struct NotificationListView: View {
                     "[NotificationRoute] row tap alarmId=\(alarm.alarmId) type=\(alarm.type.rawValue) deepLink=\(alarm.deepLink)"
                 )
                 Task {
-                    await viewModel.handleAlarmTap(alarm)
+                    await viewModel.handleAlarmTap(alarm, listPosition: listPosition)
                 }
             } label: {
                 alarmRowContent(for: alarm, isSelected: false)
@@ -304,7 +309,8 @@ struct NotificationListView: View {
                         MyCollectionDiary(
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
-                            diary: destination.diary
+                            diary: destination.diary,
+                            analyticsEntryPoint: destination.analyticsEntryPoint
                         )
                     } else {
                         EmptyView()
@@ -324,6 +330,7 @@ struct NotificationListView: View {
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
                             diary: destination.diary,
+                            analyticsEntryPoint: destination.analyticsEntryPoint,
                             makeCollectionViewModel: { user in
                                 viewModel.makeSocialMyCollectionViewModel(for: user)
                             }
@@ -346,7 +353,8 @@ struct NotificationListView: View {
                             viewModel: viewModel.makeSocialMyCollectionViewModel(
                                 for: destination.user,
                                 initialUserFeedsResponse: destination.initialUserFeedsResponse
-                            )
+                            ),
+                            analyticsEntryPoint: destination.analyticsEntryPoint
                         )
                         .id(destination.user.userId)
                     } else {
