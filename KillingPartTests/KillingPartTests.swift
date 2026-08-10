@@ -111,4 +111,53 @@ struct KillingPartTests {
         #expect(events[3].properties["stay_duration_sec"] as? Double == 2.5)
     }
 
+    @Test func diaryCreateRequestEncodesMusicCategory() throws {
+        let request = DiaryCreateRequest(
+            artist: "NewJeans",
+            musicTitle: "Ditto",
+            albumImageUrl: "https://example.com/album.jpg",
+            videoUrl: "video-id",
+            scope: .public,
+            content: "좋아하는 구간",
+            duration: "00:30",
+            totalDuration: "03:05",
+            start: "00:10",
+            end: "00:40",
+            musicMetadata: MusicMetadata(
+                sourceType: "ITUNES",
+                trackId: "1659513441",
+                artistId: "1591118672",
+                primaryGenreName: "K-Pop"
+            )
+        )
+
+        let json = try #require(encodedJSONObject(request))
+        let metadata = try #require(json["musicMetadata"] as? [String: Any])
+
+        #expect(metadata["primaryGenreName"] as? String == "K-Pop")
+    }
+
+    @Test func diaryUpdateRequestEncodesMusicCategory() throws {
+        let request = DiaryUpdateRequest(
+            content: "수정한 코멘트",
+            musicMetadata: MusicMetadata(
+                sourceType: "ITUNES",
+                trackId: "1659513441",
+                artistId: "1591118672",
+                primaryGenreName: "K-Pop"
+            )
+        )
+
+        let json = try #require(encodedJSONObject(request))
+        let metadata = try #require(json["musicMetadata"] as? [String: Any])
+
+        #expect(metadata["primaryGenreName"] as? String == "K-Pop")
+    }
+
+    private func encodedJSONObject<T: Encodable>(_ value: T) -> [String: Any]? {
+        let data = try? JSONEncoder().encode(value)
+        guard let data else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
 }

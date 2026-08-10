@@ -18,6 +18,7 @@ final class MyCollectionDiaryViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let diaryService: DiaryServicing
+    private let itunesService: ITunesServicing
     private var isRefreshingInteractionState = false
     private let maxRefreshScanPageCount = 100
     private let likeUsersPageSize = 20
@@ -28,10 +29,12 @@ final class MyCollectionDiaryViewModel: ObservableObject {
 
     init(
         diary: DiaryFeedModel,
-        diaryService: DiaryServicing = DiaryService()
+        diaryService: DiaryServicing = DiaryService(),
+        itunesService: ITunesServicing = ITunesService()
     ) {
         self.diary = diary
         self.diaryService = diaryService
+        self.itunesService = itunesService
         self.displayedStart = diary.start
         self.displayedEnd = diary.end
         self.displayedContent = diary.content
@@ -87,14 +90,16 @@ final class MyCollectionDiaryViewModel: ObservableObject {
             return false
         }
 
-        let payload = trimmedEditContent
-        let request = DiaryUpdateRequest(
-            content: payload
-        )
-
         isProcessing = true
         errorMessage = nil
         defer { isProcessing = false }
+
+        let payload = trimmedEditContent
+        let musicMetadata = await resolveMusicMetadata()
+        let request = DiaryUpdateRequest(
+            content: payload,
+            musicMetadata: musicMetadata
+        )
 
         do {
             try await diaryService.updateDiary(diaryId: diary.diaryId, request: request)
@@ -106,6 +111,25 @@ final class MyCollectionDiaryViewModel: ObservableObject {
             if isRequestCancelled(error) { return false }
             errorMessage = resolveErrorMessage(from: error)
             return false
+        }
+    }
+
+    /// 수정 요청에도 등록 요청과 같은 음악 카테고리(primaryGenreName)를 포함한다.
+    /// 메타데이터 조회 실패가 코멘트 수정 자체를 막지는 않도록 nil을 허용한다.
+    private func resolveMusicMetadata() async -> MusicMetadata? {
+        let title = diary.musicTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let artist = diary.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = "\(title) \(artist)".trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return nil }
+
+        do {
+            return try await itunesService
+                .searchTracks(query: query, limit: 1, offset: 0)
+                .first?
+                .musicMetadata
+        } catch {
+            print("[Diary][Metadata] 수정 시 iTunes 조회 실패: \(error.localizedDescription)")
+            return nil
         }
     }
 
