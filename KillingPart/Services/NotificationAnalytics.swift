@@ -6,6 +6,12 @@ enum NotificationAnalyticsEntryPoint: String {
     case pickList = "pick_list"
 }
 
+enum NotificationListAnalyticsEntryPoint: String {
+    case push
+    case socialTab = "social_tab"
+    case unknown
+}
+
 extension AlarmType {
     var analyticsNotificationType: String {
         switch self {
@@ -35,8 +41,14 @@ enum NotificationAnalytics {
         track("push_notification_opened", properties: properties)
     }
 
-    static func trackNotificationListViewed(unreadCount: Int?) {
+    static func trackNotificationListViewed(
+        entryPoint: NotificationListAnalyticsEntryPoint?,
+        unreadCount: Int?
+    ) {
         var properties: [String: Any] = [:]
+        if let entryPoint {
+            properties["entry_point"] = entryPoint.rawValue
+        }
         if let unreadCount {
             properties["unread_count"] = max(unreadCount, 0)
         }

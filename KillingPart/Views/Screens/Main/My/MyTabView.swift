@@ -2,11 +2,14 @@ import SwiftUI
 import UIKit
 
 struct MyTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
     let onLogout: () -> Void
     let isRootTabSelected: Bool
     let startupPayload: MainStartupPayload?
     @State private var selectedTab: MyTopTab = .playKillingPart
     @State private var tabTransitionDirection: Edge = .trailing
+    @State private var analyticsSession = SubTabAnalyticsSession(parent: .my)
+    @State private var hasEnteredRootForAnalytics = false
     private static var hasConfiguredSegmentedControlAppearance = false
     private let tabAnimation = Animation.interactiveSpring(
         response: 0.32,
@@ -46,8 +49,35 @@ struct MyTabView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar(.hidden, for: .navigationBar)
         }
+        .onAppear {
+            guard isRootTabSelected else { return }
+            let entryType: SubTabAnalyticsEntryType = hasEnteredRootForAnalytics ? .unknown : .appLaunch
+            hasEnteredRootForAnalytics = true
+            analyticsSession.begin(selectedTab.analyticsName, entryType: entryType)
+        }
+        .onDisappear {
+            guard isRootTabSelected, scenePhase == .active else { return }
+            analyticsSession.end(reason: .viewDisappear)
+        }
+        .onChange(of: isRootTabSelected) { isSelected in
+            if isSelected {
+                hasEnteredRootForAnalytics = true
+                analyticsSession.begin(selectedTab.analyticsName, entryType: .tabEnter)
+            } else {
+                analyticsSession.end(reason: .tabChange)
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                guard isRootTabSelected else { return }
+                hasEnteredRootForAnalytics = true
+                analyticsSession.begin(selectedTab.analyticsName, entryType: .appForeground)
+            } else {
+                analyticsSession.end(reason: .appBackground)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToPlayKillingPart)) { _ in
-            selectTab(.playKillingPart)
+            selectTab(.playKillingPart, entryType: .unknown)
         }
     }
 
@@ -71,12 +101,15 @@ struct MyTabView: View {
         Binding(
             get: { selectedTab },
             set: { newTab in
-                selectTab(newTab)
+                selectTab(newTab, entryType: .userSelect)
             }
         )
     }
 
-    private func selectTab(_ newTab: MyTopTab) {
+    private func selectTab(
+        _ newTab: MyTopTab,
+        entryType: SubTabAnalyticsEntryType
+    ) {
         let previousIndex = selectedTab.order
         let nextIndex = newTab.order
 
@@ -87,6 +120,9 @@ struct MyTabView: View {
         withAnimation(tabAnimation) {
             selectedTab = newTab
         }
+
+        guard isRootTabSelected, scenePhase == .active else { return }
+        analyticsSession.transition(to: newTab.analyticsName, entryType: entryType)
     }
 
     private var tabContentTransition: AnyTransition {
@@ -138,6 +174,17 @@ private enum MyTopTab: CaseIterable {
             return 1
         case .musicCalendar:
             return 2
+        }
+    }
+
+    var analyticsName: SubTabAnalyticsName {
+        switch self {
+        case .myCollection:
+            return .collection
+        case .playKillingPart:
+            return .killingPartPlay
+        case .musicCalendar:
+            return .musicCalendar
         }
     }
 }

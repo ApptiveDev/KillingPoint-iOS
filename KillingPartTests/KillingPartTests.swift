@@ -5,6 +5,7 @@
 //  Created by 이병찬 on 2/7/26.
 //
 
+import Foundation
 import Testing
 @testable import KillingPart
 
@@ -41,6 +42,73 @@ struct KillingPartTests {
                 == "notification_list"
         )
         #expect(NotificationAnalyticsEntryPoint.pickList.rawValue == "pick_list")
+        #expect(NotificationListAnalyticsEntryPoint.push.rawValue == "push")
+        #expect(NotificationListAnalyticsEntryPoint.socialTab.rawValue == "social_tab")
+        #expect(NotificationListAnalyticsEntryPoint.unknown.rawValue == "unknown")
+    }
+
+    @Test func subTabAnalyticsValuesMatchContract() {
+        #expect(SubTabAnalyticsParent.my.rawValue == "my")
+        #expect(SubTabAnalyticsParent.social.rawValue == "social")
+
+        #expect(SubTabAnalyticsName.collection.rawValue == "collection")
+        #expect(SubTabAnalyticsName.killingPartPlay.rawValue == "killingpart_play")
+        #expect(SubTabAnalyticsName.musicCalendar.rawValue == "music_calendar")
+        #expect(SubTabAnalyticsName.feed.rawValue == "feed")
+        #expect(SubTabAnalyticsName.friends.rawValue == "friends")
+        #expect(SubTabAnalyticsName.notification.rawValue == "notification")
+        #expect(SubTabAnalyticsName.unknown.rawValue == "unknown")
+
+        #expect(SubTabAnalyticsEntryType.appLaunch.rawValue == "app_launch")
+        #expect(SubTabAnalyticsEntryType.appForeground.rawValue == "app_foreground")
+        #expect(SubTabAnalyticsEntryType.tabEnter.rawValue == "tab_enter")
+        #expect(SubTabAnalyticsEntryType.userSelect.rawValue == "user_select")
+        #expect(SubTabAnalyticsEntryType.unknown.rawValue == "unknown")
+
+        #expect(SubTabAnalyticsEndReason.subTabChange.rawValue == "sub_tab_change")
+        #expect(SubTabAnalyticsEndReason.tabChange.rawValue == "tab_change")
+        #expect(SubTabAnalyticsEndReason.appBackground.rawValue == "app_background")
+        #expect(SubTabAnalyticsEndReason.viewDisappear.rawValue == "view_disappear")
+    }
+
+    @Test func subTabAnalyticsSessionPairsSelectionAndStayWithoutDuplicateReselection() {
+        var events: [(type: String, properties: [String: Any])] = []
+        let session = SubTabAnalyticsSession(parent: .my) { type, properties in
+            events.append((type, properties))
+        }
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+
+        session.begin(.killingPartPlay, entryType: .appLaunch, at: startedAt)
+        session.transition(
+            to: .killingPartPlay,
+            entryType: .userSelect,
+            at: startedAt.addingTimeInterval(0.5)
+        )
+        session.transition(
+            to: .collection,
+            entryType: .userSelect,
+            at: startedAt.addingTimeInterval(1.234)
+        )
+        session.end(
+            reason: .tabChange,
+            at: startedAt.addingTimeInterval(3.734)
+        )
+
+        #expect(events.count == 4)
+        #expect(events.map(\.type) == [
+            "sub_tab_selected",
+            "sub_tab_stayed",
+            "sub_tab_selected",
+            "sub_tab_stayed"
+        ])
+        #expect(events[0].properties["entry_type"] as? String == "app_launch")
+        #expect(events[0].properties["previous_sub_tab"] as? String == "none")
+        #expect(events[1].properties["end_reason"] as? String == "sub_tab_change")
+        #expect(events[1].properties["stay_duration_sec"] as? Double == 1.23)
+        #expect(events[2].properties["entry_type"] as? String == "user_select")
+        #expect(events[2].properties["previous_sub_tab"] as? String == "killingpart_play")
+        #expect(events[3].properties["end_reason"] as? String == "tab_change")
+        #expect(events[3].properties["stay_duration_sec"] as? Double == 2.5)
     }
 
 }
