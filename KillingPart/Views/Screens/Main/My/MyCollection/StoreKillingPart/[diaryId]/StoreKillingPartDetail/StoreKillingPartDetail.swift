@@ -159,7 +159,8 @@ struct StoreKillingPartDetail: View {
             title: diary.musicTitle,
             artist: diary.artist,
             albumImageUrl: diary.albumImageUrl,
-            albumId: "store-\(diary.diaryId)"
+            albumId: "store-\(diary.diaryId)",
+            musicMetadata: nil
         )
     }
 

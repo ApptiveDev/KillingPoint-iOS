@@ -243,7 +243,25 @@ struct ITunesService: ITunesServicing {
             title: title,
             artist: artist,
             albumImageUrl: artworkURL,
-            albumId: albumID
+            albumId: albumID,
+            musicMetadata: musicMetadata(for: item)
+        )
+    }
+
+    private func musicMetadata(for item: ITunesTrackItem) -> MusicMetadata? {
+        let primaryGenreName = item.primaryGenreName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedGenreName = primaryGenreName?.isEmpty == false ? primaryGenreName : nil
+
+        guard item.trackId != nil || item.artistId != nil || normalizedGenreName != nil else {
+            return nil
+        }
+
+        return MusicMetadata(
+            sourceType: "ITUNES",
+            trackId: item.trackId.map(String.init),
+            artistId: item.artistId.map(String.init),
+            primaryGenreName: normalizedGenreName
         )
     }
 

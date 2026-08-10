@@ -10,6 +10,7 @@ struct SocialFriendListView: View {
     let onRetry: () -> Void
     let onUserAppear: (Int) -> Void
     let makeCollectionViewModel: (SocialListUser, Bool?) -> SocialMyCollectionViewModel
+    let profileAnalyticsEntryPoint: NotificationAnalyticsEntryPoint?
 
     var body: some View {
         ScrollView {
@@ -45,7 +46,8 @@ struct SocialFriendListView: View {
                         ForEach(users) { user in
                             NavigationLink {
                                 SocialMyCollectionView(
-                                    viewModel: makeCollectionViewModel(for: user)
+                                    viewModel: makeCollectionViewModel(for: user),
+                                    analyticsEntryPoint: profileAnalyticsEntryPoint
                                 )
                                 .id(user.userId)
                             } label: {

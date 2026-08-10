@@ -8,6 +8,7 @@ struct MyCollectionDiary: View {
 
     let diaryId: Int
     let displayTag: String
+    let analyticsEntryPoint: NotificationAnalyticsEntryPoint?
     let onDiaryUpdated: ((DiaryFeedModel) -> Void)?
     let onDiaryDeleted: ((Int) -> Void)?
     @StateObject private var viewModel: MyCollectionDiaryViewModel
@@ -18,6 +19,7 @@ struct MyCollectionDiary: View {
     @State private var actionAlert: MyCollectionDiaryActionAlert?
     @State private var keyboardHeight: CGFloat = 0
     @State private var playerReloadToken = UUID()
+    @State private var hasTrackedDetailView = false
 
     private let commentFocusAnchorID = "my-collection-diary-comment-focus-anchor"
 
@@ -25,12 +27,14 @@ struct MyCollectionDiary: View {
         diaryId: Int,
         displayTag: String,
         diary: DiaryFeedModel,
+        analyticsEntryPoint: NotificationAnalyticsEntryPoint? = nil,
         onDiaryUpdated: ((DiaryFeedModel) -> Void)? = nil,
         onDiaryDeleted: ((Int) -> Void)? = nil,
         diaryService: DiaryServicing = DiaryService()
     ) {
         self.diaryId = diaryId
         self.displayTag = displayTag
+        self.analyticsEntryPoint = analyticsEntryPoint
         self.onDiaryUpdated = onDiaryUpdated
         self.onDiaryDeleted = onDiaryDeleted
         _viewModel = StateObject(
@@ -128,6 +132,14 @@ struct MyCollectionDiary: View {
                     }
                 }
             }
+        }
+        .onAppear {
+            guard !hasTrackedDetailView else { return }
+            hasTrackedDetailView = true
+            NotificationAnalytics.trackKillingPartDetailViewed(
+                entryPoint: analyticsEntryPoint,
+                diaryID: diaryId
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             updateKeyboardHeight(from: notification)

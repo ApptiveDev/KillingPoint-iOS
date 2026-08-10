@@ -209,10 +209,22 @@ final class AddTabViewModel: ObservableObject {
         let spotifyOutcome = await spotifyResult
         let iTunesOutcome = await iTunesResult
 
+        // 검색 정확도는 Spotify가 우수하므로 표시 순서는 Spotify를 primary로 유지하고,
+        // 추천용 musicMetadata는 같은 곡의 iTunes 결과에서 찾아 채워 넣는다.
         let mergedTracks = mergeTracks(
             primary: spotifyOutcome.tracks,
             secondary: iTunesOutcome.tracks,
+            metadataSource: iTunesOutcome.tracks,
             limit: safeLimit
+        )
+
+        let iTunesWithMetadata = iTunesOutcome.tracks.filter { $0.musicMetadata != nil }.count
+        let mergedWithMetadata = mergedTracks.filter { $0.musicMetadata != nil }.count
+        print(
+            "[Search] query=\"\(query)\" "
+            + "spotify=\(spotifyOutcome.tracks.count) "
+            + "itunes=\(iTunesOutcome.tracks.count)(meta:\(iTunesWithMetadata)) "
+            + "merged=\(mergedTracks.count)(meta:\(mergedWithMetadata))"
         )
 
         if !mergedTracks.isEmpty {
@@ -271,21 +283,84 @@ final class AddTabViewModel: ObservableObject {
     private func mergeTracks(
         primary: [SpotifySimpleTrack],
         secondary: [SpotifySimpleTrack],
+        metadataSource: [SpotifySimpleTrack] = [],
         limit: Int
     ) -> [SpotifySimpleTrack] {
+        let metadataByKey = metadataLookup(from: metadataSource)
+
         var merged: [SpotifySimpleTrack] = []
         var dedupeKeys = Set<String>()
 
         for track in primary + secondary {
             let key = normalizedTrackIdentity(for: track)
             guard dedupeKeys.insert(key).inserted else { continue }
-            merged.append(track)
+            merged.append(enrichedTrack(track, key: key, metadataByKey: metadataByKey))
             if merged.count == limit {
                 break
             }
         }
 
         return merged
+    }
+
+    private func metadataLookup(
+        from tracks: [SpotifySimpleTrack]
+    ) -> (byIdentity: [String: MusicMetadata], byTitle: [String: MusicMetadata], byBaseTitle: [String: MusicMetadata]) {
+        var byIdentity: [String: MusicMetadata] = [:]
+        var byTitle: [String: MusicMetadata] = [:]
+        var byBaseTitle: [String: MusicMetadata] = [:]
+        for track in tracks {
+            guard let metadata = track.musicMetadata else { continue }
+            let identityKey = normalizedTrackIdentity(for: track)
+            if byIdentity[identityKey] == nil {
+                byIdentity[identityKey] = metadata
+            }
+            // 아티스트 표기가 서비스마다 달라(예: "스윙스" vs "Swings") 제목만으로도 보조 매칭한다.
+            let titleKey = normalizedIdentityComponent(track.title)
+            if byTitle[titleKey] == nil {
+                byTitle[titleKey] = metadata
+            }
+            // 부제/피처링 표기(예: "파급효과 (Ripple Effect)" vs "파급효과")를 제거한 기본 제목으로도 매칭한다.
+            let baseKey = baseTitleKey(from: track.title)
+            if !baseKey.isEmpty, byBaseTitle[baseKey] == nil {
+                byBaseTitle[baseKey] = metadata
+            }
+        }
+        return (byIdentity, byTitle, byBaseTitle)
+    }
+
+    private func baseTitleKey(from title: String) -> String {
+        let withoutBrackets = title
+            .replacingOccurrences(of: "\\(.*?\\)", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "feat\\..*", with: "", options: [.regularExpression, .caseInsensitive])
+        return normalizedIdentityComponent(withoutBrackets)
+    }
+
+    private func enrichedTrack(
+        _ track: SpotifySimpleTrack,
+        key: String,
+        metadataByKey: (byIdentity: [String: MusicMetadata], byTitle: [String: MusicMetadata], byBaseTitle: [String: MusicMetadata])
+    ) -> SpotifySimpleTrack {
+        guard track.musicMetadata == nil else { return track }
+
+        let titleKey = normalizedIdentityComponent(track.title)
+        let baseKey = baseTitleKey(from: track.title)
+        let resolvedMetadata = metadataByKey.byIdentity[key]
+            ?? metadataByKey.byTitle[titleKey]
+            ?? (baseKey.isEmpty ? nil : metadataByKey.byBaseTitle[baseKey])
+        guard let metadata = resolvedMetadata else {
+            return track
+        }
+
+        return SpotifySimpleTrack(
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            albumImageUrl: track.albumImageUrl,
+            albumId: track.albumId,
+            musicMetadata: metadata
+        )
     }
 
     private func normalizedTrackIdentity(for track: SpotifySimpleTrack) -> String {

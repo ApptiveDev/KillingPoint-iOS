@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SocialView: View {
+    @Environment(\.scenePhase) private var scenePhase
     let isRootTabSelected: Bool
     @ObservedObject var viewModel: SocialViewModel
     @ObservedObject var feedViewModel: FeedViewModel
@@ -11,6 +12,9 @@ struct SocialView: View {
     @State private var isNotificationListActive = false
     @State private var friendSearchText: String
     @State private var handledDeepLinkRequestID: UUID?
+    @State private var requestedFriendSection: SocialFriendSection?
+    @State private var friendsProfileAnalyticsEntryPoint: NotificationAnalyticsEntryPoint?
+    @State private var analyticsSession = SubTabAnalyticsSession(parent: .social)
 
     init(
         isRootTabSelected: Bool,
@@ -38,11 +42,11 @@ struct SocialView: View {
 
                     VStack(spacing: AppSpacing.m) {
                         HStack(spacing: AppSpacing.s) {
-                            SocialTopToggleTabsView(selectedTopTab: $selectedTopTab)
+                            SocialTopToggleTabsView(selectedTopTab: socialTopTabSelectionBinding)
                                 .frame(maxWidth: .infinity)
 
                             Button {
-                                isNotificationListActive = true
+                                openNotificationList()
                             } label: {
                                 ZStack(alignment: .topTrailing) {
                                     Image(systemName: "bell")
@@ -69,7 +73,9 @@ struct SocialView: View {
                             FriendsSectionView(
                                 viewModel: viewModel,
                                 searchText: $friendSearchText,
-                                bottomContentInset: friendsBottomContentInset
+                                bottomContentInset: friendsBottomContentInset,
+                                requestedFriendSection: $requestedFriendSection,
+                                profileAnalyticsEntryPoint: $friendsProfileAnalyticsEntryPoint
                             )
                         } else {
                             FeedSectionView(
@@ -109,14 +115,43 @@ struct SocialView: View {
         .task(id: deepLinkRequest?.id) {
             await handleDeepLinkRequestIfNeeded()
         }
+        .onAppear {
+            guard isRootTabSelected else { return }
+            trackDisplayedSubTab(entryType: .tabEnter)
+        }
+        .onDisappear {
+            guard isRootTabSelected, scenePhase == .active else { return }
+            analyticsSession.end(reason: .viewDisappear)
+        }
+        .onChange(of: isRootTabSelected) { isSelected in
+            if isSelected {
+                trackDisplayedSubTab(entryType: .tabEnter)
+            } else {
+                analyticsSession.end(reason: .tabChange)
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                guard isRootTabSelected else { return }
+                trackDisplayedSubTab(entryType: .appForeground)
+            } else {
+                analyticsSession.end(reason: .appBackground)
+            }
+        }
+        .onChange(of: isNotificationListActive) { isActive in
+            guard !isActive, isRootTabSelected, scenePhase == .active else { return }
+            analyticsSession.transition(to: selectedTopTab.analyticsName, entryType: .unknown)
+        }
         .onChange(of: notificationListViewModel.pendingExternalRoute) { pendingRoute in
             guard let pendingRoute else { return }
 
             switch pendingRoute {
             case .socialFriends:
                 print("[PushRoute] external route -> Social Friends Section")
-                selectedTopTab = .friend
-                isNotificationListActive = false
+                requestedFriendSection = .myFandom
+                friendsProfileAnalyticsEntryPoint = .pickList
+                selectTopTab(.friend, entryType: .unknown)
+                NotificationAnalytics.trackPickListViewed(entryPoint: .push)
             }
 
             notificationListViewModel.clearPendingExternalRoute()
@@ -144,6 +179,15 @@ struct SocialView: View {
         }
     }
 
+    private var socialTopTabSelectionBinding: Binding<SocialTopTab> {
+        Binding(
+            get: { selectedTopTab },
+            set: { newTab in
+                selectTopTab(newTab, entryType: .userSelect)
+            }
+        )
+    }
+
     private var notificationNavigationLink: some View {
         NavigationLink(
             isActive: $isNotificationListActive,
@@ -166,7 +210,8 @@ struct SocialView: View {
                         MyCollectionDiary(
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
-                            diary: destination.diary
+                            diary: destination.diary,
+                            analyticsEntryPoint: destination.analyticsEntryPoint
                         )
                     } else {
                         EmptyView()
@@ -186,6 +231,7 @@ struct SocialView: View {
                             diaryId: destination.diary.diaryId,
                             displayTag: destination.displayTag,
                             diary: destination.diary,
+                            analyticsEntryPoint: destination.analyticsEntryPoint,
                             makeCollectionViewModel: { user in
                                 notificationListViewModel.makeSocialMyCollectionViewModel(for: user)
                             }
@@ -208,7 +254,8 @@ struct SocialView: View {
                             viewModel: notificationListViewModel.makeSocialMyCollectionViewModel(
                                 for: destination.user,
                                 initialUserFeedsResponse: destination.initialUserFeedsResponse
-                            )
+                            ),
+                            analyticsEntryPoint: destination.analyticsEntryPoint
                         )
                         .id(destination.user.userId)
                     } else {
@@ -278,8 +325,7 @@ struct SocialView: View {
         guard handledDeepLinkRequestID != deepLinkRequest.id else { return }
 
         handledDeepLinkRequestID = deepLinkRequest.id
-        selectedTopTab = .feed
-        isNotificationListActive = false
+        selectTopTab(.feed, entryType: .unknown)
 
         switch deepLinkRequest.route {
         case .socialDiary(let diaryId):
@@ -287,6 +333,49 @@ struct SocialView: View {
         }
 
         onDeepLinkRequestConsumed(deepLinkRequest)
+    }
+
+    private var displayedSubTab: SubTabAnalyticsName {
+        isNotificationListActive ? .notification : selectedTopTab.analyticsName
+    }
+
+    private func trackDisplayedSubTab(entryType: SubTabAnalyticsEntryType) {
+        let shouldTrackNotificationList = analyticsSession.activeSubTab == nil && isNotificationListActive
+        analyticsSession.begin(displayedSubTab, entryType: entryType)
+
+        guard shouldTrackNotificationList else { return }
+        NotificationAnalytics.trackNotificationListViewed(
+            entryPoint: .socialTab,
+            unreadCount: notificationListViewModel.unreadAlarmCount
+        )
+    }
+
+    private func selectTopTab(
+        _ newTab: SocialTopTab,
+        entryType: SubTabAnalyticsEntryType
+    ) {
+        guard selectedTopTab != newTab || isNotificationListActive else { return }
+
+        selectedTopTab = newTab
+        isNotificationListActive = false
+
+        guard isRootTabSelected, scenePhase == .active else { return }
+        analyticsSession.transition(to: newTab.analyticsName, entryType: entryType)
+    }
+
+    private func openNotificationList() {
+        guard !isNotificationListActive else { return }
+
+        isNotificationListActive = true
+        if isRootTabSelected, scenePhase == .active {
+            analyticsSession.transition(to: .notification, entryType: .userSelect)
+        }
+
+        // Keep this after sub_tab_selected so the two streams can be reconciled by order.
+        NotificationAnalytics.trackNotificationListViewed(
+            entryPoint: .socialTab,
+            unreadCount: notificationListViewModel.unreadAlarmCount
+        )
     }
 
     private func resolvedCollectionUser(from user: UserModel) -> UserModel {

@@ -2,15 +2,21 @@ import SwiftUI
 
 struct SocialMyCollectionView: View {
     @StateObject private var viewModel: SocialMyCollectionViewModel
+    private let analyticsEntryPoint: NotificationAnalyticsEntryPoint?
     @State private var activeConnectionSheet: ConnectionSheetType?
     @State private var activeLikeUsersSheet: LikeUsersSheetContext?
     @State private var pendingNavigationUser: UserModel?
     @State private var selectedNavigationUser: UserModel?
     @State private var isUserCollectionNavigationActive = false
     @State private var likeUsersSearchText = ""
+    @State private var hasTrackedProfileView = false
 
-    init(viewModel: SocialMyCollectionViewModel) {
+    init(
+        viewModel: SocialMyCollectionViewModel,
+        analyticsEntryPoint: NotificationAnalyticsEntryPoint? = nil
+    ) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.analyticsEntryPoint = analyticsEntryPoint
     }
 
     var body: some View {
@@ -83,6 +89,14 @@ struct SocialMyCollectionView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            guard !hasTrackedProfileView else { return }
+            hasTrackedProfileView = true
+            NotificationAnalytics.trackProfileViewed(
+                entryPoint: analyticsEntryPoint,
+                profileUserID: viewModel.user.userId
+            )
+        }
         .task {
             await viewModel.loadInitialDataIfNeeded()
         }

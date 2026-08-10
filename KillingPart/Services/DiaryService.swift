@@ -226,6 +226,8 @@ struct DiaryService: DiaryServicing {
             throw DiaryServiceError.requestEncodingFailed
         }
 
+        logMusicMetadata(request.musicMetadata, context: "Create", body: requestBody)
+
         do {
             var apiRequest = APIRequest(
                 path: "/diaries",
@@ -255,6 +257,8 @@ struct DiaryService: DiaryServicing {
         } catch {
             throw DiaryServiceError.requestEncodingFailed
         }
+
+        logMusicMetadata(request.musicMetadata, context: "Update(\(diaryId))", body: requestBody)
 
         do {
             var apiRequest = APIRequest(
@@ -362,6 +366,26 @@ struct DiaryService: DiaryServicing {
             if isRequestCancelled(error) { throw error }
             throw mapError(error)
         }
+    }
+
+    private func logMusicMetadata(_ metadata: MusicMetadata?, context: String, body: Data) {
+        let bodyString = String(data: body, encoding: .utf8) ?? "<non-utf8 body>"
+
+        guard let metadata else {
+            print("[Diary][\(context)] musicMetadata: nil (선호도 미반영)\nbody: \(bodyString)")
+            return
+        }
+
+        print(
+            """
+            [Diary][\(context)] musicMetadata 포함
+            sourceType: \(metadata.sourceType ?? "nil")
+            trackId: \(metadata.trackId ?? "nil")
+            artistId: \(metadata.artistId ?? "nil")
+            primaryGenreName: \(metadata.primaryGenreName ?? "nil")
+            body: \(bodyString)
+            """
+        )
     }
 
     private func mapError(_ error: Error) -> DiaryServiceError {

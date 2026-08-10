@@ -318,12 +318,12 @@ struct AddSearchDetailView: View {
     }
 
     private var trimRangeProperties: [String: Any] {
-        let start = roundedSeconds(viewModel.startSeconds)
-        let end = roundedSeconds(viewModel.endSeconds)
         return [
-            "start_sec": start,
-            "end_sec": end,
-            "clip_duration_sec": roundedSeconds(max(end - start, 0))
+            "start_sec": roundedSeconds(viewModel.startSeconds),
+            "end_sec": roundedSeconds(viewModel.endSeconds),
+            "clip_duration_sec": roundedSeconds(
+                max(viewModel.endSeconds - viewModel.startSeconds, 0)
+            )
         ]
     }
 
@@ -350,7 +350,8 @@ private enum AddSearchDetailCutCounter {
             title: "Ditto",
             artist: "NewJeans",
             albumImageUrl: nil,
-            albumId: "preview-album-id"
+            albumId: "preview-album-id",
+            musicMetadata: nil
         ))
     }
 }

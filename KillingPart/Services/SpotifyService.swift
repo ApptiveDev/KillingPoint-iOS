@@ -115,7 +115,8 @@ struct SpotifyService: SpotifyServicing {
                     albumImageUrl: item.album.images.sorted { (lhs, rhs) in
                         (lhs.width ?? 0) > (rhs.width ?? 0)
                     }.first?.url,
-                    albumId: item.album.id
+                    albumId: item.album.id,
+                    musicMetadata: nil
                 )
             }
         case 401:

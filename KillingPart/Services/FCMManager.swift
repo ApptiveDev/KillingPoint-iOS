@@ -74,14 +74,23 @@ final class FCMManager {
         UserDefaults.standard.removeObject(forKey: pendingTokenKey)
     }
 
-    func handleNotificationResponse(_ response: UNNotificationResponse) {
+    func handleNotificationResponse(
+        _ response: UNNotificationResponse,
+        isColdStart: Bool
+    ) {
         let userInfo = response.notification.request.content.userInfo
         print("[FCM] 알림 클릭 payload: \(userInfo)")
+        trackPushOpened(
+            userInfo,
+            fallbackNotificationID: response.notification.request.identifier,
+            isColdStart: isColdStart
+        )
         parsePayload(userInfo)
     }
 
     func handleLaunchRemoteNotification(_ userInfo: [AnyHashable: Any]) {
         print("[FCM] 앱 시작 remote payload: \(userInfo)")
+        trackPushOpened(userInfo, fallbackNotificationID: nil, isColdStart: true)
         parsePayload(userInfo)
     }
 
@@ -130,6 +139,23 @@ final class FCMManager {
             "[FCM][Route] emit type=\(route.type.rawValue) deepLink=\(route.deepLink) alarmId=\(route.alarmId?.description ?? "nil")"
         )
         NotificationCenter.default.post(name: .didTapPushAlarm, object: route)
+    }
+
+    private func trackPushOpened(
+        _ userInfo: [AnyHashable: Any],
+        fallbackNotificationID: String?,
+        isColdStart: Bool
+    ) {
+        let parsed = normalizedPayload(from: userInfo)
+        let rawType = parsed.string(for: ["type", "alarmType", "notificationType"]) ?? ""
+        let type = AlarmType(rawValue: rawType)
+        let notificationID = parsed.string(for: ["alarmId", "alarmID", "notificationId", "notificationID"])
+            ?? fallbackNotificationID
+        NotificationAnalytics.trackPushOpened(
+            type: type,
+            notificationID: notificationID,
+            isColdStart: isColdStart
+        )
     }
 }
 

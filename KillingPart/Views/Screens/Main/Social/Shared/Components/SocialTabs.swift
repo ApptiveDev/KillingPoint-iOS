@@ -12,6 +12,15 @@ enum SocialTopTab: CaseIterable {
             return "친구"
         }
     }
+
+    var analyticsName: SubTabAnalyticsName {
+        switch self {
+        case .feed:
+            return .feed
+        case .friend:
+            return .friends
+        }
+    }
 }
 
 enum SocialFriendSection: CaseIterable {

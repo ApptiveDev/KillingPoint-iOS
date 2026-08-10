@@ -3,17 +3,20 @@ import Foundation
 struct AlarmMyDiaryDestination {
     let diary: DiaryFeedModel
     let displayTag: String
+    let analyticsEntryPoint: NotificationAnalyticsEntryPoint?
 }
 
 struct AlarmSocialDiaryDestination {
     let diary: DiaryFeedModel
     let displayTag: String
     let user: UserModel
+    let analyticsEntryPoint: NotificationAnalyticsEntryPoint?
 }
 
 struct AlarmSocialCollectionDestination {
     let user: UserModel
     let initialUserFeedsResponse: UserDiaryFeedsResponse?
+    let analyticsEntryPoint: NotificationAnalyticsEntryPoint?
 }
 
 enum NotificationListExternalRoute: Equatable {
@@ -34,6 +37,7 @@ final class NotificationListViewModel: ObservableObject {
     @Published private(set) var activeSocialCollectionDestination: AlarmSocialCollectionDestination?
     @Published private(set) var isSubscribeFansSheetPresented = false
     @Published private(set) var subscribeFans: [SubscribeUserModel] = []
+    @Published private(set) var subscribeFansTotalCount = 0
     @Published private(set) var isLoadingSubscribeFans = false
     @Published private(set) var isLoadingMoreSubscribeFans = false
     @Published private(set) var subscribeFansErrorMessage: String?
@@ -62,6 +66,14 @@ final class NotificationListViewModel: ObservableObject {
     private let alarmReadIDStorageKeyPrefix = "social.readAlarmIDs.user"
     private let alarmDeletedIDStorageKeyPrefix = "social.deletedAlarmIDs.user"
     private let alarmDeletedBeforeStorageKeyPrefix = "social.deletedAlarmsBefore.user"
+
+    var unreadAlarmCount: Int {
+        alarms.reduce(into: 0) { count, alarm in
+            if !readAlarmIDs.contains(alarm.alarmId) {
+                count += 1
+            }
+        }
+    }
 
     init(
         userService: UserServicing = UserService(),
@@ -241,6 +253,7 @@ final class NotificationListViewModel: ObservableObject {
             )
             guard requestUserID == subscribeFansUserID else { return }
             subscribeFans = response.content
+            subscribeFansTotalCount = max(response.page.totalElements, 0)
             updateSubscribeFansPaging(from: response)
         } catch {
             if isRequestCancelled(error) { return }
@@ -275,8 +288,13 @@ final class NotificationListViewModel: ObservableObject {
         }
     }
 
-    func handleAlarmTap(_ alarm: AlarmHistoryItem) async {
+    func handleAlarmTap(_ alarm: AlarmHistoryItem, listPosition: Int) async {
         guard !isAlarmSelectionMode else { return }
+        NotificationAnalytics.trackNotificationSelected(
+            type: alarm.type,
+            notificationID: String(alarm.alarmId),
+            listPosition: listPosition
+        )
         routingErrorMessage = nil
         pendingExternalRoute = nil
         print(
@@ -287,7 +305,7 @@ final class NotificationListViewModel: ObservableObject {
             type: alarm.type,
             deepLink: alarm.deepLink,
             alarmId: alarm.alarmId,
-            source: "list",
+            source: .notificationList,
             shouldMarkAsRead: true
         )
     }
@@ -303,7 +321,7 @@ final class NotificationListViewModel: ObservableObject {
             type: route.type,
             deepLink: route.deepLink,
             alarmId: route.alarmId,
-            source: "push",
+            source: .push,
             shouldMarkAsRead: route.alarmId != nil
         )
     }
@@ -322,7 +340,8 @@ final class NotificationListViewModel: ObservableObject {
             activeSocialDiaryDestination = AlarmSocialDiaryDestination(
                 diary: diary,
                 displayTag: resolvedDisplayTag(from: diary.tag),
-                user: makeUser(from: diary)
+                user: makeUser(from: diary),
+                analyticsEntryPoint: nil
             )
         } catch {
             if isRequestCancelled(error) { return }
@@ -337,7 +356,7 @@ final class NotificationListViewModel: ObservableObject {
         type: AlarmType,
         deepLink: String,
         alarmId: Int?,
-        source: String,
+        source: NotificationAnalyticsEntryPoint,
         shouldMarkAsRead: Bool
     ) async {
         do {
@@ -349,12 +368,13 @@ final class NotificationListViewModel: ObservableObject {
                 clearNavigationDestinations()
                 activeMyDiaryDestination = AlarmMyDiaryDestination(
                     diary: diary,
-                    displayTag: resolvedDisplayTag(from: diary.tag)
+                    displayTag: resolvedDisplayTag(from: diary.tag),
+                    analyticsEntryPoint: source
                 )
             case .subscribe:
                 let subscribedUserID = try resolveSubscribedUserID(from: deepLink)
                 clearNavigationDestinations()
-                if source == "list" {
+                if source == .notificationList {
                     print(
                         "[NotificationRoute] SUBSCRIBE_ALARM subscribedId=\(subscribedUserID) -> Subscribe Fans Sheet"
                     )
@@ -375,7 +395,8 @@ final class NotificationListViewModel: ObservableObject {
                     activeSocialDiaryDestination = AlarmSocialDiaryDestination(
                         diary: diary,
                         displayTag: resolvedDisplayTag(from: diary.tag),
-                        user: makeUser(from: diary)
+                        user: makeUser(from: diary),
+                        analyticsEntryPoint: source
                     )
                 } else if let subscribedUserID = resolveSubscribedUserIDIfPresent(from: deepLink) {
                     // Fallback for mixed payloads.
@@ -385,7 +406,8 @@ final class NotificationListViewModel: ObservableObject {
                     clearNavigationDestinations()
                     activeSocialCollectionDestination = AlarmSocialCollectionDestination(
                         user: makePlaceholderUser(userId: subscribedUserID),
-                        initialUserFeedsResponse: nil
+                        initialUserFeedsResponse: nil,
+                        analyticsEntryPoint: nil
                     )
                 } else {
                     throw NotificationRoutingError.invalidDeepLink
@@ -396,14 +418,14 @@ final class NotificationListViewModel: ObservableObject {
 
             if shouldMarkAsRead, let alarmId, alarmId > 0 {
                 markAlarmAsRead(alarmId)
-                print("[NotificationRoute] success source=\(source) alarmId=\(alarmId) markedAsRead=true")
+                print("[NotificationRoute] success source=\(source.rawValue) alarmId=\(alarmId) markedAsRead=true")
             } else {
-                print("[NotificationRoute] success source=\(source) alarmId=nil")
+                print("[NotificationRoute] success source=\(source.rawValue) alarmId=nil")
             }
         } catch {
             if isRequestCancelled(error) { return }
             print(
-                "[NotificationRoute] failed source=\(source) alarmId=\(alarmId?.description ?? "nil") type=\(type.rawValue) error=\(error.localizedDescription)"
+                "[NotificationRoute] failed source=\(source.rawValue) alarmId=\(alarmId?.description ?? "nil") type=\(type.rawValue) error=\(error.localizedDescription)"
             )
             routingErrorMessage = resolveRoutingErrorMessage(from: error)
         }
@@ -434,7 +456,8 @@ final class NotificationListViewModel: ObservableObject {
         clearNavigationDestinations()
         activeSocialCollectionDestination = AlarmSocialCollectionDestination(
             user: UserModel(from: user),
-            initialUserFeedsResponse: nil
+            initialUserFeedsResponse: nil,
+            analyticsEntryPoint: .pickList
         )
     }
 
@@ -442,6 +465,10 @@ final class NotificationListViewModel: ObservableObject {
         subscribeFansUserID = subscribedUserID
         isSubscribeFansSheetPresented = true
         await refreshSubscribeFans()
+        NotificationAnalytics.trackPickListViewed(
+            entryPoint: .notificationList,
+            pickCount: subscribeFansErrorMessage == nil ? subscribeFansTotalCount : nil
+        )
     }
 
     func makeSocialMyCollectionViewModel(
@@ -587,6 +614,7 @@ final class NotificationListViewModel: ObservableObject {
 
     private func clearSubscribeFansState() {
         subscribeFans = []
+        subscribeFansTotalCount = 0
         subscribeFansErrorMessage = nil
         subscribeFansUserID = nil
         isLoadingSubscribeFans = false

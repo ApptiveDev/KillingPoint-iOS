@@ -48,6 +48,7 @@ struct SpotifySimpleTrack: Identifiable {
     let artist: String
     let albumImageUrl: String?
     let albumId: String
+    let musicMetadata: MusicMetadata?
 
     var albumImageURL: URL? {
         guard let albumImageUrl else { return nil }

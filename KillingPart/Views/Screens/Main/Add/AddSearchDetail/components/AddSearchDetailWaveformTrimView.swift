@@ -4,9 +4,11 @@ import UIKit
 enum AddSearchDetailTrimInteractionControl: String {
     case left
     case right
-    case spectrumBar = "spectrum_bar"
-    case minusOneSecond = "minus_1s"
-    case plusOneSecond = "plus_1s"
+    case spectrum
+    case minimap
+    case nudgeMinusOneSecond = "nudge_minus_1s"
+    case nudgePlusOneSecond = "nudge_plus_1s"
+    case unknown
 }
 
 struct AddSearchDetailWaveformTrimView: View {
@@ -48,7 +50,6 @@ struct AddSearchDetailWaveformTrimView: View {
     private let playheadWidth: CGFloat = 3
     private let handleTapMaxTranslation: CGFloat = 4
     private let selectionBorderLineWidth: CGFloat = 1.5
-    private let maximumClipDuration: Double = 30
     private let handlePressedScale: CGFloat = 1.12
     private let selectionRecenterDelay: TimeInterval = 0.4
     private let handleLoopActivationDelay: TimeInterval = 0.5
@@ -121,9 +122,6 @@ struct AddSearchDetailWaveformTrimView: View {
                         nudgeSelection(by: 1)
                     }
                 }
-                .disabled(isNudgeDisabled)
-                .opacity(isNudgeDisabled ? 0.35 : 1)
-                .animation(.easeInOut(duration: 0.2), value: isNudgeDisabled)
 
                 overviewBar(width: viewportWidth)
                     .padding(.top, 10)
@@ -454,7 +452,7 @@ struct AddSearchDetailWaveformTrimView: View {
                     moveSelectionCenter(to: target)
                 }
                 .onEnded { _ in
-                    onInteractionEnded(.spectrumBar)
+                    onInteractionEnded(.minimap)
                     scrollTimelineToCenterSelection(animated: true)
                 }
         )
@@ -571,12 +569,8 @@ struct AddSearchDetailWaveformTrimView: View {
         .buttonStyle(.plain)
     }
 
-    private var isNudgeDisabled: Bool {
-        currentClipDuration >= maximumClipDuration - 0.001
-    }
-
     private func nudgeSelection(by delta: Double) {
-        guard duration > 0, !isNudgeDisabled else { return }
+        guard duration > 0 else { return }
 
         onTrimInteracted()
         if delta < 0 {
@@ -589,7 +583,7 @@ struct AddSearchDetailWaveformTrimView: View {
                 endSeconds += delta
             }
         }
-        onInteractionEnded(delta < 0 ? .minusOneSecond : .plusOneSecond)
+        onInteractionEnded(delta < 0 ? .nudgeMinusOneSecond : .nudgePlusOneSecond)
         scheduleSelectionRecenter()
     }
 
@@ -693,7 +687,7 @@ struct AddSearchDetailWaveformTrimView: View {
                 scheduleTimelineScrollEndEvent()
                 return
             }
-            onInteractionEnded(.spectrumBar)
+            onInteractionEnded(.spectrum)
         }
         timelineScrollEndWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
@@ -722,7 +716,9 @@ struct AddSearchDetailWaveformTrimView: View {
                 cancelHandleLoop()
                 onHandleDragMovementChanged(false)
                 startDragBase = nil
-                onInteractionEnded(.left)
+                if !isTap {
+                    onInteractionEnded(.left)
+                }
                 endActiveHandleDrag()
                 if isTap {
                     if didActivateLoop {
@@ -755,12 +751,15 @@ struct AddSearchDetailWaveformTrimView: View {
             }
             .onEnded { value in
                 let didActivateLoop = activeLoopDirection == .right
+                let didDrag = isBeyondTapThreshold(value.translation)
                 cancelHandleLoop()
                 onHandleDragMovementChanged(false)
                 endDragBase = nil
-                onInteractionEnded(.right)
+                if didDrag {
+                    onInteractionEnded(.right)
+                }
                 endActiveHandleDrag()
-                if isBeyondTapThreshold(value.translation) || didActivateLoop {
+                if didDrag || didActivateLoop {
                     scheduleSelectionRecenter()
                 }
             }
@@ -1120,4 +1119,3 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
         }
     }
 }
-
