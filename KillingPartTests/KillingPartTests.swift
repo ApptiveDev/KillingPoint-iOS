@@ -31,6 +31,37 @@ struct KillingPartTests {
         #expect(AddSearchDetailTrimInteractionControl.unknown.rawValue == "unknown")
     }
 
+    @Test func spectrumScrollMovesTheRangeWithoutChangingItsDuration() {
+        let shiftedRange = AddSearchDetailSpectrumScrollRange.shifted(
+            start: 10,
+            end: 30,
+            by: 4.25,
+            duration: 120
+        )
+
+        #expect(shiftedRange.start == 14.25)
+        #expect(shiftedRange.end == 34.25)
+        #expect(shiftedRange.end - shiftedRange.start == 20)
+    }
+
+    @Test func spectrumScrollKeepsTheRangeInsideTheTrackBounds() {
+        let beforeTrackStart = AddSearchDetailSpectrumScrollRange.shifted(
+            start: 5,
+            end: 25,
+            by: -10,
+            duration: 120
+        )
+        let afterTrackEnd = AddSearchDetailSpectrumScrollRange.shifted(
+            start: 90,
+            end: 120,
+            by: 10,
+            duration: 120
+        )
+
+        #expect(beforeTrackStart == .init(start: 0, end: 20))
+        #expect(afterTrackEnd == .init(start: 90, end: 120))
+    }
+
     @Test func notificationAnalyticsValuesMatchContract() {
         #expect(AlarmType.like.analyticsNotificationType == "like")
         #expect(AlarmType.subscribe.analyticsNotificationType == "pick")

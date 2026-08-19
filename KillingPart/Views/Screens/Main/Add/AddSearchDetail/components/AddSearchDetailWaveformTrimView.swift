@@ -11,6 +11,31 @@ enum AddSearchDetailTrimInteractionControl: String {
     case unknown
 }
 
+struct AddSearchDetailSpectrumScrollRange: Equatable {
+    let start: Double
+    let end: Double
+
+    static func shifted(
+        start: Double,
+        end: Double,
+        by deltaSeconds: Double,
+        duration: Double
+    ) -> Self {
+        guard duration > 0 else { return Self(start: 0, end: 0) }
+
+        let clampedStart = min(max(start, 0), duration)
+        let clampedEnd = min(max(end, clampedStart), duration)
+        let clipDuration = min(max(clampedEnd - clampedStart, 0), duration)
+        let maxStart = max(duration - clipDuration, 0)
+        let shiftedStart = min(max(clampedStart + deltaSeconds, 0), maxStart)
+
+        return Self(
+            start: shiftedStart,
+            end: min(shiftedStart + clipDuration, duration)
+        )
+    }
+}
+
 struct AddSearchDetailWaveformTrimView: View {
     @Binding var startSeconds: Double
     @Binding var endSeconds: Double
@@ -68,6 +93,8 @@ struct AddSearchDetailWaveformTrimView: View {
     @State private var timelineViewportWidth: CGFloat = 0
     @State private var timelineContentWidth: CGFloat = 0
     @State private var timelineScrollEndWorkItem: DispatchWorkItem?
+    @State private var isSpectrumInteractionActive = false
+    @State private var ignoredCorrectedTimelineOffsetX: CGFloat?
     @State private var selectionRecenterWorkItem: DispatchWorkItem?
     @State private var handleLoopWorkItem: DispatchWorkItem?
     @State private var activeLoopDirection: HandleDirection?
@@ -130,6 +157,8 @@ struct AddSearchDetailWaveformTrimView: View {
         .onDisappear {
             timelineScrollEndWorkItem?.cancel()
             timelineScrollEndWorkItem = nil
+            isSpectrumInteractionActive = false
+            ignoredCorrectedTimelineOffsetX = nil
             selectionRecenterWorkItem?.cancel()
             selectionRecenterWorkItem = nil
             cancelHandleLoop()
@@ -655,12 +684,80 @@ struct AddSearchDetailWaveformTrimView: View {
         timelineViewportWidth = viewport.viewportWidth
         timelineContentWidth = viewport.contentWidth
 
-        let didOffsetChange = abs(previousOffset - viewport.contentOffsetX) > 0.5
+        if let ignoredOffset = ignoredCorrectedTimelineOffsetX {
+            ignoredCorrectedTimelineOffsetX = nil
+            if abs(ignoredOffset - viewport.contentOffsetX) <= 0.75 {
+                return
+            }
+        }
+
+        let offsetDelta = viewport.contentOffsetX - previousOffset
+        let didOffsetChange = abs(offsetDelta) > 0.5
         guard didOffsetChange else { return }
         guard activeHandleDragDirection == nil else { return }
-        guard viewport.isTracking || viewport.isDragging || viewport.isDecelerating else { return }
+        let isUserDrivenScroll = viewport.isTracking
+            || viewport.isDragging
+            || viewport.isDecelerating
+            || isSpectrumInteractionActive
+        guard isUserDrivenScroll else { return }
 
+        if !isSpectrumInteractionActive {
+            isSpectrumInteractionActive = true
+            onTrimInteracted()
+        }
+        updateSelectionForSpectrumScroll(
+            offsetDelta: offsetDelta,
+            contentWidth: viewport.contentWidth
+        )
         scheduleTimelineScrollEndEvent()
+    }
+
+    private func updateSelectionForSpectrumScroll(
+        offsetDelta: CGFloat,
+        contentWidth: CGFloat
+    ) {
+        guard duration > 0 else { return }
+
+        let deltaSeconds = seconds(
+            forTranslation: offsetDelta,
+            contentWidth: contentWidth
+        )
+        let shiftedRange = AddSearchDetailSpectrumScrollRange.shifted(
+            start: startSeconds,
+            end: endSeconds,
+            by: deltaSeconds,
+            duration: duration
+        )
+        let appliedDelta = shiftedRange.start - startSeconds
+
+        onUpdateRange(shiftedRange.start, shiftedRange.end)
+
+        // 곡의 시작/끝에서는 더 이상 구간을 옮길 수 없으므로 스크롤 위치를
+        // 선택 구간 중심으로 되돌려 핸들과 시간 라벨이 중앙에서 밀리지 않게 한다.
+        if abs(appliedDelta - deltaSeconds) > 0.0001 {
+            correctTimelineOffsetToSelectionCenter(
+                start: shiftedRange.start,
+                end: shiftedRange.end
+            )
+        }
+    }
+
+    private func correctTimelineOffsetToSelectionCenter(start: Double, end: Double) {
+        guard let scrollView = timelineScrollView else { return }
+
+        let contentWidth = resolvedTimelineContentWidth(for: scrollView)
+        let startX = xPosition(for: start, contentWidth: contentWidth)
+        let endX = xPosition(for: end, contentWidth: contentWidth)
+        let rawOffset = (startX + endX) / 2 - scrollView.bounds.width / 2
+        let maxOffset = max(scrollView.contentSize.width - scrollView.bounds.width, 0)
+        let correctedOffset = min(max(rawOffset, 0), maxOffset)
+
+        ignoredCorrectedTimelineOffsetX = correctedOffset
+        scrollView.setContentOffset(
+            CGPoint(x: correctedOffset, y: scrollView.contentOffset.y),
+            animated: false
+        )
+        timelineViewportOffsetX = correctedOffset
     }
 
     private func performInitialCenteringIfNeeded(viewport: AddSearchDetailTimelineViewport) {
@@ -682,11 +779,13 @@ struct AddSearchDetailWaveformTrimView: View {
     private func scheduleTimelineScrollEndEvent() {
         timelineScrollEndWorkItem?.cancel()
         let workItem = DispatchWorkItem {
+            guard isSpectrumInteractionActive else { return }
             guard let scrollView = timelineScrollView else { return }
             if scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating {
                 scheduleTimelineScrollEndEvent()
                 return
             }
+            isSpectrumInteractionActive = false
             onInteractionEnded(.spectrum)
         }
         timelineScrollEndWorkItem = workItem
