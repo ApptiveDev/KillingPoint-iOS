@@ -1121,6 +1121,11 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
         }
     }
 
+    // 관찰 대상 UIScrollView가 KVO 옵저버를 단 채로 해제되면 NSKVODeallocate 크래시가 나므로 해제 전에 정리
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.invalidate()
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onResolve: onResolve,
@@ -1133,6 +1138,7 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
         private let onViewportChange: (AddSearchDetailTimelineViewport) -> Void
         private weak var resolvedScrollView: UIScrollView?
         private var observations: [NSKeyValueObservation] = []
+        private var isInvalidated = false
 
         init(
             onResolve: @escaping (UIScrollView) -> Void,
@@ -1143,6 +1149,7 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
         }
 
         func resolve(from view: UIView) {
+            guard !isInvalidated else { return }
             var current: UIView? = view.superview
             var candidates: [UIScrollView] = []
             while let candidate = current {
@@ -1162,6 +1169,13 @@ private struct AddSearchDetailScrollViewResolver: UIViewRepresentable {
             observe(scrollView)
             onResolve(scrollView)
             publishViewport(for: scrollView)
+        }
+
+        func invalidate() {
+            isInvalidated = true
+            observations.forEach { $0.invalidate() }
+            observations.removeAll()
+            resolvedScrollView = nil
         }
 
         private func preferredScrollView(from candidates: [UIScrollView]) -> UIScrollView? {
