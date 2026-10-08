@@ -296,6 +296,19 @@ private struct MainTabBarSelectionObserver: UIViewControllerRepresentable {
             detach()
         }
 
+        // SwiftUI TabView가 쓰는 원래 delegate의 나머지 메서드(iOS 18+ UITab 선택 콜백 등)를 그대로 전달해야
+        // selection 바인딩이 갱신됨. 빠지면 탭이 화면상으로만 바뀌고 selectedTab은 그대로 남음
+        override func responds(to aSelector: Selector!) -> Bool {
+            super.responds(to: aSelector) || forwardedDelegate?.responds(to: aSelector) == true
+        }
+
+        override func forwardingTarget(for aSelector: Selector!) -> Any? {
+            if forwardedDelegate?.responds(to: aSelector) == true {
+                return forwardedDelegate
+            }
+            return super.forwardingTarget(for: aSelector)
+        }
+
         func tabBarController(
             _ tabBarController: UITabBarController,
             shouldSelect viewController: UIViewController

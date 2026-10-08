@@ -13,7 +13,11 @@ final class AmplitudeClient {
         guard !isConfigured else { return }
         guard let normalizedKey = normalizedApiKey(from: apiKey) else { return }
 
-        amplitude = Amplitude(apiKey: normalizedKey)
+        // Session Replay가 CALayer에 KVO를 걸어둔 채 레이어가 해제되면 iOS 27에서 NSKVODeallocate 크래시가 발생해 비활성화
+        amplitude = Amplitude(
+            apiKey: normalizedKey,
+            sessionReplayConfig: .init(sampleRate: 0, enableRemoteConfig: false, autoStart: false)
+        )
         isConfigured = true
     }
 
