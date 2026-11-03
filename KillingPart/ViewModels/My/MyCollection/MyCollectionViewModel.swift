@@ -313,16 +313,20 @@ final class MyCollectionViewModel: ObservableObject {
         )
     }
 
+    /// 첫 페이지만 기다리고 나머지 페이지는 백그라운드로 이어서 로드한다.
+    /// (전체 페이지를 기다리면 피드가 많은 유저는 스플래시에서 멈춘 것처럼 보임)
     func preloadPlaybackFeeds() async {
         await refetchCollectionDataOnFocus()
 
-        var previousFeedCount = -1
-        var iteration = 0
-        while previousFeedCount != myFeeds.count && iteration < 200 {
-            if Task.isCancelled { return }
-            previousFeedCount = myFeeds.count
-            await loadMoreMyFeedsFromBottomIfNeeded()
-            iteration += 1
+        Task { [weak self] in
+            var previousFeedCount = -1
+            var iteration = 0
+            while let self, previousFeedCount != self.myFeeds.count && iteration < 200 {
+                if Task.isCancelled { return }
+                previousFeedCount = self.myFeeds.count
+                await self.loadMoreMyFeedsFromBottomIfNeeded()
+                iteration += 1
+            }
         }
     }
 

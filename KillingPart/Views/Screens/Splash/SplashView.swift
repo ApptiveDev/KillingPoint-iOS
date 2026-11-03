@@ -37,6 +37,11 @@ struct SplashView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
+
+            if isPlaybackWaitFinished && !isReadyToFinish {
+                ProgressView()
+                    .tint(AppColors.primary600)
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
