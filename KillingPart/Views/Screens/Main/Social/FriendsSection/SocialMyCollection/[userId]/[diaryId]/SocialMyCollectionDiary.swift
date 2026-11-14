@@ -183,6 +183,7 @@ struct SocialMyCollectionDiary: View {
                 selectedNavigationUser = nil
             }
         }
+        .ignoresSafeArea(.keyboard, edges: isCommentSheetPresented ? .bottom : [])
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -315,7 +316,9 @@ struct SocialMyCollectionDiary: View {
     }
 
     private func updateKeyboardHeight(from notification: Notification) {
+        // 댓글 시트 키보드는 이 화면과 무관 → 무시해야 뒤 화면 재렌더 딜레이가 없음
         guard
+            !isCommentSheetPresented,
             let userInfo = notification.userInfo,
             let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         else {

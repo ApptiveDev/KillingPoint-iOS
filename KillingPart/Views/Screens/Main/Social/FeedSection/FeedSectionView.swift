@@ -72,6 +72,8 @@ struct FeedSectionView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 시트(댓글/신고) 키보드가 뒤 피드 레이아웃을 다시 계산하지 않도록
+        .ignoresSafeArea(.keyboard)
         .overlay(alignment: .center) {
             SocialInteractionFeedbackOverlay(feedback: interactionFeedbackPresenter.activeFeedback)
         }
