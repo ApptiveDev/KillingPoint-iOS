@@ -37,7 +37,18 @@ struct SplashView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
+
+            // 영상이 끝났거나(탭으로 건너뜀 포함) 초기 설정/메인 데이터 준비가 아직이면
+            // 멈춘 화면 대신 로딩 표시
+            if isPlaybackWaitFinished && !isReadyToFinish {
+                ProgressView()
+                    .tint(AppColors.primary600)
+                    .padding(AppSpacing.m)
+                    .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: isPlaybackWaitFinished)
         .contentShape(Rectangle())
         .onTapGesture {
             finishPlaybackWait()

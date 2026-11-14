@@ -101,6 +101,9 @@ final class APIClient: APIClienting {
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
+            #if DEBUG
+            print("[APIClient] decode \(T.self) 실패 \(request.method.rawValue) \(request.path)\n\(error)\nbody: \(String(data: data, encoding: .utf8) ?? "<non-utf8>")")
+            #endif
             throw APIClientError.decodingFailed
         }
     }

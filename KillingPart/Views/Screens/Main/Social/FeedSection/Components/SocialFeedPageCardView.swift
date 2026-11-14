@@ -16,7 +16,11 @@ struct SocialFeedPageCardView: View {
     let onVideoPlaybackEnded: () -> Void
     let onVideoPlaybackStateChanged: (YoutubePlayerView.PlaybackState) -> Void
     let onVideoPlaybackProgressChanged: (YoutubePlaybackProgress) -> Void
+    var onCommentsChanged: () -> Void = {}
+    var onMentionUserTap: (UserModel) -> Void = { _ in }
+    @State private var pendingMentionUser: UserModel?
     @State private var shouldIgnoreNextLikeTap = false
+    @State private var isCommentSheetPresented = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -140,6 +144,12 @@ struct SocialFeedPageCardView: View {
                 .padding(.horizontal, AppSpacing.m)
                 .padding(.top, AppSpacing.m)
 
+            DiaryCommentPreviewBar(preview: feed.commentPreview ?? .empty) {
+                isCommentSheetPresented = true
+            }
+            .padding(.horizontal, AppSpacing.xs)
+            .padding(.top, AppSpacing.s)
+
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text("재생 구간")
                     .font(AppFont.paperlogy5Medium(size: 13))
@@ -164,6 +174,22 @@ struct SocialFeedPageCardView: View {
                     onDoubleTap()
                 }
         )
+        .sheet(isPresented: $isCommentSheetPresented, onDismiss: {
+            // 시트가 완전히 닫힌 뒤 프로필로 이동
+            guard let user = pendingMentionUser else { return }
+            pendingMentionUser = nil
+            onMentionUserTap(user)
+        }) {
+            DiaryCommentSheet(
+                diaryId: feed.diaryId,
+                initialCommentCount: feed.commentPreview?.commentCount ?? 0,
+                onCommentsChanged: onCommentsChanged,
+                onUserTap: { user in
+                    pendingMentionUser = user
+                    isCommentSheetPresented = false
+                }
+            )
+        }
     }
 
     private var diarySection: some View {

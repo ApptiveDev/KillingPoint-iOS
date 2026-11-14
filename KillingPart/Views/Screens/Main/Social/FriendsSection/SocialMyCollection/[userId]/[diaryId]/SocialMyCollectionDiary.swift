@@ -18,6 +18,7 @@ struct SocialMyCollectionDiary: View {
     @State private var playerReloadToken = UUID()
     @State private var shouldIgnoreNextLikeTap = false
     @State private var isLikeUsersSheetPresented = false
+    @State private var isCommentSheetPresented = false
     @State private var likeUsersSearchText = ""
     @State private var pendingNavigationUser: UserModel?
     @State private var selectedNavigationUser: UserModel?
@@ -182,14 +183,39 @@ struct SocialMyCollectionDiary: View {
                 selectedNavigationUser = nil
             }
         }
+        .ignoresSafeArea(.keyboard, edges: isCommentSheetPresented ? .bottom : [])
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 likeButton
+                DiaryCommentCapsuleButton(commentCount: viewModel.diary.commentPreview?.commentCount ?? 0) {
+                    isCommentSheetPresented = true
+                }
                 storeButton
             }
+        }
+        .sheet(isPresented: $isCommentSheetPresented, onDismiss: {
+            // 멘션 탭 → 시트가 닫힌 뒤 프로필로 이동 (좋아요 목록과 같은 흐름)
+            guard let pendingNavigationUser else { return }
+            self.pendingNavigationUser = nil
+            selectedNavigationUser = pendingNavigationUser
+            DispatchQueue.main.async {
+                isUserCollectionNavigationActive = true
+            }
+        }) {
+            DiaryCommentSheet(
+                diaryId: viewModel.diary.diaryId,
+                initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
+                onCommentsChanged: {
+                    Task { await viewModel.refreshCommentPreview() }
+                },
+                onUserTap: makeCollectionViewModel == nil ? nil : { user in
+                    pendingNavigationUser = user
+                    isCommentSheetPresented = false
+                }
+            )
         }
         .sheet(isPresented: $isLikeUsersSheetPresented) {
             SocialDiaryLikeUsersSheet(
@@ -305,7 +331,9 @@ struct SocialMyCollectionDiary: View {
     }
 
     private func updateKeyboardHeight(from notification: Notification) {
+        // 댓글 시트 키보드는 이 화면과 무관 → 무시해야 뒤 화면 재렌더 딜레이가 없음
         guard
+            !isCommentSheetPresented,
             let userInfo = notification.userInfo,
             let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         else {

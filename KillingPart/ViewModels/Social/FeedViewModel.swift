@@ -325,6 +325,15 @@ final class FeedViewModel: ObservableObject {
         }
     }
     
+    /// 댓글 작성/수정/삭제 후 카드의 댓글 미리보기·개수 갱신
+    func refreshCommentPreview(diaryId: Int) async {
+        guard
+            let refreshed = try? await diaryService.fetchDiary(diaryId: diaryId),
+            let index = feeds.firstIndex(where: { $0.diaryId == diaryId })
+        else { return }
+        feeds[index].commentPreview = refreshed.commentPreview
+    }
+
     func blockUser(blockedId: Int) async -> Bool {
         guard blockedId > 0 else { return false }
         guard !isBlockingUser else { return false }

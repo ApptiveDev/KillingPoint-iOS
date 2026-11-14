@@ -133,6 +133,12 @@ final class MyCollectionDiaryViewModel: ObservableObject {
         }
     }
 
+    /// 댓글 작성/수정/삭제 후 상세 화면 댓글 개수 갱신
+    func refreshCommentPreview() async {
+        guard let refreshed = try? await diaryService.fetchDiary(diaryId: diary.diaryId) else { return }
+        diary.commentPreview = refreshed.commentPreview
+    }
+
     func deleteDiary() async -> Bool {
         guard !isProcessing else { return false }
 

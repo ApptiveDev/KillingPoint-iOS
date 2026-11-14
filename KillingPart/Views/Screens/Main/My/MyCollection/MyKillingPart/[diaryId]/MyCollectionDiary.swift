@@ -14,6 +14,10 @@ struct MyCollectionDiary: View {
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
     @State private var isShareDialogPresented = false
+    @State private var isCommentSheetPresented = false
+    /// 댓글 멘션 탭 → 시트 닫힌 뒤 해당 유저 컬렉션으로 이동
+    @State private var pendingMentionUser: UserModel?
+    @State private var mentionCollectionViewModel: SocialMyCollectionViewModel?
     @State private var isExportingImage = false
     @State private var activityShareItem: MyCollectionDiaryActivityShareItem?
     @State private var actionAlert: MyCollectionDiaryActionAlert?
@@ -151,12 +155,21 @@ struct MyCollectionDiary: View {
             guard phase == .active else { return }
             playerReloadToken = UUID()
         }
+        .ignoresSafeArea(.keyboard, edges: isCommentSheetPresented ? .bottom : [])
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 0) {
+                    Button {
+                        dismissKeyboard()
+                        isCommentSheetPresented = true
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_comment", title: commentToolbarTitle)
+                    }
+                    .accessibilityLabel("댓글")
+
                     Button {
                         handleSaveImageTap()
                     } label: {
@@ -242,6 +255,32 @@ struct MyCollectionDiary: View {
         } message: {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
         }
+        .sheet(isPresented: $isCommentSheetPresented, onDismiss: {
+            guard let user = pendingMentionUser else { return }
+            pendingMentionUser = nil
+            // ponytail: 소셜 탭과 같은 픽 토글 동작을 쓰려고 SocialViewModel 을 그때그때 생성
+            mentionCollectionViewModel = SocialViewModel().makeSocialMyCollectionViewModel(for: user)
+        }) {
+            DiaryCommentSheet(
+                diaryId: viewModel.diary.diaryId,
+                initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
+                onCommentsChanged: {
+                    Task { await viewModel.refreshCommentPreview() }
+                },
+                onUserTap: { user in
+                    pendingMentionUser = user
+                    isCommentSheetPresented = false
+                }
+            )
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { mentionCollectionViewModel != nil },
+            set: { if !$0 { mentionCollectionViewModel = nil } }
+        )) {
+            if let mentionCollectionViewModel {
+                SocialMyCollectionView(viewModel: mentionCollectionViewModel)
+            }
+        }
         .sheet(item: $activityShareItem) { item in
             MyCollectionDiaryActivityShareSheet(item: item)
         }
@@ -325,7 +364,9 @@ struct MyCollectionDiary: View {
     }
 
     private func updateKeyboardHeight(from notification: Notification) {
+        // 댓글 시트 키보드는 이 화면과 무관 → 무시해야 뒤 화면 재렌더 딜레이가 없음
         guard
+            !isCommentSheetPresented,
             let userInfo = notification.userInfo,
             let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
         else {
@@ -482,6 +523,12 @@ struct MyCollectionDiary: View {
         }
 
         return "이미지를 처리하는 중 오류가 발생했어요."
+    }
+
+    /// 0개면 "댓글", 1개 이상이면 숫자
+    private var commentToolbarTitle: String {
+        let count = viewModel.diary.commentPreview?.commentCount ?? 0
+        return count > 0 ? DiaryCommentFormat.count(count) : "댓글"
     }
 
     private func toolbarIconWithTitle(named name: String, title: String) -> some View {

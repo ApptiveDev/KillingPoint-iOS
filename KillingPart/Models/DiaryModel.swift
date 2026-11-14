@@ -41,6 +41,7 @@ struct DiaryFeedModel: Decodable, Identifiable {
     let tag: String?
     let profileImageUrl: String?
     let isMyPick: Bool?
+    var commentPreview: DiaryCommentPreview? = nil
 
     var id: Int { diaryId }
 
@@ -193,6 +194,7 @@ struct UserDiaryFeedModel: Decodable, Identifiable {
     let isLiked: Bool
     let isStored: Bool
     let likeCount: Int
+    var commentPreview: DiaryCommentPreview? = nil
 
     var id: Int { diaryId }
 
@@ -218,7 +220,8 @@ struct UserDiaryFeedModel: Decodable, Identifiable {
             username: user.username,
             tag: user.tag,
             profileImageUrl: user.profileImageUrl,
-            isMyPick: user.isMyPick
+            isMyPick: user.isMyPick,
+            commentPreview: commentPreview
         )
     }
 }
@@ -647,7 +650,8 @@ extension DiaryFeedModel {
             username: username,
             tag: tag,
             profileImageUrl: profileImageUrl,
-            isMyPick: isMyPick
+            isMyPick: isMyPick,
+            commentPreview: commentPreview
         )
     }
 
@@ -673,7 +677,25 @@ extension DiaryFeedModel {
             username: username,
             tag: tag,
             profileImageUrl: profileImageUrl,
-            isMyPick: isMyPick
+            isMyPick: isMyPick,
+            commentPreview: commentPreview
         )
     }
+}
+
+/// 킬링파트 조회 응답의 댓글 미리보기 (최신 원댓글 3개 + ACTIVE 원댓글 수)
+struct DiaryCommentPreview: Decodable {
+    let commentCount: Int
+    let comments: [DiaryCommentPreviewItem]
+
+    static let empty = DiaryCommentPreview(commentCount: 0, comments: [])
+}
+
+struct DiaryCommentPreviewItem: Decodable, Identifiable {
+    let commentId: Int
+    let userId: Int
+    let profileImageUrl: String?
+    let content: String
+
+    var id: Int { commentId }
 }
