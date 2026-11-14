@@ -54,7 +54,6 @@ struct DiaryCommentSheet: View {
                 ZStack {
                     Color.black.opacity(0.45).ignoresSafeArea()
                     ProgressView()
-                        .controlSize(.large)
                         .tint(AppColors.primary600)
                 }
                 .transition(.opacity)
@@ -134,7 +133,6 @@ struct DiaryCommentSheet: View {
     private var content: some View {
         if !viewModel.hasLoaded {
             ProgressView()
-                .controlSize(.large)
                 .tint(AppColors.primary600)
                 .padding(.top, 60)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
