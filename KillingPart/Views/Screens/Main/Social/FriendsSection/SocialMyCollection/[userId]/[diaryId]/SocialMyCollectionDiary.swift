@@ -18,6 +18,7 @@ struct SocialMyCollectionDiary: View {
     @State private var playerReloadToken = UUID()
     @State private var shouldIgnoreNextLikeTap = false
     @State private var isLikeUsersSheetPresented = false
+    @State private var isCommentSheetPresented = false
     @State private var likeUsersSearchText = ""
     @State private var pendingNavigationUser: UserModel?
     @State private var selectedNavigationUser: UserModel?
@@ -188,8 +189,17 @@ struct SocialMyCollectionDiary: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 likeButton
+                DiaryCommentCapsuleButton(commentCount: DiaryCommentMock.preview.commentCount) {
+                    isCommentSheetPresented = true
+                }
                 storeButton
             }
+        }
+        .sheet(isPresented: $isCommentSheetPresented) {
+            DiaryCommentSheet(
+                commentCount: DiaryCommentMock.preview.commentCount,
+                comments: DiaryCommentMock.comments
+            )
         }
         .sheet(isPresented: $isLikeUsersSheetPresented) {
             SocialDiaryLikeUsersSheet(

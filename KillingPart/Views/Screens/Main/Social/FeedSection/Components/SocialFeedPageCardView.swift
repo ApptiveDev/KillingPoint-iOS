@@ -17,6 +17,7 @@ struct SocialFeedPageCardView: View {
     let onVideoPlaybackStateChanged: (YoutubePlayerView.PlaybackState) -> Void
     let onVideoPlaybackProgressChanged: (YoutubePlaybackProgress) -> Void
     @State private var shouldIgnoreNextLikeTap = false
+    @State private var isCommentSheetPresented = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -140,6 +141,12 @@ struct SocialFeedPageCardView: View {
                 .padding(.horizontal, AppSpacing.m)
                 .padding(.top, AppSpacing.m)
 
+            DiaryCommentPreviewBar(preview: DiaryCommentMock.preview) {
+                isCommentSheetPresented = true
+            }
+            .padding(.horizontal, AppSpacing.xs)
+            .padding(.top, AppSpacing.s)
+
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text("재생 구간")
                     .font(AppFont.paperlogy5Medium(size: 13))
@@ -164,6 +171,12 @@ struct SocialFeedPageCardView: View {
                     onDoubleTap()
                 }
         )
+        .sheet(isPresented: $isCommentSheetPresented) {
+            DiaryCommentSheet(
+                commentCount: DiaryCommentMock.preview.commentCount,
+                comments: DiaryCommentMock.comments
+            )
+        }
     }
 
     private var diarySection: some View {

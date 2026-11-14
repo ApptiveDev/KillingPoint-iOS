@@ -14,6 +14,7 @@ struct MyCollectionDiary: View {
     @StateObject private var viewModel: MyCollectionDiaryViewModel
     @State private var isDeleteDialogPresented = false
     @State private var isShareDialogPresented = false
+    @State private var isCommentSheetPresented = false
     @State private var isExportingImage = false
     @State private var activityShareItem: MyCollectionDiaryActivityShareItem?
     @State private var actionAlert: MyCollectionDiaryActionAlert?
@@ -158,6 +159,14 @@ struct MyCollectionDiary: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 0) {
                     Button {
+                        dismissKeyboard()
+                        isCommentSheetPresented = true
+                    } label: {
+                        toolbarIconWithTitle(named: "ic_comment", title: commentToolbarTitle)
+                    }
+                    .accessibilityLabel("댓글")
+
+                    Button {
                         handleSaveImageTap()
                     } label: {
                         toolbarIconWithTitle(named: "ic_save", title: "저장")
@@ -241,6 +250,12 @@ struct MyCollectionDiary: View {
             Button("취소", role: .cancel) {}
         } message: {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
+        }
+        .sheet(isPresented: $isCommentSheetPresented) {
+            DiaryCommentSheet(
+                commentCount: DiaryCommentMock.preview.commentCount,
+                comments: DiaryCommentMock.comments
+            )
         }
         .sheet(item: $activityShareItem) { item in
             MyCollectionDiaryActivityShareSheet(item: item)
@@ -482,6 +497,12 @@ struct MyCollectionDiary: View {
         }
 
         return "이미지를 처리하는 중 오류가 발생했어요."
+    }
+
+    /// 0개면 "댓글", 1개 이상이면 숫자
+    private var commentToolbarTitle: String {
+        let count = DiaryCommentMock.preview.commentCount
+        return count > 0 ? DiaryCommentFormat.count(count) : "댓글"
     }
 
     private func toolbarIconWithTitle(named name: String, title: String) -> some View {
