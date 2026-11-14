@@ -177,19 +177,53 @@ final class DiaryCommentViewModel: ObservableObject {
 
     // MARK: - 입력 모드 (com_005, 수정)
 
-    /// 본문 멘션은 태그(@goodmusic) 기준 (시안)
+    /// 본문 멘션은 항상 태그(@goodmusic)로 통일 (시안)
     func startReply(to comment: CommentResponse) {
         guard let author = comment.author else { return }
-        let mentionName = author.tag ?? author.username ?? ""
-        let displayName = author.username ?? mentionName
-        guard !mentionName.isEmpty else { return }
+        let displayName = author.username ?? author.tag ?? ""
         inputMode = .reply(
             parentCommentId: comment.parentCommentId ?? comment.id,
             targetCommentId: comment.id,
             targetName: displayName
         )
-        mentionCandidates = [CommentMentionCandidate(userId: author.userId, name: mentionName)]
-        setDraft("@\(mentionName) ")
+
+        if let tag = knownTag(of: author) {
+            insertReplyMention(userId: author.userId, tag: tag)
+            return
+        }
+        // 응답에 태그가 없으면 찾아서 넣는다 (못 찾을 때만 이름)
+        mentionCandidates = []
+        setDraft("")
+        Task {
+            let tag = await lookupTag(of: author) ?? author.username ?? ""
+            guard case .reply(_, let targetId, _) = inputMode, targetId == comment.id, draft.isEmpty, !tag.isEmpty else { return }
+            insertReplyMention(userId: author.userId, tag: tag)
+        }
+    }
+
+    private func insertReplyMention(userId: Int, tag: String) {
+        mentionCandidates = [CommentMentionCandidate(userId: userId, name: tag)]
+        setDraft("@\(tag) ")
+    }
+
+    private func knownTag(of author: CommentAuthor) -> String? {
+        if let tag = author.tag, !tag.isEmpty { return tag }
+        if let me = myUser, me.userId == author.userId, !me.tag.isEmpty { return me.tag }
+        return nil
+    }
+
+    private func lookupTag(of author: CommentAuthor) async -> String? {
+        if myUser == nil {
+            myUser = try? await userService.fetchMyUser()
+        }
+        if let me = myUser, me.userId == author.userId { return me.tag }
+        guard let username = author.username, !username.isEmpty else { return nil }
+        if let found = try? await userService.searchUsers(searchCond: username, page: 0, size: 20).content
+            .first(where: { $0.userId == author.userId }) {
+            return found.tag
+        }
+        return try? await commentService.fetchMentionCandidates(keyword: username, size: 20)
+            .first(where: { $0.userId == author.userId })?.tag
     }
 
     func startEdit(_ comment: CommentResponse) {
@@ -434,23 +468,25 @@ final class DiaryCommentViewModel: ObservableObject {
         if myUser == nil {
             myUser = try? await userService.fetchMyUser()
         }
-        if let me = myUser, me.userId == userId || me.tag.caseInsensitiveCompare(tag) == .orderedSame {
+        // tag 자리에는 예전에 이름으로 저장된 멘션(@이병찬)도 올 수 있어 이름도 같이 비교
+        let isSame: (String) -> Bool = { $0.caseInsensitiveCompare(tag) == .orderedSame }
+        if let me = myUser, me.userId == userId || isSame(me.tag) || isSame(me.username) {
             return me
         }
 
-        let matches: (Int, String) -> Bool = { candidateId, candidateTag in
+        let matches: (Int, String, String) -> Bool = { candidateId, candidateTag, candidateName in
             if let userId { return candidateId == userId }
-            return candidateTag.caseInsensitiveCompare(tag) == .orderedSame
+            return isSame(candidateTag) || isSame(candidateName)
         }
 
         // 1) 유저 검색
         if let found = try? await userService.searchUsers(searchCond: tag, page: 0, size: 20).content
-            .first(where: { matches($0.userId, $0.tag) }) {
+            .first(where: { matches($0.userId, $0.tag, $0.username) }) {
             return found
         }
         // 2) 멘션 후보(내가 픽한 유저)
         if let author = try? await commentService.fetchMentionCandidates(keyword: tag, size: 20)
-            .first(where: { matches($0.userId, $0.tag ?? "") }) {
+            .first(where: { matches($0.userId, $0.tag ?? "", $0.username ?? "") }) {
             return UserModel(
                 userId: author.userId,
                 username: author.username ?? "",
