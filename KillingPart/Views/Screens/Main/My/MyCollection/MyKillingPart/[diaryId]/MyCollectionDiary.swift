@@ -254,7 +254,7 @@ struct MyCollectionDiary: View {
         }
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
-                commentCount: DiaryCommentMock.preview.commentCount,
+                commentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
                 comments: DiaryCommentMock.comments
             )
         }
@@ -504,7 +504,7 @@ struct MyCollectionDiary: View {
 
     /// 0개면 "댓글", 1개 이상이면 숫자
     private var commentToolbarTitle: String {
-        let count = DiaryCommentMock.preview.commentCount
+        let count = viewModel.diary.commentPreview?.commentCount ?? 0
         return count > 0 ? DiaryCommentFormat.count(count) : "댓글"
     }
 

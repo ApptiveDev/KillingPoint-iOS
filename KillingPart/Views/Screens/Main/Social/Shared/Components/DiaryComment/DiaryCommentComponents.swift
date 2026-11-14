@@ -1,22 +1,6 @@
 import SwiftUI
 
-// MARK: - UI 모델 (API 연동 시 commentPreview / CommentResponse 에서 매핑)
-
-struct DiaryCommentPreviewItem: Identifiable {
-    let commentId: Int
-    let userId: Int
-    let profileImageUrl: String?
-    let content: String
-
-    var id: Int { commentId }
-}
-
-struct DiaryCommentPreview {
-    let commentCount: Int
-    let comments: [DiaryCommentPreviewItem]
-
-    static let empty = DiaryCommentPreview(commentCount: 0, comments: [])
-}
+// MARK: - UI 모델 (댓글 목록 API 연동 시 CommentResponse 에서 매핑)
 
 struct DiaryCommentItem: Identifiable {
     let commentId: Int
@@ -31,17 +15,8 @@ struct DiaryCommentItem: Identifiable {
     var id: Int { commentId }
 }
 
-// ponytail: 목업 데이터. 페이지별 API 명세 받으면 commentPreview / 댓글 목록 API 로 교체
+// ponytail: 바텀시트 목업 데이터. 댓글 목록 API 명세 받으면 교체
 enum DiaryCommentMock {
-    static let preview = DiaryCommentPreview(
-        commentCount: 8,
-        comments: [
-            .init(commentId: 31, userId: 7, profileImageUrl: nil, content: "안녕하세요! 좋은 킬파 잘 감상했습니다. 너무"),
-            .init(commentId: 29, userId: 3, profileImageUrl: nil, content: "@이진원 레전드입니다."),
-            .init(commentId: 25, userId: 5, profileImageUrl: nil, content: "안녕하세요! 히히")
-        ]
-    )
-
     static let comments: [DiaryCommentItem] = [
         item(1, "안녕하세요! 좋은 킬파 잘 감상했습니다.", liked: false, likes: 24),
         item(2, "@goodmusic 레전드입니다."),
@@ -130,6 +105,8 @@ struct DiaryCommentCapsuleButton: View {
 struct DiaryCommentPreviewBar: View {
     let preview: DiaryCommentPreview
     let onTap: () -> Void
+    /// 카드가 보일 때마다 가장 최신 댓글부터 로테이션 시작
+    @State private var rotationStartDate = Date()
 
     var body: some View {
         Button(action: onTap) {
@@ -149,6 +126,7 @@ struct DiaryCommentPreviewBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("댓글 \(preview.commentCount)개 보기")
+        .onAppear { rotationStartDate = Date() }
     }
 
     /// 같은 유저 중복 제거 후 최대 3명
@@ -176,8 +154,9 @@ struct DiaryCommentPreviewBar: View {
         } else if preview.comments.count == 1 {
             previewLabel(DiaryCommentFormat.previewText(preview.comments[0].content))
         } else {
-            TimelineView(.periodic(from: .now, by: 2)) { context in
-                let index = Int(context.date.timeIntervalSinceReferenceDate / 2) % preview.comments.count
+            TimelineView(.periodic(from: rotationStartDate, by: 2)) { context in
+                let elapsed = max(context.date.timeIntervalSince(rotationStartDate), 0)
+                let index = Int(elapsed / 2) % preview.comments.count
                 previewLabel(DiaryCommentFormat.previewText(preview.comments[index].content))
                     .id(index)
                     .transition(.asymmetric(

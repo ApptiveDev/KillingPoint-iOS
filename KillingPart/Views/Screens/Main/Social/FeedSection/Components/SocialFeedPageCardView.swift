@@ -141,7 +141,7 @@ struct SocialFeedPageCardView: View {
                 .padding(.horizontal, AppSpacing.m)
                 .padding(.top, AppSpacing.m)
 
-            DiaryCommentPreviewBar(preview: DiaryCommentMock.preview) {
+            DiaryCommentPreviewBar(preview: feed.commentPreview ?? .empty) {
                 isCommentSheetPresented = true
             }
             .padding(.horizontal, AppSpacing.xs)
@@ -173,7 +173,7 @@ struct SocialFeedPageCardView: View {
         )
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
-                commentCount: DiaryCommentMock.preview.commentCount,
+                commentCount: feed.commentPreview?.commentCount ?? 0,
                 comments: DiaryCommentMock.comments
             )
         }

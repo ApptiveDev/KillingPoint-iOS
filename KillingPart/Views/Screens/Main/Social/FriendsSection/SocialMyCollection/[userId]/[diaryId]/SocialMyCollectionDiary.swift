@@ -190,7 +190,7 @@ struct SocialMyCollectionDiary: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 likeButton
-                DiaryCommentCapsuleButton(commentCount: DiaryCommentMock.preview.commentCount) {
+                DiaryCommentCapsuleButton(commentCount: viewModel.diary.commentPreview?.commentCount ?? 0) {
                     isCommentSheetPresented = true
                 }
                 storeButton
@@ -198,7 +198,7 @@ struct SocialMyCollectionDiary: View {
         }
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
-                commentCount: DiaryCommentMock.preview.commentCount,
+                commentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
                 comments: DiaryCommentMock.comments
             )
         }
