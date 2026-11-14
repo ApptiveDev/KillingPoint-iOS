@@ -5,6 +5,11 @@ import SwiftUI
 struct DiaryCommentSheet: View {
     @StateObject private var viewModel: DiaryCommentViewModel
     @State private var isInputFocused = false
+    /// 앱 실행 후 첫 키보드는 iOS 가 로딩하느라 멈칫함 → 그동안 딤 + 로딩 표시
+    @State private var isPreparingKeyboard = false
+    private static var hasShownKeyboard = false
+    /// 피드와 같은 좋아요 피드백 모달
+    @StateObject private var interactionFeedbackPresenter = SocialInteractionFeedbackPresenter()
 
     @State private var menuTarget: CommentResponse?
     @State private var deleteTarget: CommentResponse?
@@ -40,6 +45,25 @@ struct DiaryCommentSheet: View {
             content
         }
         .safeAreaInset(edge: .bottom) { inputBar }
+        .overlay {
+            SocialInteractionFeedbackOverlay(feedback: interactionFeedbackPresenter.activeFeedback)
+                .allowsHitTesting(false)
+        }
+        .overlay {
+            if isPreparingKeyboard {
+                ZStack {
+                    Color.black.opacity(0.45).ignoresSafeArea()
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(AppColors.primary600)
+                }
+                .transition(.opacity)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+            Self.hasShownKeyboard = true
+            isPreparingKeyboard = false
+        }
         .background(Color.black)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
@@ -265,10 +289,13 @@ struct DiaryCommentSheet: View {
             comment: comment,
             isBodyExpanded: expandedBodyIds.contains(comment.id),
             onExpandBody: { expandedBodyIds.insert(comment.id) },
-            onLikeTap: { Task { await viewModel.toggleLike(comment) } },
+            onLikeTap: {
+                interactionFeedbackPresenter.show(comment.isLiked ? .likeRemoved : .likeAdded)
+                Task { await viewModel.toggleLike(comment) }
+            },
             onReplyTap: {
                 viewModel.startReply(to: comment)
-                isInputFocused = true
+                focusInput()
             },
             onMoreTap: { menuTarget = comment },
             onUnblockTap: {
@@ -304,7 +331,7 @@ struct DiaryCommentSheet: View {
         if comment.isMine {
             Button("수정") {
                 viewModel.startEdit(comment)
-                isInputFocused = true
+                focusInput()
             }
             Button("삭제", role: .destructive) {
                 deleteTarget = comment
@@ -416,6 +443,14 @@ struct DiaryCommentSheet: View {
         .padding(.horizontal, AppSpacing.m)
         .padding(.vertical, 10)
         .background(DiaryCommentColors.inputBackground, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            // 포커스 전 탭은 가로채서 딤을 먼저 그린 뒤 키보드를 올린다
+            if !isInputFocused {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { focusInput() }
+            }
+        }
     }
 
     @ViewBuilder
@@ -495,6 +530,23 @@ struct DiaryCommentSheet: View {
                 + Text(" 님에게 답글 다는 중...").foregroundColor(.white)
         case .edit:
             return Text("댓글 수정 중...").foregroundColor(.white)
+        }
+    }
+
+    private func focusInput() {
+        guard !isInputFocused else { return }
+        guard !Self.hasShownKeyboard else {
+            isInputFocused = true
+            return
+        }
+        isPreparingKeyboard = true
+        // 딤이 화면에 그려진 다음 프레임에 키보드 요청 (요청 순간 메인 스레드가 멈춤)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isInputFocused = true
+        }
+        // 키보드 알림을 못 받는 경우 대비
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            isPreparingKeyboard = false
         }
     }
 

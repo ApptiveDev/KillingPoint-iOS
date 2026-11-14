@@ -7,6 +7,10 @@ struct FeedSectionView: View {
     let makeCollectionViewModel: (UserModel) -> SocialMyCollectionViewModel
     let onPageChanged: ((_ oldIndex: Int, _ newIndex: Int, _ diaryId: Int) -> Void)?
     @State private var currentPageIndex = 0
+    /// 첫 카드에서 오른쪽으로 당기면 새로고침 (가로 pull to refresh)
+    @State private var pullOffset: CGFloat = 0
+    @State private var isPullRefreshing = false
+    private let pullRefreshThreshold: CGFloat = 90
     @State private var elapsedInCurrentRange: TimeInterval = 0
     @State private var isViewActive = false
     @State private var previousFeedCount = 0
@@ -195,6 +199,52 @@ struct FeedSectionView: View {
         }
     }
 
+    private var pullToRefreshGesture: some Gesture {
+        DragGesture(minimumDistance: 15)
+            .onChanged { value in
+                guard
+                    currentPageIndex == 0,
+                    !isPullRefreshing,
+                    value.translation.width > 0,
+                    abs(value.translation.width) > abs(value.translation.height)
+                else { return }
+                pullOffset = min(value.translation.width, pullRefreshThreshold * 1.4)
+            }
+            .onEnded { _ in
+                let shouldRefresh = pullOffset >= pullRefreshThreshold
+                withAnimation(.easeOut(duration: 0.2)) { pullOffset = 0 }
+                guard shouldRefresh else { return }
+                Task {
+                    isPullRefreshing = true
+                    await viewModel.refresh(showInitialLoading: false)
+                    currentPageIndex = 0
+                    isPullRefreshing = false
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var pullToRefreshIndicator: some View {
+        if isPullRefreshing || pullOffset > 0 {
+            let progress = min(pullOffset / pullRefreshThreshold, 1)
+            Group {
+                if isPullRefreshing {
+                    ProgressView().tint(AppColors.primary600)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(progress >= 1 ? AppColors.primary600 : .white)
+                        .rotationEffect(.degrees(progress * 270))
+                }
+            }
+            .frame(width: 40, height: 40)
+            .background(Color.black.opacity(0.75), in: Circle())
+            .opacity(isPullRefreshing ? 1 : Double(progress))
+            .offset(x: isPullRefreshing ? 12 : pullOffset / 2 - 20)
+            .allowsHitTesting(false)
+        }
+    }
+
     private var feedPager: some View {
         VStack(spacing: AppSpacing.s) {
             TabView(selection: $currentPageIndex) {
@@ -273,6 +323,8 @@ struct FeedSectionView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .simultaneousGesture(pullToRefreshGesture)
+            .overlay(alignment: .leading) { pullToRefreshIndicator }
 
             if viewModel.isLoadingMore {
                 ProgressView()
