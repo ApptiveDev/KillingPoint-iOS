@@ -198,8 +198,8 @@ struct SocialMyCollectionDiary: View {
         }
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
-                commentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
-                comments: DiaryCommentMock.comments
+                diaryId: viewModel.diary.diaryId,
+                initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0
             )
         }
         .sheet(isPresented: $isLikeUsersSheetPresented) {

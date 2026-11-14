@@ -173,8 +173,8 @@ struct SocialFeedPageCardView: View {
         )
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
-                commentCount: feed.commentPreview?.commentCount ?? 0,
-                comments: DiaryCommentMock.comments
+                diaryId: feed.diaryId,
+                initialCommentCount: feed.commentPreview?.commentCount ?? 0
             )
         }
     }
