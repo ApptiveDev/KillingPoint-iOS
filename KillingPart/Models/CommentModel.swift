@@ -20,6 +20,30 @@ struct CommentResponse: Decodable, Identifiable, Equatable {
 
     var id: Int { commentId }
     var isDeleted: Bool { status == "DELETED" }
+
+    private enum CodingKeys: String, CodingKey {
+        case commentId, diaryId, parentCommentId, status, isBlocked, text, attachment, author
+        case isMine, isLiked, likeCount, replyCount, createDate, isEdited
+    }
+
+    /// 답글/작성 응답에서 일부 필드가 빠지거나 null 이어도 화면이 깨지지 않도록 기본값 처리
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        commentId = try c.decode(Int.self, forKey: .commentId)
+        diaryId = (try? c.decodeIfPresent(Int.self, forKey: .diaryId)) ?? 0
+        parentCommentId = try? c.decodeIfPresent(Int.self, forKey: .parentCommentId)
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "ACTIVE"
+        isBlocked = (try? c.decodeIfPresent(Bool.self, forKey: .isBlocked)) ?? false
+        text = try? c.decodeIfPresent(String.self, forKey: .text)
+        attachment = (try? c.decodeIfPresent(CommentAttachment.self, forKey: .attachment)) ?? CommentAttachment(references: [])
+        author = try? c.decodeIfPresent(CommentAuthor.self, forKey: .author)
+        isMine = (try? c.decodeIfPresent(Bool.self, forKey: .isMine)) ?? false
+        isLiked = (try? c.decodeIfPresent(Bool.self, forKey: .isLiked)) ?? false
+        likeCount = (try? c.decodeIfPresent(Int.self, forKey: .likeCount)) ?? 0
+        replyCount = (try? c.decodeIfPresent(Int.self, forKey: .replyCount)) ?? 0
+        createDate = (try? c.decodeIfPresent(String.self, forKey: .createDate)) ?? ""
+        isEdited = (try? c.decodeIfPresent(Bool.self, forKey: .isEdited)) ?? false
+    }
     var isReply: Bool { parentCommentId != nil }
 
     /// 답글이 남아 있는 원댓글 삭제 시 서버와 같은 형태의 플레이스홀더로 바꾼다
@@ -38,6 +62,26 @@ struct CommentResponse: Decodable, Identifiable, Equatable {
 
 struct CommentAttachment: Decodable, Equatable {
     let references: [CommentReference]
+
+    init(references: [CommentReference]) {
+        self.references = references
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // 형식이 다른 reference 하나 때문에 댓글 전체가 실패하지 않도록 개별 디코딩
+        let items = (try? c.decodeIfPresent([FailableReference].self, forKey: .references)) ?? []
+        references = items.compactMap(\.value)
+    }
+
+    private enum CodingKeys: String, CodingKey { case references }
+
+    private struct FailableReference: Decodable {
+        let value: CommentReference?
+        init(from decoder: Decoder) throws {
+            value = try? CommentReference(from: decoder)
+        }
+    }
 }
 
 struct CommentReference: Decodable, Equatable {
@@ -62,7 +106,18 @@ struct CommentListResponse: Decodable {
 
 struct CommentPageResponse: Decodable {
     let content: [CommentResponse]
-    let page: DiaryFeedPageModel
+    /// 서버 직렬화 방식에 따라 `page` 객체가 없고 totalPages 가 최상위에 올 수 있다
+    let totalPages: Int
+
+    private enum CodingKeys: String, CodingKey { case content, page, totalPages }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        content = (try? c.decodeIfPresent([CommentResponse].self, forKey: .content)) ?? []
+        totalPages = (try? c.decodeIfPresent(DiaryFeedPageModel.self, forKey: .page))?.totalPages
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .totalPages))
+            ?? 1
+    }
 }
 
 struct CommentLikeToggleResponse: Decodable {

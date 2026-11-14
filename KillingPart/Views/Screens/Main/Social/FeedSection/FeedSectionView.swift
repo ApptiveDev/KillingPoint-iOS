@@ -253,6 +253,9 @@ struct FeedSectionView: View {
                         },
                         onVideoPlaybackProgressChanged: { progress in
                             handleVideoPlaybackProgressChanged(progress, diaryId: feed.diaryId)
+                        },
+                        onCommentsChanged: {
+                            Task { await viewModel.refreshCommentPreview(diaryId: feed.diaryId) }
                         }
                     )
                     .tag(index)

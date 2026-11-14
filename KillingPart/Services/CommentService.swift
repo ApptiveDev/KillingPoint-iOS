@@ -3,7 +3,7 @@ import Foundation
 protocol CommentServicing {
     func fetchComments(diaryId: Int, page: Int, size: Int) async throws -> CommentListResponse
     func fetchReplies(commentId: Int, page: Int, size: Int) async throws -> CommentPageResponse
-    func createComment(diaryId: Int, request: CommentWriteRequest) async throws -> CommentResponse
+    func createComment(diaryId: Int, request: CommentWriteRequest) async throws -> CommentResponse?
     func updateComment(commentId: Int, request: CommentWriteRequest) async throws -> CommentResponse
     func deleteComment(commentId: Int) async throws
     func toggleLike(commentId: Int) async throws -> CommentLikeToggleResponse
@@ -31,11 +31,16 @@ struct CommentService: CommentServicing {
         )
     }
 
-    func createComment(diaryId: Int, request: CommentWriteRequest) async throws -> CommentResponse {
-        try await apiClient.request(
-            jsonRequest(path: "/diaries/\(diaryId)/comments", method: .post, body: request),
-            responseType: CommentResponse.self
-        )
+    /// 등록은 성공(2xx)했는데 바디를 못 읽으면 nil → 호출부에서 목록을 다시 불러온다
+    func createComment(diaryId: Int, request: CommentWriteRequest) async throws -> CommentResponse? {
+        do {
+            return try await apiClient.request(
+                jsonRequest(path: "/diaries/\(diaryId)/comments", method: .post, body: request),
+                responseType: CommentResponse.self
+            )
+        } catch APIClientError.decodingFailed {
+            return nil
+        }
     }
 
     func updateComment(commentId: Int, request: CommentWriteRequest) async throws -> CommentResponse {

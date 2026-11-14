@@ -255,7 +255,10 @@ struct MyCollectionDiary: View {
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
                 diaryId: viewModel.diary.diaryId,
-                initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0
+                initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
+                onCommentsChanged: {
+                    Task { await viewModel.refreshCommentPreview() }
+                }
             )
         }
         .sheet(item: $activityShareItem) { item in

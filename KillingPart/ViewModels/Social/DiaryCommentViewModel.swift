@@ -22,6 +22,8 @@ final class DiaryCommentViewModel: ObservableObject {
     @Published private(set) var expandedCommentIds: Set<Int> = []
     @Published private(set) var loadingReplyIds: Set<Int> = []
     @Published private(set) var isLoading = false
+    /// 첫 목록 응답 전까지 전체 로딩 표시
+    @Published private(set) var hasLoaded = false
     @Published private(set) var isSubmitting = false
     @Published private(set) var inputMode: InputMode = .normal
     @Published var draft = "" {
@@ -38,6 +40,9 @@ final class DiaryCommentViewModel: ObservableObject {
     private var currentPage = 0
     private var hasMorePages = true
     private var mentionCandidates: [CommentMentionCandidate] = []
+
+    /// 작성/수정/삭제 성공 시 호출 → 뒤 화면 refetch
+    var onCommentsChanged: () -> Void = {}
 
     private let commentService: CommentServicing
     private let userService: UserServicing
@@ -76,7 +81,10 @@ final class DiaryCommentViewModel: ObservableObject {
     private func loadNextPage(replacing: Bool) async {
         guard !isLoading, hasMorePages else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
 
         do {
             let response = try await commentService.fetchComments(diaryId: diaryId, page: currentPage, size: Self.pageSize)
@@ -88,7 +96,7 @@ final class DiaryCommentViewModel: ObservableObject {
                 comments += response.comments.content.filter { !existing.contains($0.id) }
             }
             currentPage += 1
-            hasMorePages = currentPage < response.comments.page.totalPages
+            hasMorePages = currentPage < response.comments.totalPages
         } catch {
             show(error)
         }
@@ -160,25 +168,25 @@ final class DiaryCommentViewModel: ObservableObject {
                     diaryId: diaryId,
                     request: CommentWriteRequest(text: text, parentCommentId: nil, references: references.isEmpty ? nil : references)
                 )
-                comments.insert(created, at: 0)
-                commentCount += 1
-                scrollTargetId = created.id
+                if let created {
+                    comments.insert(created, at: 0)
+                    commentCount += 1
+                    scrollTargetId = created.id
+                } else {
+                    await loadInitial()
+                }
 
             case .reply(let parentId, _):
                 let created = try await commentService.createComment(
                     diaryId: diaryId,
                     request: CommentWriteRequest(text: text, parentCommentId: parentId, references: references.isEmpty ? nil : references)
                 )
-                if replies[parentId] == nil, expandedCommentIds.contains(parentId) == false {
-                    // 펼친 적 없는 원댓글이면 기존 답글까지 불러와서 펼친다
-                    expandedCommentIds.insert(parentId)
-                    await loadReplies(of: parentId)
-                } else {
-                    expandedCommentIds.insert(parentId)
-                    replies[parentId, default: []].append(created)
-                }
-                updateComment(id: parentId) { $0.replyCount += 1 }
-                scrollTargetId = created.id
+                // 답글은 서버 기준(오래된 순)으로 다시 불러와 펼친다
+                expandedCommentIds.insert(parentId)
+                await loadReplies(of: parentId)
+                let loadedCount = replies[parentId]?.count
+                updateComment(id: parentId) { $0.replyCount = loadedCount ?? $0.replyCount + 1 }
+                scrollTargetId = created?.id ?? replies[parentId]?.last?.id
 
             case .edit(let original):
                 // 수정은 references 전체 교체 → 빈 배열이면 멘션 제거
@@ -189,6 +197,7 @@ final class DiaryCommentViewModel: ObservableObject {
                 updateComment(id: original.id) { $0 = updated }
             }
             cancelInputMode()
+            onCommentsChanged()
             return true
         } catch {
             // 실패 시 작성 내용 유지하지 않음 (명세)
@@ -241,6 +250,7 @@ final class DiaryCommentViewModel: ObservableObject {
             if case .edit(let editing) = inputMode, editing.id == comment.id {
                 cancelInputMode()
             }
+            onCommentsChanged()
         } catch {
             show(error)
         }
@@ -262,6 +272,7 @@ final class DiaryCommentViewModel: ObservableObject {
         do {
             try await userService.blockUser(blockedId: userId)
             await loadInitial()
+            onCommentsChanged()
         } catch {
             show(error)
         }
@@ -271,6 +282,7 @@ final class DiaryCommentViewModel: ObservableObject {
         do {
             try await userService.unblockUser(blockedId: userId)
             await loadInitial()
+            onCommentsChanged()
         } catch {
             show(error)
         }

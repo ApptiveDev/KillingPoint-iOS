@@ -16,6 +16,7 @@ struct SocialFeedPageCardView: View {
     let onVideoPlaybackEnded: () -> Void
     let onVideoPlaybackStateChanged: (YoutubePlayerView.PlaybackState) -> Void
     let onVideoPlaybackProgressChanged: (YoutubePlaybackProgress) -> Void
+    var onCommentsChanged: () -> Void = {}
     @State private var shouldIgnoreNextLikeTap = false
     @State private var isCommentSheetPresented = false
 
@@ -174,7 +175,8 @@ struct SocialFeedPageCardView: View {
         .sheet(isPresented: $isCommentSheetPresented) {
             DiaryCommentSheet(
                 diaryId: feed.diaryId,
-                initialCommentCount: feed.commentPreview?.commentCount ?? 0
+                initialCommentCount: feed.commentPreview?.commentCount ?? 0,
+                onCommentsChanged: onCommentsChanged
             )
         }
     }

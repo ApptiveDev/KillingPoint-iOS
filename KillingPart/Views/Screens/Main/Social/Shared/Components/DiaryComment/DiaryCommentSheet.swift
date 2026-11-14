@@ -12,11 +12,13 @@ struct DiaryCommentSheet: View {
     @State private var reportContent = ""
     @State private var reportErrorMessage: String?
     @State private var isReporting = false
+    /// 첫 프레임엔 입력창(UITextView) 생성을 미뤄 시트가 바로 올라오게 한다
+    @State private var isInputReady = false
 
-    init(diaryId: Int, initialCommentCount: Int) {
-        _viewModel = StateObject(
-            wrappedValue: DiaryCommentViewModel(diaryId: diaryId, initialCommentCount: initialCommentCount)
-        )
+    init(diaryId: Int, initialCommentCount: Int, onCommentsChanged: @escaping () -> Void = {}) {
+        let viewModel = DiaryCommentViewModel(diaryId: diaryId, initialCommentCount: initialCommentCount)
+        viewModel.onCommentsChanged = onCommentsChanged
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
 
     var body: some View {
@@ -30,7 +32,10 @@ struct DiaryCommentSheet: View {
         .presentationDragIndicator(.hidden)
         .presentationBackground(Color.black)
         .presentationCornerRadius(24)
-        .task { await viewModel.loadInitial() }
+        .task {
+            isInputReady = true
+            await viewModel.loadInitial()
+        }
         .confirmationDialog("", isPresented: isPresented($menuTarget), titleVisibility: .hidden, presenting: menuTarget) { comment in
             menuButtons(for: comment)
         }
@@ -97,7 +102,13 @@ struct DiaryCommentSheet: View {
                             .task { await viewModel.loadMoreIfNeeded(current: comment) }
                     }
 
-                    if viewModel.isLoading {
+                    if !viewModel.hasLoaded {
+                        ProgressView()
+                            .controlSize(.large)
+                            .tint(AppColors.primary600)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, AppSpacing.xl)
+                    } else if viewModel.isLoading {
                         ProgressView()
                             .tint(AppColors.primary600)
                             .frame(maxWidth: .infinity)
@@ -245,16 +256,24 @@ struct DiaryCommentSheet: View {
             }
 
             HStack(spacing: AppSpacing.xs) {
-                TextField(
-                    "",
-                    text: $viewModel.draft,
-                    prompt: Text("댓글을 달아보세요!").foregroundColor(.white.opacity(0.45)),
-                    axis: .vertical
-                )
-                .lineLimit(1...4)
+                Group {
+                    if isInputReady {
+                        TextField(
+                            "",
+                            text: $viewModel.draft,
+                            prompt: Text("댓글을 달아보세요!").foregroundColor(.white.opacity(0.45)),
+                            axis: .vertical
+                        )
+                        .lineLimit(1...4)
+                        .foregroundStyle(.white)
+                        .focused($isInputFocused)
+                    } else {
+                        Text("댓글을 달아보세요!")
+                            .foregroundStyle(.white.opacity(0.45))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
                 .font(AppFont.paperlogy4Regular(size: 15))
-                .foregroundStyle(.white)
-                .focused($isInputFocused)
                 .padding(.horizontal, AppSpacing.m)
                 .padding(.vertical, 10)
                 .background(DiaryCommentColors.inputBackground, in: RoundedRectangle(cornerRadius: 6))
