@@ -42,7 +42,7 @@ struct DiaryCommentCapsuleButton: View {
                         Image("ic_comment")
                             .resizable()
                             .scaledToFit()
-                            .scaleEffect(1.45)
+                            .scaleEffect(1.0)
                     }
 
                 if commentCount > 0 {
