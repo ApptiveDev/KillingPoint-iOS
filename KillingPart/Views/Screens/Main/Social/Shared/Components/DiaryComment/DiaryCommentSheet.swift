@@ -19,10 +19,19 @@ struct DiaryCommentSheet: View {
 
     private static let pendingRowId = "pending-comment"
 
-    init(diaryId: Int, initialCommentCount: Int, onCommentsChanged: @escaping () -> Void = {}) {
+    /// 멘션 탭 시 프로필로 이동 (호스트가 시트를 닫고 push)
+    private let onUserTap: ((UserModel) -> Void)?
+
+    init(
+        diaryId: Int,
+        initialCommentCount: Int,
+        onCommentsChanged: @escaping () -> Void = {},
+        onUserTap: ((UserModel) -> Void)? = nil
+    ) {
         let viewModel = DiaryCommentViewModel(diaryId: diaryId, initialCommentCount: initialCommentCount)
         viewModel.onCommentsChanged = onCommentsChanged
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.onUserTap = onUserTap
     }
 
     var body: some View {
@@ -184,6 +193,15 @@ struct DiaryCommentSheet: View {
                 .padding(.vertical, AppSpacing.l)
             }
             .scrollDismissesKeyboard(.interactively)
+            .environment(\.openURL, OpenURLAction { url in
+                guard let mention = DiaryCommentBodyFormatter.parseMention(url) else { return .systemAction }
+                Task {
+                    if let user = await viewModel.resolveMentionUser(userId: mention.userId, tag: mention.tag) {
+                        onUserTap?(user)
+                    }
+                }
+                return .handled
+            })
             .onChange(of: viewModel.scrollTargetId) { targetId in
                 guard let targetId else { return }
                 withAnimation(.easeOut(duration: 0.25)) {
@@ -675,27 +693,68 @@ private struct TruncationPreferenceKey: PreferenceKey {
     }
 }
 
-// MARK: - 본문 강조 (멘션·링크: 초록, 링크는 밑줄)
+// MARK: - 본문 강조 (멘션·링크: 초록, 링크는 밑줄, 멘션은 탭하면 프로필)
 
 enum DiaryCommentBodyFormatter {
+    static let mentionScheme = "kpmention"
+
     private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    /// references 없이 저장된 `@태그` 도 강조 (픽하지 않은 유저를 직접 입력한 경우 등)
+    private static let plainMentionRegex = try? NSRegularExpression(pattern: "(?<![^\\s])@[^\\s@]+")
 
     static func attributed(_ text: String, references: [CommentReference]) -> AttributedString {
         var attributed = AttributedString(text)
+        let units = Array(text.utf16)
+        let offsets = CommentMention.atOffsets(in: text)
+        var mentionRanges: [NSRange] = []
 
-        for nsRange in CommentMention.highlightRanges(in: text, references: references) {
-            if let range = attributedRange(nsRange, text: text, in: attributed) {
-                attributed[range].foregroundColor = AppColors.primary600
+        for reference in references {
+            for order in reference.atOrders where order >= 1 && order <= offsets.count {
+                let nsRange = NSRange(location: offsets[order - 1], length: reference.len + 1)
+                guard NSMaxRange(nsRange) <= units.count else { continue }
+                let tag = String(decoding: units[(nsRange.location + 1)..<NSMaxRange(nsRange)], as: UTF16.self)
+                mentionRanges.append(nsRange)
+                applyMention(nsRange, url: mentionURL(userId: reference.targetId, tag: tag), text: text, to: &attributed)
             }
         }
 
-        let fullRange = NSRange(location: 0, length: text.utf16.count)
+        let fullRange = NSRange(location: 0, length: units.count)
+        plainMentionRegex?.matches(in: text, range: fullRange).forEach { match in
+            guard !mentionRanges.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) else { return }
+            let tag = String(decoding: units[(match.range.location + 1)..<NSMaxRange(match.range)], as: UTF16.self)
+            applyMention(match.range, url: mentionURL(userId: nil, tag: tag), text: text, to: &attributed)
+        }
+
         linkDetector?.matches(in: text, range: fullRange).forEach { match in
             guard let url = match.url, let range = attributedRange(match.range, text: text, in: attributed) else { return }
             attributed[range].link = url
             attributed[range].underlineStyle = .single
         }
         return attributed
+    }
+
+    /// kpmention://user?id=3&tag=goodmusic
+    static func mentionURL(userId: Int?, tag: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = mentionScheme
+        components.host = "user"
+        components.queryItems = [URLQueryItem(name: "tag", value: tag)]
+            + (userId.map { [URLQueryItem(name: "id", value: String($0))] } ?? [])
+        return components.url
+    }
+
+    static func parseMention(_ url: URL) -> (userId: Int?, tag: String)? {
+        guard url.scheme == mentionScheme,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let tag = items.first(where: { $0.name == "tag" })?.value
+        else { return nil }
+        return (items.first(where: { $0.name == "id" })?.value.flatMap(Int.init), tag)
+    }
+
+    private static func applyMention(_ nsRange: NSRange, url: URL?, text: String, to attributed: inout AttributedString) {
+        guard let range = attributedRange(nsRange, text: text, in: attributed) else { return }
+        attributed[range].foregroundColor = AppColors.primary600
+        attributed[range].link = url
     }
 
     private static func attributedRange(_ nsRange: NSRange, text: String, in attributed: AttributedString) -> Range<AttributedString.Index>? {

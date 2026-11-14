@@ -17,6 +17,8 @@ struct SocialFeedPageCardView: View {
     let onVideoPlaybackStateChanged: (YoutubePlayerView.PlaybackState) -> Void
     let onVideoPlaybackProgressChanged: (YoutubePlaybackProgress) -> Void
     var onCommentsChanged: () -> Void = {}
+    var onMentionUserTap: (UserModel) -> Void = { _ in }
+    @State private var pendingMentionUser: UserModel?
     @State private var shouldIgnoreNextLikeTap = false
     @State private var isCommentSheetPresented = false
 
@@ -172,11 +174,20 @@ struct SocialFeedPageCardView: View {
                     onDoubleTap()
                 }
         )
-        .sheet(isPresented: $isCommentSheetPresented) {
+        .sheet(isPresented: $isCommentSheetPresented, onDismiss: {
+            // 시트가 완전히 닫힌 뒤 프로필로 이동
+            guard let user = pendingMentionUser else { return }
+            pendingMentionUser = nil
+            onMentionUserTap(user)
+        }) {
             DiaryCommentSheet(
                 diaryId: feed.diaryId,
                 initialCommentCount: feed.commentPreview?.commentCount ?? 0,
-                onCommentsChanged: onCommentsChanged
+                onCommentsChanged: onCommentsChanged,
+                onUserTap: { user in
+                    pendingMentionUser = user
+                    isCommentSheetPresented = false
+                }
             )
         }
     }

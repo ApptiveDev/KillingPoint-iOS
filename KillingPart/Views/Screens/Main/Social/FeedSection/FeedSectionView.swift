@@ -256,6 +256,10 @@ struct FeedSectionView: View {
                         },
                         onCommentsChanged: {
                             Task { await viewModel.refreshCommentPreview(diaryId: feed.diaryId) }
+                        },
+                        onMentionUserTap: { user in
+                            selectedProfileUser = user
+                            isProfileNavigationActive = true
                         }
                     )
                     .tag(index)

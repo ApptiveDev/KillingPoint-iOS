@@ -15,6 +15,9 @@ struct MyCollectionDiary: View {
     @State private var isDeleteDialogPresented = false
     @State private var isShareDialogPresented = false
     @State private var isCommentSheetPresented = false
+    /// 댓글 멘션 탭 → 시트 닫힌 뒤 해당 유저 컬렉션으로 이동
+    @State private var pendingMentionUser: UserModel?
+    @State private var mentionCollectionViewModel: SocialMyCollectionViewModel?
     @State private var isExportingImage = false
     @State private var activityShareItem: MyCollectionDiaryActivityShareItem?
     @State private var actionAlert: MyCollectionDiaryActionAlert?
@@ -252,14 +255,31 @@ struct MyCollectionDiary: View {
         } message: {
             Text("일기를 삭제하시겠습니까? 삭제된 일기는 복구할 수 없습니다.")
         }
-        .sheet(isPresented: $isCommentSheetPresented) {
+        .sheet(isPresented: $isCommentSheetPresented, onDismiss: {
+            guard let user = pendingMentionUser else { return }
+            pendingMentionUser = nil
+            // ponytail: 소셜 탭과 같은 픽 토글 동작을 쓰려고 SocialViewModel 을 그때그때 생성
+            mentionCollectionViewModel = SocialViewModel().makeSocialMyCollectionViewModel(for: user)
+        }) {
             DiaryCommentSheet(
                 diaryId: viewModel.diary.diaryId,
                 initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
                 onCommentsChanged: {
                     Task { await viewModel.refreshCommentPreview() }
+                },
+                onUserTap: { user in
+                    pendingMentionUser = user
+                    isCommentSheetPresented = false
                 }
             )
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { mentionCollectionViewModel != nil },
+            set: { if !$0 { mentionCollectionViewModel = nil } }
+        )) {
+            if let mentionCollectionViewModel {
+                SocialMyCollectionView(viewModel: mentionCollectionViewModel)
+            }
         }
         .sheet(item: $activityShareItem) { item in
             MyCollectionDiaryActivityShareSheet(item: item)

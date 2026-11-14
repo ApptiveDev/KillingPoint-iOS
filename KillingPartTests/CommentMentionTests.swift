@@ -74,6 +74,20 @@ struct CommentMentionTests {
     }
 
     @Test
+    func bodyMentionsBecomeTappableLinks() throws {
+        // references 없이 저장된 @태그도 링크가 되고, 이메일은 제외
+        let attributed = DiaryCommentBodyFormatter.attributed("@latteeea 테스트 a@b.com", references: [])
+        let mentionLinks = attributed.runs.compactMap(\.link).filter { $0.scheme == DiaryCommentBodyFormatter.mentionScheme }
+        #expect(mentionLinks.count == 1)
+        let parsed = try #require(DiaryCommentBodyFormatter.parseMention(mentionLinks[0]))
+        #expect(parsed.tag == "latteeea")
+        #expect(parsed.userId == nil)
+
+        let url = try #require(DiaryCommentBodyFormatter.mentionURL(userId: 3, tag: "goodmusic"))
+        #expect(DiaryCommentBodyFormatter.parseMention(url)?.userId == 3)
+    }
+
+    @Test
     func relativeTimeBuckets() throws {
         let now = try #require(CommentTimeFormatter.date(from: "2026-10-05T12:00:00"))
         #expect(CommentTimeFormatter.relativeText(from: "2026-10-05T11:58:00.123456", now: now) == "방금")

@@ -196,12 +196,24 @@ struct SocialMyCollectionDiary: View {
                 storeButton
             }
         }
-        .sheet(isPresented: $isCommentSheetPresented) {
+        .sheet(isPresented: $isCommentSheetPresented, onDismiss: {
+            // 멘션 탭 → 시트가 닫힌 뒤 프로필로 이동 (좋아요 목록과 같은 흐름)
+            guard let pendingNavigationUser else { return }
+            self.pendingNavigationUser = nil
+            selectedNavigationUser = pendingNavigationUser
+            DispatchQueue.main.async {
+                isUserCollectionNavigationActive = true
+            }
+        }) {
             DiaryCommentSheet(
                 diaryId: viewModel.diary.diaryId,
                 initialCommentCount: viewModel.diary.commentPreview?.commentCount ?? 0,
                 onCommentsChanged: {
                     Task { await viewModel.refreshCommentPreview() }
+                },
+                onUserTap: makeCollectionViewModel == nil ? nil : { user in
+                    pendingNavigationUser = user
+                    isCommentSheetPresented = false
                 }
             )
         }

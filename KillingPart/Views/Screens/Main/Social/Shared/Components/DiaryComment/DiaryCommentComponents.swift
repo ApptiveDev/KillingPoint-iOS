@@ -34,10 +34,16 @@ struct DiaryCommentCapsuleButton: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
-                Image("ic_comment")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 16, height: 16)
+                // 옆 좋아요 하트(SF Symbol)와 크기를 똑같이 맞추려고 투명 하트를 틀로 사용
+                Image(systemName: "heart")
+                    .opacity(0)
+                    .overlay {
+                        // PNG 자체 여백 때문에 하트보다 작아 보여 확대 (실기기 비교 기준)
+                        Image("ic_comment")
+                            .resizable()
+                            .scaledToFit()
+                            .scaleEffect(1.45)
+                    }
 
                 if commentCount > 0 {
                     Text(DiaryCommentFormat.count(commentCount))

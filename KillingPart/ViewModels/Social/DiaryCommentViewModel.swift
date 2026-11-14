@@ -427,6 +427,26 @@ final class DiaryCommentViewModel: ObservableObject {
         }
     }
 
+    // MARK: - 멘션 탭 → 프로필
+
+    /// 멘션 대상 유저를 찾는다. 본인이면 nil (이동 안 함)
+    func resolveMentionUser(userId: Int?, tag: String) async -> UserModel? {
+        if let me = myUser, me.userId == userId || me.tag.caseInsensitiveCompare(tag) == .orderedSame {
+            return nil
+        }
+        let found = try? await userService.searchUsers(searchCond: tag, page: 0, size: 20).content.first { user in
+            if let userId { return user.userId == userId }
+            return user.tag.caseInsensitiveCompare(tag) == .orderedSame
+        }
+        if let found { return found }
+        guard let userId else {
+            errorMessage = "사용자를 찾을 수 없어요."
+            return nil
+        }
+        // 검색에 안 잡혀도 id 가 있으면 프로필 화면에서 나머지를 불러온다
+        return UserModel(userId: userId, username: "", tag: tag, identifier: "", profileImageUrl: "", userRoleType: "", socialType: "")
+    }
+
     // MARK: - Helpers
 
     private func updateComment(id: Int, _ change: (inout CommentResponse) -> Void) {
