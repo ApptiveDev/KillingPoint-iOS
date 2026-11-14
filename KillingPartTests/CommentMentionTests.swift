@@ -52,6 +52,28 @@ struct CommentMentionTests {
     }
 
     @Test
+    func activeQueryDetectsTypingMentionOnly() {
+        let text = "안녕 @goo"
+        #expect(CommentMention.activeQuery(in: text, cursor: text.utf16.count)?.keyword == "goo")
+        #expect(CommentMention.activeQuery(in: "@", cursor: 1)?.keyword == "")
+        // 이메일, 공백 이후는 검색하지 않음
+        #expect(CommentMention.activeQuery(in: "a@b", cursor: 3) == nil)
+        #expect(CommentMention.activeQuery(in: "@goo ", cursor: 5) == nil)
+    }
+
+    @Test
+    func inputHighlightAndDistinctUserCount() {
+        let candidates = (1...5).map { CommentMentionCandidate(userId: $0, name: "u\($0)") }
+        let text = "@u1 @u2 @u1 @u3 @u4 @u5 @guma"
+        let refs = CommentMention.references(in: text, candidates: candidates)
+        // 같은 사람 두 번은 1명 → 5명 (6번째 @guma 는 확정 멘션 아님)
+        #expect(refs.count == 5)
+        let ranges = CommentMention.inputHighlightRanges(in: text, candidates: candidates)
+        #expect(ranges.count == 6)
+        #expect(ranges.contains(NSRange(location: 0, length: 3)))
+    }
+
+    @Test
     func relativeTimeBuckets() throws {
         let now = try #require(CommentTimeFormatter.date(from: "2026-10-05T12:00:00"))
         #expect(CommentTimeFormatter.relativeText(from: "2026-10-05T11:58:00.123456", now: now) == "방금")

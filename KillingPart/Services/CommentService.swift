@@ -8,6 +8,7 @@ protocol CommentServicing {
     func deleteComment(commentId: Int) async throws
     func toggleLike(commentId: Int) async throws -> CommentLikeToggleResponse
     func reportComment(commentId: Int, content: String) async throws
+    func fetchMentionCandidates(keyword: String, size: Int) async throws -> [CommentAuthor]
 }
 
 struct CommentService: CommentServicing {
@@ -70,6 +71,19 @@ struct CommentService: CommentServicing {
                 method: .post,
                 body: CommentReportRequest(content: content.trimmingCharacters(in: .whitespacesAndNewlines))
             )
+        )
+    }
+
+    /// 내가 픽한 유저 중 이름/태그 포함 검색 (차단 관계 제외, 이름순)
+    func fetchMentionCandidates(keyword: String, size: Int) async throws -> [CommentAuthor] {
+        try await apiClient.request(
+            APIRequest(
+                path: "/comments/mention-candidates",
+                method: .get,
+                queryItems: [URLQueryItem(name: "keyword", value: keyword), URLQueryItem(name: "size", value: String(size))],
+                requiresAuthorization: true
+            ),
+            responseType: [CommentAuthor].self
         )
     }
 

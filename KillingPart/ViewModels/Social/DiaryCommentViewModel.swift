@@ -4,15 +4,29 @@ import Foundation
 final class DiaryCommentViewModel: ObservableObject {
     enum InputMode: Equatable {
         case normal
-        /// parentCommentId 는 항상 원댓글 id (답글의 답글 없음)
-        case reply(parentCommentId: Int, targetName: String)
+        /// parentCommentId 는 항상 원댓글 id (답글의 답글 없음), targetCommentId 는 누른 댓글(하이라이트용)
+        case reply(parentCommentId: Int, targetCommentId: Int, targetName: String)
         case edit(comment: CommentResponse)
+    }
+
+    enum MentionState: Equatable {
+        case hidden
+        case results(keyword: String, users: [CommentAuthor])
+        case empty
+        case limitReached
+    }
+
+    /// 등록 응답 전까지 흐리게 보여줄 내 댓글
+    struct PendingComment: Equatable {
+        let text: String
+        let parentCommentId: Int?
     }
 
     static let maxTextLength = 500
     private static let pageSize = 20
     // ponytail: 답글은 한 번에 최대 100개. 그 이상 달리는 경우가 생기면 페이지 더보기 추가
     private static let replyPageSize = 100
+    private static let mentionSearchSize = 10
 
     let diaryId: Int
 
@@ -24,22 +38,27 @@ final class DiaryCommentViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     /// 첫 목록 응답 전까지 전체 로딩 표시
     @Published private(set) var hasLoaded = false
+    /// 첫 페이지 실패 → "댓글을 불러오지 못했어요" 화면
+    @Published private(set) var loadFailed = false
+    /// 다음 페이지 실패 → 목록 아래 [다시 시도]
+    @Published private(set) var loadMoreFailed = false
     @Published private(set) var isSubmitting = false
+    @Published private(set) var pendingComment: PendingComment?
+    @Published private(set) var myUser: UserModel?
     @Published private(set) var inputMode: InputMode = .normal
-    @Published var draft = "" {
-        didSet {
-            if draft.count > Self.maxTextLength {
-                draft = String(draft.prefix(Self.maxTextLength))
-            }
-        }
-    }
+    @Published private(set) var mentionState: MentionState = .hidden
+    @Published var draft = ""
+    /// 입력창이 이 위치로 커서를 옮기고 nil 로 돌려놓는다 (멘션 선택 후)
+    @Published var requestedCursor: Int?
     @Published var errorMessage: String?
     /// 등록 후 스크롤할 댓글 id
     @Published private(set) var scrollTargetId: Int?
 
     private var currentPage = 0
     private var hasMorePages = true
-    private var mentionCandidates: [CommentMentionCandidate] = []
+    private(set) var mentionCandidates: [CommentMentionCandidate] = []
+    private var mentionQuery: (location: Int, keyword: String)?
+    private var mentionSearchTask: Task<Void, Never>?
 
     /// 작성/수정/삭제 성공 시 호출 → 뒤 화면 refetch
     var onCommentsChanged: () -> Void = {}
@@ -63,6 +82,19 @@ final class DiaryCommentViewModel: ObservableObject {
         !isSubmitting && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// 답글/수정 대상 하이라이트
+    var highlightedCommentId: Int? {
+        switch inputMode {
+        case .normal: return nil
+        case .reply(_, let targetId, _): return targetId
+        case .edit(let comment): return comment.id
+        }
+    }
+
+    var inputHighlightRanges: [NSRange] {
+        CommentMention.inputHighlightRanges(in: draft, candidates: mentionCandidates)
+    }
+
     // MARK: - 목록
 
     func loadInitial() async {
@@ -70,11 +102,20 @@ final class DiaryCommentViewModel: ObservableObject {
         hasMorePages = true
         replies = [:]
         expandedCommentIds = []
+        loadFailed = false
+        if myUser == nil {
+            myUser = try? await userService.fetchMyUser()
+        }
         await loadNextPage(replacing: true)
     }
 
     func loadMoreIfNeeded(current comment: CommentResponse) async {
-        guard comment.id == comments.last?.id else { return }
+        guard comment.id == comments.last?.id, !loadMoreFailed else { return }
+        await loadNextPage(replacing: false)
+    }
+
+    func retryLoadMore() async {
+        loadMoreFailed = false
         await loadNextPage(replacing: false)
     }
 
@@ -97,8 +138,15 @@ final class DiaryCommentViewModel: ObservableObject {
             }
             currentPage += 1
             hasMorePages = currentPage < response.comments.totalPages
+        } catch is CancellationError {
+            return
         } catch {
-            show(error)
+            // 실패는 알림 대신 화면 상태로 보여준다
+            if replacing {
+                loadFailed = true
+            } else {
+                loadMoreFailed = true
+            }
         }
     }
 
@@ -129,24 +177,99 @@ final class DiaryCommentViewModel: ObservableObject {
 
     // MARK: - 입력 모드 (com_005, 수정)
 
+    /// 본문 멘션은 태그(@goodmusic) 기준 (시안)
     func startReply(to comment: CommentResponse) {
-        guard let author = comment.author, let name = author.username, !name.isEmpty else { return }
-        let parentId = comment.parentCommentId ?? comment.id
-        inputMode = .reply(parentCommentId: parentId, targetName: name)
-        mentionCandidates = [CommentMentionCandidate(userId: author.userId, name: name)]
-        draft = "@\(name) "
+        guard let author = comment.author else { return }
+        let mentionName = author.tag ?? author.username ?? ""
+        let displayName = author.username ?? mentionName
+        guard !mentionName.isEmpty else { return }
+        inputMode = .reply(
+            parentCommentId: comment.parentCommentId ?? comment.id,
+            targetCommentId: comment.id,
+            targetName: displayName
+        )
+        mentionCandidates = [CommentMentionCandidate(userId: author.userId, name: mentionName)]
+        setDraft("@\(mentionName) ")
     }
 
     func startEdit(_ comment: CommentResponse) {
         inputMode = .edit(comment: comment)
         mentionCandidates = CommentMention.candidates(from: comment)
-        draft = comment.text ?? ""
+        setDraft(comment.text ?? "")
     }
 
     func cancelInputMode() {
         inputMode = .normal
         mentionCandidates = []
-        draft = ""
+        setDraft("")
+    }
+
+    private func setDraft(_ text: String) {
+        draft = text
+        requestedCursor = text.utf16.count
+        hideMentions()
+    }
+
+    // MARK: - 멘션 검색 (08)
+
+    /// 입력창의 텍스트/커서가 바뀔 때마다 호출
+    func inputChanged(cursor: Int) {
+        guard let query = CommentMention.activeQuery(in: draft, cursor: cursor) else {
+            hideMentions()
+            return
+        }
+        // 이미 확정된 멘션 위에 커서가 있는 경우는 검색하지 않는다
+        if mentionCandidates.contains(where: { $0.name == query.keyword }) {
+            hideMentions()
+            return
+        }
+        mentionQuery = query
+
+        let mentionedCount = CommentMention.references(in: draft, candidates: mentionCandidates).count
+        if mentionedCount >= CommentMention.maxMentionUsers {
+            mentionSearchTask?.cancel()
+            mentionState = .limitReached
+            return
+        }
+
+        mentionSearchTask?.cancel()
+        mentionSearchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled, let self else { return }
+            do {
+                let users = try await commentService.fetchMentionCandidates(keyword: query.keyword, size: Self.mentionSearchSize)
+                guard !Task.isCancelled, mentionQuery?.location == query.location else { return }
+                mentionState = users.isEmpty ? .empty : .results(keyword: query.keyword, users: users)
+            } catch {
+                // 검색 실패 시 목록만 닫고 일반 텍스트로 입력
+                hideMentions()
+            }
+        }
+    }
+
+    func selectMention(_ user: CommentAuthor) {
+        guard let query = mentionQuery, let tag = user.tag ?? user.username, !tag.isEmpty else { return }
+        let units = Array(draft.utf16)
+        let end = query.location + 1 + query.keyword.utf16.count
+        guard end <= units.count else { return }
+        let inserted = "@\(tag) "
+        let newText = String(decoding: units[..<query.location], as: UTF16.self)
+            + inserted
+            + String(decoding: units[end...], as: UTF16.self)
+        guard newText.count <= Self.maxTextLength else { return }
+
+        if !mentionCandidates.contains(where: { $0.userId == user.userId && $0.name == tag }) {
+            mentionCandidates.append(CommentMentionCandidate(userId: user.userId, name: tag))
+        }
+        draft = newText
+        requestedCursor = query.location + inserted.utf16.count
+        hideMentions()
+    }
+
+    func hideMentions() {
+        mentionSearchTask?.cancel()
+        mentionQuery = nil
+        mentionState = .hidden
     }
 
     // MARK: - 등록 (reply_005)
@@ -155,15 +278,28 @@ final class DiaryCommentViewModel: ObservableObject {
     func submit() async -> Bool {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSubmitting else { return false }
-        isSubmitting = true
-        defer { isSubmitting = false }
 
         let references = CommentMention.references(in: text, candidates: mentionCandidates)
         let mode = inputMode
 
+        // 내용 변경 없는 수정은 요청하지 않고 종료
+        if case .edit(let original) = mode, text == original.text {
+            cancelInputMode()
+            return true
+        }
+
+        isSubmitting = true
+        hideMentions()
+        defer {
+            isSubmitting = false
+            pendingComment = nil
+        }
+
         do {
             switch mode {
             case .normal:
+                pendingComment = PendingComment(text: text, parentCommentId: nil)
+                cancelInputMode()
                 let created = try await commentService.createComment(
                     diaryId: diaryId,
                     request: CommentWriteRequest(text: text, parentCommentId: nil, references: references.isEmpty ? nil : references)
@@ -176,14 +312,17 @@ final class DiaryCommentViewModel: ObservableObject {
                     await loadInitial()
                 }
 
-            case .reply(let parentId, _):
+            case .reply(let parentId, _, _):
+                expandedCommentIds.insert(parentId)
+                pendingComment = PendingComment(text: text, parentCommentId: parentId)
+                cancelInputMode()
                 let created = try await commentService.createComment(
                     diaryId: diaryId,
                     request: CommentWriteRequest(text: text, parentCommentId: parentId, references: references.isEmpty ? nil : references)
                 )
                 // 답글은 서버 기준(오래된 순)으로 다시 불러와 펼친다
-                expandedCommentIds.insert(parentId)
                 await loadReplies(of: parentId)
+                expandedCommentIds.insert(parentId)
                 let loadedCount = replies[parentId]?.count
                 updateComment(id: parentId) { $0.replyCount = loadedCount ?? $0.replyCount + 1 }
                 scrollTargetId = created?.id ?? replies[parentId]?.last?.id
@@ -195,8 +334,8 @@ final class DiaryCommentViewModel: ObservableObject {
                     request: CommentWriteRequest(text: text, parentCommentId: nil, references: references)
                 )
                 updateComment(id: original.id) { $0 = updated }
+                cancelInputMode()
             }
-            cancelInputMode()
             onCommentsChanged()
             return true
         } catch {
@@ -247,7 +386,7 @@ final class DiaryCommentViewModel: ObservableObject {
                 }
                 commentCount = max(commentCount - 1, 0)
             }
-            if case .edit(let editing) = inputMode, editing.id == comment.id {
+            if highlightedCommentId == comment.id {
                 cancelInputMode()
             }
             onCommentsChanged()

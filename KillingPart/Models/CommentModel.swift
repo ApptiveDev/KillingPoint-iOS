@@ -200,6 +200,42 @@ enum CommentMention {
         }
     }
 
+    static let maxMentionUsers = 5
+
+    /// 커서 바로 앞에서 입력 중인 `@검색어` (공백 없이 이어진 부분).
+    /// `a@b` 같은 이메일은 제외하려고 `@` 앞이 처음/공백일 때만 인정한다.
+    static func activeQuery(in text: String, cursor: Int) -> (location: Int, keyword: String)? {
+        let units = Array(text.utf16)
+        guard cursor > 0, cursor <= units.count else { return nil }
+        let at = "@".utf16.first!
+        var index = cursor - 1
+        while index >= 0 {
+            let unit = units[index]
+            if unit == at {
+                if index > 0, !isWhitespace(units[index - 1]) {
+                    return nil
+                }
+                let keyword = String(decoding: units[(index + 1)..<cursor], as: UTF16.self)
+                return (index, keyword)
+            }
+            if isWhitespace(unit) { return nil }
+            index -= 1
+        }
+        return nil
+    }
+
+    private static func isWhitespace(_ unit: UInt16) -> Bool {
+        Unicode.Scalar(unit).map { Character($0).isWhitespace } ?? false
+    }
+
+    /// 입력창에서 강조할 확정 멘션 범위 (`@` 포함)
+    static func inputHighlightRanges(in text: String, candidates: [CommentMentionCandidate]) -> [NSRange] {
+        let offsets = atOffsets(in: text)
+        return references(in: text, candidates: candidates).flatMap { reference in
+            reference.atOrders.map { NSRange(location: offsets[$0 - 1], length: reference.len + 1) }
+        }
+    }
+
     /// 강조할 멘션 범위들 (`@` 포함, UTF-16 NSRange)
     static func highlightRanges(in text: String, references: [CommentReference]) -> [NSRange] {
         let offsets = atOffsets(in: text)
